@@ -35,10 +35,25 @@ enum
 
 struct VulkanState
 {
+    VkDevice device;
+    VkQueue graphicsQueue;
+    VkQueue presentQueue;
+    VkSwapchainKHR swapchain;
     VkSwapchainKHR oldSwapchain;
+    VkSemaphore imageAvailableSemaphore;
+    VkSemaphore renderingFinishedSemaphore;
+    VkCommandPool presentQueueCommandPool;
+    std::vector<VkCommandBuffer> presentQueueCommandBuffers;
 
     VulkanState()
-        : oldSwapchain(VK_NULL_HANDLE)
+        : device(VK_NULL_HANDLE)
+        , graphicsQueue(VK_NULL_HANDLE)
+        , presentQueue(VK_NULL_HANDLE)
+        , swapchain(VK_NULL_HANDLE)
+        , oldSwapchain(VK_NULL_HANDLE)
+        , imageAvailableSemaphore(VK_NULL_HANDLE)
+        , renderingFinishedSemaphore(VK_NULL_HANDLE)
+        , presentQueueCommandPool(VK_NULL_HANDLE)
     {}
 };
 
@@ -298,6 +313,69 @@ bool SelectQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
     return true;
 }
 
+void RunFrame()
+{
+    uint32_t imageIndex;
+
+    VkResult result = vkAcquireNextImageKHR(
+        vulkanState.device,
+        vulkanState.swapchain,
+        UINT64_MAX,
+        vulkanState.imageAvailableSemaphore,
+        VK_NULL_HANDLE,
+        &imageIndex);
+
+    CheckResult(result, "Failed to acquire presentation image");
+
+    VkPipelineStageFlags waitDstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+    VkSubmitInfo submitInfo;
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.pNext = nullptr;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &vulkanState.imageAvailableSemaphore;
+    submitInfo.pWaitDstStageMask = &waitDstStageMask;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &vulkanState.presentQueueCommandBuffers[imageIndex];
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &vulkanState.renderingFinishedSemaphore;
+
+    result = vkQueueSubmit(vulkanState.presentQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    CheckResult(result, "failed to submit to presentation queue");
+
+    VkPresentInfoKHR presentInfo;
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.pNext = nullptr;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &vulkanState.renderingFinishedSemaphore;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &vulkanState.swapchain;
+    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pResults = nullptr;
+
+    result = vkQueuePresentKHR(vulkanState.presentQueue, &presentInfo);
+    CheckResult(result, "failed to present image");
+}
+
+void RunMainLoop()
+{
+    SDL_Event event;
+    bool running = true;
+    while (running)
+    {
+        while (SDL_PollEvent(&event))
+        {
+            if (event.type == SDL_QUIT)
+                running = false;
+        }
+        if (running)
+        {
+            RunFrame();
+            SDL_Delay(1);
+        }
+    }
+}
+
 int main()
 {
     // create SDL window
@@ -398,51 +476,151 @@ int main()
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensionNames.data();
     deviceCreateInfo.pEnabledFeatures = nullptr;
 
-    VkDevice device;
-    result = vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device);
+    result = vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &vulkanState.device);
     CheckResult(result, "failed to create device");
     std::cout << "Device created\n";
 
-    VkSwapchainKHR swapchain = CreateSwapchain(physicalDevice, device, surface, VK_NULL_HANDLE);
+    vulkanState.swapchain = CreateSwapchain(physicalDevice, vulkanState.device, surface, VK_NULL_HANDLE);
+
+    VkSemaphoreCreateInfo semaphoreCreateInfo;
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    semaphoreCreateInfo.pNext = nullptr;
+    semaphoreCreateInfo.flags = 0;
+
+    result = vkCreateSemaphore(vulkanState.device, &semaphoreCreateInfo, nullptr, &vulkanState.imageAvailableSemaphore);
+    CheckResult(result, "failed to create semaphore");
+
+    result = vkCreateSemaphore(vulkanState.device, &semaphoreCreateInfo, nullptr, &vulkanState.renderingFinishedSemaphore);
+    CheckResult(result, "failed to create semaphore");
 
     // get queues
-    VkQueue graphicsQueue;
-    vkGetDeviceQueue(device, graphicsQueueFamilyIndex, 0, &graphicsQueue);
+    vkGetDeviceQueue(vulkanState.device, graphicsQueueFamilyIndex, 0, &vulkanState.graphicsQueue);
+    vkGetDeviceQueue(vulkanState.device, presentQueueFamilyIndex, 0, &vulkanState.presentQueue);
 
-    VkQueue presentQueue;
-    vkGetDeviceQueue(device, presentQueueFamilyIndex, 0, &presentQueue);
+    VkCommandPoolCreateInfo commandPoolCreateInfo;
+    commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    commandPoolCreateInfo.pNext = nullptr;
+    commandPoolCreateInfo.flags = 0;
+    commandPoolCreateInfo.queueFamilyIndex = presentQueueFamilyIndex;
 
-    // destroy swapchain
-    vkDestroySwapchainKHR(device, swapchain, nullptr);
+    result = vkCreateCommandPool(vulkanState.device, &commandPoolCreateInfo, nullptr, &vulkanState.presentQueueCommandPool);
+    CheckResult(result, "failed to create command pool");
 
-    // destroy device
-    result = vkDeviceWaitIdle(device);
+    uint32_t imagesCount;
+    result = vkGetSwapchainImagesKHR(vulkanState.device, vulkanState.swapchain, &imagesCount, nullptr);
+    CheckResult(result, "failed to get the number of swapchain images");
+
+    std::vector<VkImage> swapchainImages(imagesCount);
+    result = vkGetSwapchainImagesKHR(vulkanState.device, vulkanState.swapchain, &imagesCount, swapchainImages.data());
+    CheckResult(result, "failed to get swapchain images");
+
+    vulkanState.presentQueueCommandBuffers.resize(imagesCount);
+
+    VkCommandBufferAllocateInfo commandBufferAllocateInfo;
+    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandBufferAllocateInfo.pNext = nullptr;
+    commandBufferAllocateInfo.commandPool = vulkanState.presentQueueCommandPool;
+    commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    commandBufferAllocateInfo.commandBufferCount = imagesCount;
+
+    result = vkAllocateCommandBuffers(vulkanState.device, &commandBufferAllocateInfo, vulkanState.presentQueueCommandBuffers.data());
+    CheckResult(result, "failed to allocate command buffers");
+
+    VkCommandBufferBeginInfo commandBufferBeginInfo;
+    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    commandBufferBeginInfo.pNext = nullptr;
+    commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+    commandBufferBeginInfo.pInheritanceInfo = nullptr;
+
+    VkClearColorValue clearColor = {1.0f, 0.8f, 0.4f, 0.0f};
+
+    VkImageSubresourceRange imageSubresourceRange;
+    imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageSubresourceRange.baseMipLevel = 0;
+    imageSubresourceRange.levelCount = 1;
+    imageSubresourceRange.baseArrayLayer = 0;
+    imageSubresourceRange.layerCount = 1;
+
+    for (uint32_t i = 0; i < imagesCount; ++i)
+    {
+        VkImageMemoryBarrier barrierFromPresentToClear;
+        barrierFromPresentToClear.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrierFromPresentToClear.pNext = nullptr;
+        barrierFromPresentToClear.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        barrierFromPresentToClear.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrierFromPresentToClear.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrierFromPresentToClear.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrierFromPresentToClear.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrierFromPresentToClear.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrierFromPresentToClear.image = swapchainImages[i];
+        barrierFromPresentToClear.subresourceRange = imageSubresourceRange;
+
+        VkImageMemoryBarrier barrierFromClearToPresent;
+        barrierFromClearToPresent.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrierFromClearToPresent.pNext = nullptr;
+        barrierFromClearToPresent.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrierFromClearToPresent.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        barrierFromClearToPresent.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrierFromClearToPresent.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrierFromClearToPresent.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrierFromClearToPresent.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrierFromClearToPresent.image = swapchainImages[i];
+        barrierFromClearToPresent.subresourceRange = imageSubresourceRange;
+
+        vkBeginCommandBuffer(vulkanState.presentQueueCommandBuffers[i], &commandBufferBeginInfo);
+        vkCmdPipelineBarrier(
+            vulkanState.presentQueueCommandBuffers[i],
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            0,
+            0,
+            nullptr,
+            0,
+            nullptr,
+            1,
+            &barrierFromPresentToClear
+            );
+
+        vkCmdClearColorImage(vulkanState.presentQueueCommandBuffers[i], swapchainImages[i],
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1, &imageSubresourceRange);
+
+        vkCmdPipelineBarrier(
+            vulkanState.presentQueueCommandBuffers[i],
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            0,
+            0,
+            nullptr,
+            0,
+            nullptr,
+            1,
+            &barrierFromClearToPresent);
+
+        result = vkEndCommandBuffer(vulkanState.presentQueueCommandBuffers[i]);
+        CheckResult(result, "failed to record command buffer");
+    }
+
+    RunMainLoop();
+
+    result = vkDeviceWaitIdle(vulkanState.device);
     CheckResult(result, "failed waiting for device idle state");
 
-    vkDestroyDevice(device, nullptr);
-    device = VK_NULL_HANDLE;
+    vkDestroySemaphore(vulkanState.device, vulkanState.imageAvailableSemaphore, nullptr);
+    vulkanState.imageAvailableSemaphore = VK_NULL_HANDLE;
+
+    vkDestroySemaphore(vulkanState.device, vulkanState.renderingFinishedSemaphore, nullptr);
+    vulkanState.renderingFinishedSemaphore = VK_NULL_HANDLE;
+
+    vkDestroySwapchainKHR(vulkanState.device, vulkanState.swapchain, nullptr);
+    vulkanState.swapchain = VK_NULL_HANDLE;
+
+    vkDestroyDevice(vulkanState.device, nullptr);
+    vulkanState.device = VK_NULL_HANDLE;
     std::cout << "Device destroyed\n";
 
-    // destroy vulkan instance
     vkDestroyInstance(instance, nullptr);
     instance = VK_NULL_HANDLE;
     std::cout << "Vulkan instance destroyed\n";
-
-    // run event loop
-    SDL_Event event;
-    bool running = true;
-    while (running)
-    {
-        while (SDL_PollEvent(&event))
-        {
-            if (event.type == SDL_QUIT)
-                running = false;
-        }
-        if (running)
-        {
-            SDL_Delay(1);
-        }
-    }
 
     SDL_Quit();
     return 0;
