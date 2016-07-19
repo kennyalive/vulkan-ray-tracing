@@ -35,6 +35,7 @@ enum
 
 struct VulkanState
 {
+    VkInstance instance;
     VkDevice device;
     VkQueue graphicsQueue;
     VkQueue presentQueue;
@@ -46,7 +47,8 @@ struct VulkanState
     std::vector<VkCommandBuffer> presentQueueCommandBuffers;
 
     VulkanState()
-        : device(VK_NULL_HANDLE)
+        : instance(VK_NULL_HANDLE)
+        , device(VK_NULL_HANDLE)
         , graphicsQueue(VK_NULL_HANDLE)
         , presentQueue(VK_NULL_HANDLE)
         , swapchain(VK_NULL_HANDLE)
@@ -313,6 +315,27 @@ bool SelectQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
     return true;
 }
 
+void CleanupVulkanResources()
+{
+    VkResult result = vkDeviceWaitIdle(vulkanState.device);
+    CheckResult(result, "vkDeviceWaitIdle failed");
+
+    vkDestroySemaphore(vulkanState.device, vulkanState.imageAvailableSemaphore, nullptr);
+    vulkanState.imageAvailableSemaphore = VK_NULL_HANDLE;
+
+    vkDestroySemaphore(vulkanState.device, vulkanState.renderingFinishedSemaphore, nullptr);
+    vulkanState.renderingFinishedSemaphore = VK_NULL_HANDLE;
+
+    vkDestroySwapchainKHR(vulkanState.device, vulkanState.swapchain, nullptr);
+    vulkanState.swapchain = VK_NULL_HANDLE;
+
+    vkDestroyDevice(vulkanState.device, nullptr);
+    vulkanState.device = VK_NULL_HANDLE;
+
+    vkDestroyInstance(vulkanState.instance, nullptr);
+    vulkanState.instance = VK_NULL_HANDLE;
+}
+
 void RunFrame()
 {
     uint32_t imageIndex;
@@ -400,12 +423,11 @@ int main()
 
     VkResult result;
 
-    VkInstance instance = CreateInstance();
-    std::cout << "Vulkan instance created\n";
+    vulkanState.instance = CreateInstance();
 
-    VkSurfaceKHR surface = CreateSurface(instance, wmInfo.info.win.window);
+    VkSurfaceKHR surface = CreateSurface(vulkanState.instance, wmInfo.info.win.window);
 
-    VkPhysicalDevice physicalDevice = SelectPhysicalDevice(instance);
+    VkPhysicalDevice physicalDevice = SelectPhysicalDevice(vulkanState.instance);
 
     // check device extensions availability
     uint32_t deviceExtensionsCount = 0;
@@ -601,27 +623,7 @@ int main()
     }
 
     RunMainLoop();
-
-    result = vkDeviceWaitIdle(vulkanState.device);
-    CheckResult(result, "failed waiting for device idle state");
-
-    vkDestroySemaphore(vulkanState.device, vulkanState.imageAvailableSemaphore, nullptr);
-    vulkanState.imageAvailableSemaphore = VK_NULL_HANDLE;
-
-    vkDestroySemaphore(vulkanState.device, vulkanState.renderingFinishedSemaphore, nullptr);
-    vulkanState.renderingFinishedSemaphore = VK_NULL_HANDLE;
-
-    vkDestroySwapchainKHR(vulkanState.device, vulkanState.swapchain, nullptr);
-    vulkanState.swapchain = VK_NULL_HANDLE;
-
-    vkDestroyDevice(vulkanState.device, nullptr);
-    vulkanState.device = VK_NULL_HANDLE;
-    std::cout << "Device destroyed\n";
-
-    vkDestroyInstance(instance, nullptr);
-    instance = VK_NULL_HANDLE;
-    std::cout << "Vulkan instance destroyed\n";
-
+    CleanupVulkanResources();
     SDL_Quit();
     return 0;
 }
