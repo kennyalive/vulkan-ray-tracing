@@ -39,6 +39,7 @@ struct VulkanState
     VkDevice device;
     VkQueue graphicsQueue;
     VkQueue presentQueue;
+    VkSurfaceKHR surface;
     VkSwapchainKHR swapchain;
     VkSwapchainKHR oldSwapchain;
     VkSemaphore imageAvailableSemaphore;
@@ -51,6 +52,7 @@ struct VulkanState
         , device(VK_NULL_HANDLE)
         , graphicsQueue(VK_NULL_HANDLE)
         , presentQueue(VK_NULL_HANDLE)
+        , surface(VK_NULL_HANDLE)
         , swapchain(VK_NULL_HANDLE)
         , oldSwapchain(VK_NULL_HANDLE)
         , imageAvailableSemaphore(VK_NULL_HANDLE)
@@ -326,8 +328,14 @@ void CleanupVulkanResources()
     vkDestroySemaphore(vulkanState.device, vulkanState.renderingFinishedSemaphore, nullptr);
     vulkanState.renderingFinishedSemaphore = VK_NULL_HANDLE;
 
+    vkDestroyCommandPool(vulkanState.device, vulkanState.presentQueueCommandPool, nullptr);
+    vulkanState.presentQueueCommandPool = VK_NULL_HANDLE;
+
     vkDestroySwapchainKHR(vulkanState.device, vulkanState.swapchain, nullptr);
     vulkanState.swapchain = VK_NULL_HANDLE;
+
+    vkDestroySurfaceKHR(vulkanState.instance, vulkanState.surface, nullptr);
+    vulkanState.surface = VK_NULL_HANDLE;
 
     vkDestroyDevice(vulkanState.device, nullptr);
     vulkanState.device = VK_NULL_HANDLE;
@@ -425,7 +433,7 @@ int main()
 
     vulkanState.instance = CreateInstance();
 
-    VkSurfaceKHR surface = CreateSurface(vulkanState.instance, wmInfo.info.win.window);
+    vulkanState.surface = CreateSurface(vulkanState.instance, wmInfo.info.win.window);
 
     VkPhysicalDevice physicalDevice = SelectPhysicalDevice(vulkanState.instance);
 
@@ -458,7 +466,7 @@ int main()
     uint32_t graphicsQueueFamilyIndex;
     uint32_t presentQueueFamilyIndex;
 
-    if (!SelectQueueFamilies(physicalDevice, surface, graphicsQueueFamilyIndex, presentQueueFamilyIndex))
+    if (!SelectQueueFamilies(physicalDevice, vulkanState.surface, graphicsQueueFamilyIndex, presentQueueFamilyIndex))
         Error("failed to select present and graphics queue families");
 
     // create device
@@ -500,9 +508,8 @@ int main()
 
     result = vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &vulkanState.device);
     CheckResult(result, "failed to create device");
-    std::cout << "Device created\n";
 
-    vulkanState.swapchain = CreateSwapchain(physicalDevice, vulkanState.device, surface, VK_NULL_HANDLE);
+    vulkanState.swapchain = CreateSwapchain(physicalDevice, vulkanState.device, vulkanState.surface, VK_NULL_HANDLE);
 
     VkSemaphoreCreateInfo semaphoreCreateInfo;
     semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -568,7 +575,7 @@ int main()
         VkImageMemoryBarrier barrierFromPresentToClear;
         barrierFromPresentToClear.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         barrierFromPresentToClear.pNext = nullptr;
-        barrierFromPresentToClear.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        barrierFromPresentToClear.srcAccessMask = 0;
         barrierFromPresentToClear.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrierFromPresentToClear.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         barrierFromPresentToClear.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
