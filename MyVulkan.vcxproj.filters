@@ -2,5 +2,13 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="device_initialization.cpp" />
+    <ClCompile Include="swapchain_initialization.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="device_initialization.h" />
+    <ClInclude Include="swapchain_initialization.h" />
+    <ClInclude Include="common.h" />
+    <ClInclude Include="vulkan_definitions.h" />
   </ItemGroup>
 </Project>
