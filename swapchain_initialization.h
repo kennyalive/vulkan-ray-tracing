@@ -8,7 +8,6 @@ struct SwapchainInfo
     VkSwapchainKHR handle;
     VkFormat imageFormat;
     std::vector<VkImage> images;
-    std::vector<VkImageView> imageViews;
 
     SwapchainInfo()
         : handle(VK_NULL_HANDLE)

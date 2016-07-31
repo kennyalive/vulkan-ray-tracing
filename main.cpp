@@ -20,6 +20,13 @@ enum
     window_height = 480,
 };
 
+struct VulkanApp
+{
+    std::vector<VkImageView> swapchainImageViews;
+};
+
+VulkanApp vkApp;
+
 struct VulkanState
 {
     VkInstance instance;
@@ -122,12 +129,11 @@ void CleanupVulkanResources()
     }
     framebuffers.clear();
 
-    auto& swapchainImageViews = vulkanState.swapchainInfo.imageViews;
-    for (size_t i = 0; i < swapchainImageViews.size(); i++)
+    for (auto imageView : vkApp.swapchainImageViews)
     {
-        vkDestroyImageView(vulkanState.device, swapchainImageViews[i], nullptr);
+        vkDestroyImageView(vulkanState.device, imageView, nullptr);
     }
-    swapchainImageViews.clear();
+    vkApp.swapchainImageViews.clear();
 
     vkDestroyRenderPass(vulkanState.device, renderPass, nullptr);
     renderPass = VK_NULL_HANDLE;
@@ -269,6 +275,34 @@ int main()
 
     uint32_t imagesCount = static_cast<uint32_t>(vulkanState.swapchainInfo.images.size());
 
+    // create views for swapchain images
+    vkApp.swapchainImageViews.resize(imagesCount);
+    for (uint32_t i = 0; i < imagesCount; i++)
+    {
+        VkImageViewCreateInfo imageViewCreateInfo;
+        imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        imageViewCreateInfo.pNext = nullptr;
+        imageViewCreateInfo.flags = 0;
+        imageViewCreateInfo.image = vulkanState.swapchainInfo.images[i];
+        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        imageViewCreateInfo.format = vulkanState.swapchainInfo.imageFormat;
+        imageViewCreateInfo.components = {
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY
+        };
+        imageViewCreateInfo.subresourceRange = {
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            0,
+            1,
+            0,
+            1
+        };
+        result = vkCreateImageView(vulkanState.device, &imageViewCreateInfo, nullptr, &vkApp.swapchainImageViews[i]);
+        CheckVkResult(result, "vkCreateImageView");
+    }
+
     renderPass = CreateRenderPass();
 
     framebuffers.resize(imagesCount);
@@ -280,7 +314,7 @@ int main()
         framebufferCreateInfo.flags = 0;
         framebufferCreateInfo.renderPass = renderPass;
         framebufferCreateInfo.attachmentCount = 1;
-        framebufferCreateInfo.pAttachments = &vulkanState.swapchainInfo.imageViews[i];
+        framebufferCreateInfo.pAttachments = &vkApp.swapchainImageViews[i];
         framebufferCreateInfo.width = window_width;
         framebufferCreateInfo.height = window_height;
         framebufferCreateInfo.layers = 1;
