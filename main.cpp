@@ -22,40 +22,22 @@ enum
 
 struct VulkanApp
 {
+    VkInstance instance = VK_NULL_HANDLE;
+    VkDevice device = VK_NULL_HANDLE;
+    VkQueue graphicsQueue = VK_NULL_HANDLE;
+    VkQueue presentQueue = VK_NULL_HANDLE;
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    SwapchainInfo swapchainInfo;
+    VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+    VkSemaphore renderingFinishedSemaphore = VK_NULL_HANDLE;
+    VkCommandPool presentQueueCommandPool = VK_NULL_HANDLE;
+    std::vector<VkCommandBuffer> presentQueueCommandBuffers;
     std::vector<VkImageView> swapchainImageViews;
+    VkRenderPass renderPass = VK_NULL_HANDLE;
+    std::vector<VkFramebuffer> framebuffers;
 };
 
 VulkanApp vkApp;
-
-struct VulkanState
-{
-    VkInstance instance;
-    VkDevice device;
-    VkQueue graphicsQueue;
-    VkQueue presentQueue;
-    VkSurfaceKHR surface;
-    SwapchainInfo swapchainInfo;
-    VkSemaphore imageAvailableSemaphore;
-    VkSemaphore renderingFinishedSemaphore;
-    VkCommandPool presentQueueCommandPool;
-    std::vector<VkCommandBuffer> presentQueueCommandBuffers;
-
-    VulkanState()
-        : instance(VK_NULL_HANDLE)
-        , device(VK_NULL_HANDLE)
-        , graphicsQueue(VK_NULL_HANDLE)
-        , presentQueue(VK_NULL_HANDLE)
-        , surface(VK_NULL_HANDLE)
-        , imageAvailableSemaphore(VK_NULL_HANDLE)
-        , renderingFinishedSemaphore(VK_NULL_HANDLE)
-        , presentQueueCommandPool(VK_NULL_HANDLE)
-    {}
-};
-
-VulkanState vulkanState;
-
-VkRenderPass renderPass = VK_NULL_HANDLE;
-std::vector<VkFramebuffer> framebuffers;
 
 VkSurfaceKHR CreateSurface(VkInstance instance, HWND hwnd)
 {
@@ -76,7 +58,7 @@ VkRenderPass CreateRenderPass()
 {
     VkAttachmentDescription attachmentDescription;
     attachmentDescription.flags = 0;
-    attachmentDescription.format = vulkanState.swapchainInfo.imageFormat;
+    attachmentDescription.format = vkApp.swapchainInfo.imageFormat;
     attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
     attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -113,51 +95,51 @@ VkRenderPass CreateRenderPass()
     renderPassCreateInfo.pDependencies = nullptr;
 
     VkRenderPass renderPass;
-    VkResult result = vkCreateRenderPass(vulkanState.device, &renderPassCreateInfo, nullptr, &renderPass);
+    VkResult result = vkCreateRenderPass(vkApp.device, &renderPassCreateInfo, nullptr, &renderPass);
     CheckVkResult(result, "vkCreateRenderPass");
     return renderPass;
 }
 
 void CleanupVulkanResources()
 {
-    VkResult result = vkDeviceWaitIdle(vulkanState.device);
+    VkResult result = vkDeviceWaitIdle(vkApp.device);
     CheckVkResult(result, "vkDeviceWaitIdle");
 
-    for (size_t i = 0; i < framebuffers.size(); i++)
+    for (size_t i = 0; i < vkApp.framebuffers.size(); i++)
     {
-        vkDestroyFramebuffer(vulkanState.device, framebuffers[i], nullptr);
+        vkDestroyFramebuffer(vkApp.device, vkApp.framebuffers[i], nullptr);
     }
-    framebuffers.clear();
+    vkApp.framebuffers.clear();
 
     for (auto imageView : vkApp.swapchainImageViews)
     {
-        vkDestroyImageView(vulkanState.device, imageView, nullptr);
+        vkDestroyImageView(vkApp.device, imageView, nullptr);
     }
     vkApp.swapchainImageViews.clear();
 
-    vkDestroyRenderPass(vulkanState.device, renderPass, nullptr);
-    renderPass = VK_NULL_HANDLE;
+    vkDestroyRenderPass(vkApp.device, vkApp.renderPass, nullptr);
+    vkApp.renderPass = VK_NULL_HANDLE;
 
-    vkDestroySemaphore(vulkanState.device, vulkanState.imageAvailableSemaphore, nullptr);
-    vulkanState.imageAvailableSemaphore = VK_NULL_HANDLE;
+    vkDestroySemaphore(vkApp.device, vkApp.imageAvailableSemaphore, nullptr);
+    vkApp.imageAvailableSemaphore = VK_NULL_HANDLE;
 
-    vkDestroySemaphore(vulkanState.device, vulkanState.renderingFinishedSemaphore, nullptr);
-    vulkanState.renderingFinishedSemaphore = VK_NULL_HANDLE;
+    vkDestroySemaphore(vkApp.device, vkApp.renderingFinishedSemaphore, nullptr);
+    vkApp.renderingFinishedSemaphore = VK_NULL_HANDLE;
 
-    vkDestroyCommandPool(vulkanState.device, vulkanState.presentQueueCommandPool, nullptr);
-    vulkanState.presentQueueCommandPool = VK_NULL_HANDLE;
+    vkDestroyCommandPool(vkApp.device, vkApp.presentQueueCommandPool, nullptr);
+    vkApp.presentQueueCommandPool = VK_NULL_HANDLE;
 
-    vkDestroySwapchainKHR(vulkanState.device, vulkanState.swapchainInfo.handle, nullptr);
-    vulkanState.swapchainInfo = SwapchainInfo();
+    vkDestroySwapchainKHR(vkApp.device, vkApp.swapchainInfo.handle, nullptr);
+    vkApp.swapchainInfo = SwapchainInfo();
 
-    vkDestroySurfaceKHR(vulkanState.instance, vulkanState.surface, nullptr);
-    vulkanState.surface = VK_NULL_HANDLE;
+    vkDestroySurfaceKHR(vkApp.instance, vkApp.surface, nullptr);
+    vkApp.surface = VK_NULL_HANDLE;
 
-    vkDestroyDevice(vulkanState.device, nullptr);
-    vulkanState.device = VK_NULL_HANDLE;
+    vkDestroyDevice(vkApp.device, nullptr);
+    vkApp.device = VK_NULL_HANDLE;
 
-    vkDestroyInstance(vulkanState.instance, nullptr);
-    vulkanState.instance = VK_NULL_HANDLE;
+    vkDestroyInstance(vkApp.instance, nullptr);
+    vkApp.instance = VK_NULL_HANDLE;
 }
 
 void RunFrame()
@@ -165,10 +147,10 @@ void RunFrame()
     uint32_t imageIndex;
 
     VkResult result = vkAcquireNextImageKHR(
-        vulkanState.device,
-        vulkanState.swapchainInfo.handle,
+        vkApp.device,
+        vkApp.swapchainInfo.handle,
         UINT64_MAX,
-        vulkanState.imageAvailableSemaphore,
+        vkApp.imageAvailableSemaphore,
         VK_NULL_HANDLE,
         &imageIndex);
 
@@ -180,27 +162,27 @@ void RunFrame()
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.pNext = nullptr;
     submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &vulkanState.imageAvailableSemaphore;
+    submitInfo.pWaitSemaphores = &vkApp.imageAvailableSemaphore;
     submitInfo.pWaitDstStageMask = &waitDstStageMask;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &vulkanState.presentQueueCommandBuffers[imageIndex];
+    submitInfo.pCommandBuffers = &vkApp.presentQueueCommandBuffers[imageIndex];
     submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &vulkanState.renderingFinishedSemaphore;
+    submitInfo.pSignalSemaphores = &vkApp.renderingFinishedSemaphore;
 
-    result = vkQueueSubmit(vulkanState.presentQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    result = vkQueueSubmit(vkApp.presentQueue, 1, &submitInfo, VK_NULL_HANDLE);
     CheckVkResult(result, "vkQueueSubmit");
 
     VkPresentInfoKHR presentInfo;
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.pNext = nullptr;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &vulkanState.renderingFinishedSemaphore;
+    presentInfo.pWaitSemaphores = &vkApp.renderingFinishedSemaphore;
     presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &vulkanState.swapchainInfo.handle;
+    presentInfo.pSwapchains = &vkApp.swapchainInfo.handle;
     presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = nullptr;
 
-    result = vkQueuePresentKHR(vulkanState.presentQueue, &presentInfo);
+    result = vkQueuePresentKHR(vkApp.presentQueue, &presentInfo);
     CheckVkResult(result, "vkQueuePresentKHR");
 }
 
@@ -247,15 +229,15 @@ int main()
 
     VkResult result;
 
-    vulkanState.instance = CreateInstance();
-    VkPhysicalDevice physicalDevice = SelectPhysicalDevice(vulkanState.instance);
+    vkApp.instance = CreateInstance();
+    VkPhysicalDevice physicalDevice = SelectPhysicalDevice(vkApp.instance);
 
-    vulkanState.surface = CreateSurface(vulkanState.instance, wmInfo.info.win.window);;
+    vkApp.surface = CreateSurface(vkApp.instance, wmInfo.info.win.window);;
 
     uint32_t graphicsQueueFamilyIndex;
     uint32_t presentationQueueFamilyIndex;
 
-    if (!SelectQueueFamilies(physicalDevice, vulkanState.surface,
+    if (!SelectQueueFamilies(physicalDevice, vkApp.surface,
         graphicsQueueFamilyIndex, presentationQueueFamilyIndex))
     {
         Error("failed to find matching queue families");
@@ -266,14 +248,14 @@ int main()
     if (presentationQueueFamilyIndex != graphicsQueueFamilyIndex)
         queueInfos.push_back(QueueInfo(presentationQueueFamilyIndex, 1));
 
-    vulkanState.device = CreateDevice(physicalDevice, queueInfos);
+    vkApp.device = CreateDevice(physicalDevice, queueInfos);
 
-    vkGetDeviceQueue(vulkanState.device, graphicsQueueFamilyIndex, 0, &vulkanState.graphicsQueue);
-    vkGetDeviceQueue(vulkanState.device, presentationQueueFamilyIndex, 0, &vulkanState.presentQueue);
+    vkGetDeviceQueue(vkApp.device, graphicsQueueFamilyIndex, 0, &vkApp.graphicsQueue);
+    vkGetDeviceQueue(vkApp.device, presentationQueueFamilyIndex, 0, &vkApp.presentQueue);
 
-    vulkanState.swapchainInfo = CreateSwapchain(physicalDevice, vulkanState.device, vulkanState.surface);
+    vkApp.swapchainInfo = CreateSwapchain(physicalDevice, vkApp.device, vkApp.surface);
 
-    uint32_t imagesCount = static_cast<uint32_t>(vulkanState.swapchainInfo.images.size());
+    uint32_t imagesCount = static_cast<uint32_t>(vkApp.swapchainInfo.images.size());
 
     // create views for swapchain images
     vkApp.swapchainImageViews.resize(imagesCount);
@@ -283,9 +265,9 @@ int main()
         imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         imageViewCreateInfo.pNext = nullptr;
         imageViewCreateInfo.flags = 0;
-        imageViewCreateInfo.image = vulkanState.swapchainInfo.images[i];
+        imageViewCreateInfo.image = vkApp.swapchainInfo.images[i];
         imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        imageViewCreateInfo.format = vulkanState.swapchainInfo.imageFormat;
+        imageViewCreateInfo.format = vkApp.swapchainInfo.imageFormat;
         imageViewCreateInfo.components = {
             VK_COMPONENT_SWIZZLE_IDENTITY,
             VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -299,27 +281,27 @@ int main()
             0,
             1
         };
-        result = vkCreateImageView(vulkanState.device, &imageViewCreateInfo, nullptr, &vkApp.swapchainImageViews[i]);
+        result = vkCreateImageView(vkApp.device, &imageViewCreateInfo, nullptr, &vkApp.swapchainImageViews[i]);
         CheckVkResult(result, "vkCreateImageView");
     }
 
-    renderPass = CreateRenderPass();
+    vkApp.renderPass = CreateRenderPass();
 
-    framebuffers.resize(imagesCount);
+    vkApp.framebuffers.resize(imagesCount);
     for (uint32_t i = 0; i < imagesCount; i++)
     {
         VkFramebufferCreateInfo framebufferCreateInfo;
         framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferCreateInfo.pNext = nullptr;
         framebufferCreateInfo.flags = 0;
-        framebufferCreateInfo.renderPass = renderPass;
+        framebufferCreateInfo.renderPass = vkApp.renderPass;
         framebufferCreateInfo.attachmentCount = 1;
         framebufferCreateInfo.pAttachments = &vkApp.swapchainImageViews[i];
         framebufferCreateInfo.width = window_width;
         framebufferCreateInfo.height = window_height;
         framebufferCreateInfo.layers = 1;
 
-        result = vkCreateFramebuffer(vulkanState.device, &framebufferCreateInfo, nullptr, &framebuffers[i]);
+        result = vkCreateFramebuffer(vkApp.device, &framebufferCreateInfo, nullptr, &vkApp.framebuffers[i]);
         CheckVkResult(result, "vkCreateFramebuffer");
     }
 
@@ -328,10 +310,10 @@ int main()
     semaphoreCreateInfo.pNext = nullptr;
     semaphoreCreateInfo.flags = 0;
 
-    result = vkCreateSemaphore(vulkanState.device, &semaphoreCreateInfo, nullptr, &vulkanState.imageAvailableSemaphore);
+    result = vkCreateSemaphore(vkApp.device, &semaphoreCreateInfo, nullptr, &vkApp.imageAvailableSemaphore);
     CheckVkResult(result, "vkCreateSemaphore");
 
-    result = vkCreateSemaphore(vulkanState.device, &semaphoreCreateInfo, nullptr, &vulkanState.renderingFinishedSemaphore);
+    result = vkCreateSemaphore(vkApp.device, &semaphoreCreateInfo, nullptr, &vkApp.renderingFinishedSemaphore);
     CheckVkResult(result, "vkCreateSemaphore");
 
     VkCommandPoolCreateInfo commandPoolCreateInfo;
@@ -340,19 +322,19 @@ int main()
     commandPoolCreateInfo.flags = 0;
     commandPoolCreateInfo.queueFamilyIndex = presentationQueueFamilyIndex;
 
-    result = vkCreateCommandPool(vulkanState.device, &commandPoolCreateInfo, nullptr, &vulkanState.presentQueueCommandPool);
+    result = vkCreateCommandPool(vkApp.device, &commandPoolCreateInfo, nullptr, &vkApp.presentQueueCommandPool);
     CheckVkResult(result, "vkCreateCommandPool");
 
-    vulkanState.presentQueueCommandBuffers.resize(imagesCount);
+    vkApp.presentQueueCommandBuffers.resize(imagesCount);
 
     VkCommandBufferAllocateInfo commandBufferAllocateInfo;
     commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     commandBufferAllocateInfo.pNext = nullptr;
-    commandBufferAllocateInfo.commandPool = vulkanState.presentQueueCommandPool;
+    commandBufferAllocateInfo.commandPool = vkApp.presentQueueCommandPool;
     commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     commandBufferAllocateInfo.commandBufferCount = imagesCount;
 
-    result = vkAllocateCommandBuffers(vulkanState.device, &commandBufferAllocateInfo, vulkanState.presentQueueCommandBuffers.data());
+    result = vkAllocateCommandBuffers(vkApp.device, &commandBufferAllocateInfo, vkApp.presentQueueCommandBuffers.data());
     CheckVkResult(result, "vkAllocateCommandBuffers");
 
     VkCommandBufferBeginInfo commandBufferBeginInfo;
@@ -381,7 +363,7 @@ int main()
         barrierFromPresentToClear.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrierFromPresentToClear.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrierFromPresentToClear.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrierFromPresentToClear.image = vulkanState.swapchainInfo.images[i];
+        barrierFromPresentToClear.image = vkApp.swapchainInfo.images[i];
         barrierFromPresentToClear.subresourceRange = imageSubresourceRange;
 
         VkImageMemoryBarrier barrierFromClearToPresent;
@@ -393,12 +375,12 @@ int main()
         barrierFromClearToPresent.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         barrierFromClearToPresent.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrierFromClearToPresent.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrierFromClearToPresent.image = vulkanState.swapchainInfo.images[i];
+        barrierFromClearToPresent.image = vkApp.swapchainInfo.images[i];
         barrierFromClearToPresent.subresourceRange = imageSubresourceRange;
 
-        vkBeginCommandBuffer(vulkanState.presentQueueCommandBuffers[i], &commandBufferBeginInfo);
+        vkBeginCommandBuffer(vkApp.presentQueueCommandBuffers[i], &commandBufferBeginInfo);
         vkCmdPipelineBarrier(
-            vulkanState.presentQueueCommandBuffers[i],
+            vkApp.presentQueueCommandBuffers[i],
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             0,
@@ -410,11 +392,11 @@ int main()
             &barrierFromPresentToClear
             );
 
-        vkCmdClearColorImage(vulkanState.presentQueueCommandBuffers[i], vulkanState.swapchainInfo.images[i],
+        vkCmdClearColorImage(vkApp.presentQueueCommandBuffers[i], vkApp.swapchainInfo.images[i],
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1, &imageSubresourceRange);
 
         vkCmdPipelineBarrier(
-            vulkanState.presentQueueCommandBuffers[i],
+            vkApp.presentQueueCommandBuffers[i],
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
             0,
@@ -425,7 +407,7 @@ int main()
             1,
             &barrierFromClearToPresent);
 
-        result = vkEndCommandBuffer(vulkanState.presentQueueCommandBuffers[i]);
+        result = vkEndCommandBuffer(vkApp.presentQueueCommandBuffers[i]);
         CheckVkResult(result, "vkEndCommandBuffer");
     }
 
