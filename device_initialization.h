@@ -3,22 +3,19 @@
 #include <vector>
 #include "vulkan_definitions.h"
 
+struct DeviceInfo
+{
+    VkDevice device = VK_NULL_HANDLE;
+
+    uint32_t graphicsQueueFamilyIndex = 0;
+    VkQueue graphicsQueue = VK_NULL_HANDLE;
+
+    uint32_t presentationQueueFamilyIndex = 0;
+    VkQueue presentationQueue = VK_NULL_HANDLE;
+};
+
 VkInstance CreateInstance();
 
 VkPhysicalDevice SelectPhysicalDevice(VkInstance instance);
 
-bool SelectQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
-    uint32_t& graphicsQueueFamilyIndex, uint32_t& presentationQueueFamilyIndex);
-
-struct QueueInfo
-{
-    uint32_t queueFamilyIndex = -1;
-    uint32_t queueCount = 0;
-
-    QueueInfo(uint32_t queueFamilyIndex, uint32_t queueCount)
-        : queueFamilyIndex(queueFamilyIndex)
-        , queueCount(queueCount)
-    {}
-};
-
-VkDevice CreateDevice(VkPhysicalDevice physicalDevice, const std::vector<QueueInfo>& queueInfos);
+DeviceInfo CreateDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);

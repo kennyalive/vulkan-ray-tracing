@@ -27,7 +27,60 @@ namespace
         });
         return it != extensionProperties.cend();
     }
-}
+
+    bool SelectQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
+        uint32_t& graphicsQueueFamilyIndex, uint32_t& presentQueueFamilyIndex)
+    {
+        uint32_t queueFamilyCount;
+        vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
+
+        uint32_t selectedGraphicsQueueFamilyIndex;
+        bool graphicsFound = false;
+
+        uint32_t selectedPresentationQueueFamilyIndex;
+        bool presentationFound = false;
+
+        for (uint32_t i = 0; i < queueFamilyCount; i++)
+        {
+            if (queueFamilies[i].queueCount == 0)
+                continue;
+
+            // check graphics operations support
+            bool graphicsSupported = (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
+
+            // check presentation support
+            VkBool32 presentationSupported;
+            auto result = vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentationSupported);
+            CheckVkResult(result, "vkGetPhysicalDeviceSurfaceSupportKHR");
+
+            if (graphicsSupported)
+            {
+                selectedGraphicsQueueFamilyIndex = i;
+                graphicsFound = true;
+            }
+            if (presentationSupported == VK_TRUE)
+            {
+                selectedPresentationQueueFamilyIndex = i;
+                presentationFound = true;
+            }
+
+            // check if we found a preferred queue that supports both present and graphics operations
+            if (selectedGraphicsQueueFamilyIndex == i && 
+                selectedPresentationQueueFamilyIndex == i)
+                break;
+        }
+
+        if (!graphicsFound || !presentationFound)
+            return false;
+
+        graphicsQueueFamilyIndex = selectedGraphicsQueueFamilyIndex;
+        presentQueueFamilyIndex = selectedPresentationQueueFamilyIndex;
+        return true;
+    }
+} // namespace
 
 VkInstance CreateInstance()
 {
@@ -79,61 +132,9 @@ VkPhysicalDevice SelectPhysicalDevice(VkInstance instance)
     return physicalDevices[0]; // just get the first one
 }
 
-bool SelectQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
-    uint32_t& graphicsQueueFamilyIndex, uint32_t& presentQueueFamilyIndex)
+DeviceInfo CreateDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
 {
-    uint32_t queueFamilyCount;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
-
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
-
-    uint32_t selectedGraphicsQueueFamilyIndex;
-    bool graphicsFound = false;
-
-    uint32_t selectedPresentationQueueFamilyIndex;
-    bool presentationFound = false;
-
-    for (uint32_t i = 0; i < queueFamilyCount; i++)
-    {
-        if (queueFamilies[i].queueCount == 0)
-            continue;
-
-        // check graphics operations support
-        bool graphicsSupported = (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
-
-        // check presentation support
-        VkBool32 presentationSupported;
-        auto result = vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentationSupported);
-        CheckVkResult(result, "vkGetPhysicalDeviceSurfaceSupportKHR");
-
-        if (graphicsSupported)
-        {
-            selectedGraphicsQueueFamilyIndex = i;
-            graphicsFound = true;
-        }
-        if (presentationSupported == VK_TRUE)
-        {
-            selectedPresentationQueueFamilyIndex = i;
-            presentationFound = true;
-        }
-
-        // check if we found a preferred queue that supports both present and graphics operations
-        if (selectedGraphicsQueueFamilyIndex == i && 
-            selectedPresentationQueueFamilyIndex == i)
-            break;
-    }
-
-    if (!graphicsFound || !presentationFound)
-        return false;
-
-    graphicsQueueFamilyIndex = selectedGraphicsQueueFamilyIndex;
-    presentQueueFamilyIndex = selectedPresentationQueueFamilyIndex;
-    return true;
-}
-
-VkDevice CreateDevice(VkPhysicalDevice physicalDevice, const std::vector<QueueInfo>& queueInfos)
-{
+    // Check device extensions availability.
     uint32_t extensionCount = 0;
     VkResult result = vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
     CheckVkResult(result, "vkEnumerateDeviceExtensionProperties");
@@ -148,20 +149,33 @@ VkDevice CreateDevice(VkPhysicalDevice physicalDevice, const std::vector<QueueIn
             Error(std::string("required device extension is not available: ") + extensionName);
     }
 
+    // Select queue families for graphics and presentation operations.
+    uint32_t graphicsQueueFamilyIndex;
+    uint32_t presentationQueueFamilyIndex;
+
+    if (!SelectQueueFamilies(physicalDevice, surface, graphicsQueueFamilyIndex, presentationQueueFamilyIndex))
+        Error("failed to find matching queue families");
+
+    // Fill in queues create info.
+    std::vector<uint32_t> queueFamilyIndices { graphicsQueueFamilyIndex };
+    if (presentationQueueFamilyIndex != graphicsQueueFamilyIndex)
+        queueFamilyIndices.push_back(presentationQueueFamilyIndex);
+
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     const float queuePriority = 1.0;
-    for (const auto& queueInfo : queueInfos)
+    for (uint32_t index : queueFamilyIndices)
     {
         VkDeviceQueueCreateInfo queueCreateInfo;
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.pNext = nullptr;
         queueCreateInfo.flags = 0;
-        queueCreateInfo.queueFamilyIndex = queueInfo.queueFamilyIndex;
-        queueCreateInfo.queueCount = queueInfo.queueCount;
+        queueCreateInfo.queueFamilyIndex = index;
+        queueCreateInfo.queueCount = 1;
         queueCreateInfo.pQueuePriorities = &queuePriority;
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
+    // Fill in device create info.
     VkDeviceCreateInfo createInfo;
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.pNext = nullptr;
@@ -174,8 +188,16 @@ VkDevice CreateDevice(VkPhysicalDevice physicalDevice, const std::vector<QueueIn
     createInfo.ppEnabledExtensionNames = deviceExtensionNames.data();
     createInfo.pEnabledFeatures = nullptr;
 
-    VkDevice device;
-    result = vkCreateDevice(physicalDevice, &createInfo, nullptr, &device);
+    // Create device.
+    DeviceInfo deviceInfo;
+    result = vkCreateDevice(physicalDevice, &createInfo, nullptr, &deviceInfo.device);
     CheckVkResult(result, "vkCreateDevice");
-    return device;
+
+    deviceInfo.graphicsQueueFamilyIndex = graphicsQueueFamilyIndex;
+    vkGetDeviceQueue(deviceInfo.device, graphicsQueueFamilyIndex, 0, &deviceInfo.graphicsQueue);
+
+    deviceInfo.presentationQueueFamilyIndex = presentationQueueFamilyIndex;
+    vkGetDeviceQueue(deviceInfo.device, presentationQueueFamilyIndex, 0, &deviceInfo.presentationQueue);
+
+    return deviceInfo;
 }

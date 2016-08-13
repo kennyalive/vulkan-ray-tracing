@@ -5,14 +5,9 @@
 
 struct SwapchainInfo
 {
-    VkSwapchainKHR handle;
-    VkFormat imageFormat;
+    VkSwapchainKHR handle = VK_NULL_HANDLE;
+    VkFormat imageFormat = VK_FORMAT_UNDEFINED;
     std::vector<VkImage> images;
-
-    SwapchainInfo()
-        : handle(VK_NULL_HANDLE)
-        , imageFormat(VK_FORMAT_UNDEFINED)
-    {}
 };
 
 SwapchainInfo CreateSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface);
