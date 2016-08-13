@@ -7,79 +7,79 @@
 
 namespace
 {
-    const std::vector<const char*> instanceExtensionNames =
-    {
-        VK_KHR_SURFACE_EXTENSION_NAME,
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-    };
+const std::vector<const char*> instanceExtensionNames =
+{
+    VK_KHR_SURFACE_EXTENSION_NAME,
+    VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+};
 
-    const std::vector<const char*> deviceExtensionNames =
-    {
-      VK_KHR_SWAPCHAIN_EXTENSION_NAME
-    };
+const std::vector<const char*> deviceExtensionNames =
+{
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
 
-    bool IsExtensionAvailable(const std::vector<VkExtensionProperties>& extensionProperties, const char* extensionName)
+bool IsExtensionAvailable(const std::vector<VkExtensionProperties>& extensionProperties, const char* extensionName)
+{
+    auto it = std::find_if(extensionProperties.cbegin(), extensionProperties.cend(),
+        [&extensionName](const auto& extensionProperty)
     {
-        auto it = std::find_if(extensionProperties.cbegin(), extensionProperties.cend(),
-            [&extensionName](const auto& extensionProperty)
+        return strcmp(extensionName, extensionProperty.extensionName) == 0;
+    });
+    return it != extensionProperties.cend();
+}
+
+bool SelectQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
+    uint32_t& graphicsQueueFamilyIndex, uint32_t& presentQueueFamilyIndex)
+{
+    uint32_t queueFamilyCount;
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
+
+    uint32_t selectedGraphicsQueueFamilyIndex;
+    bool graphicsFound = false;
+
+    uint32_t selectedPresentationQueueFamilyIndex;
+    bool presentationFound = false;
+
+    for (uint32_t i = 0; i < queueFamilyCount; i++)
+    {
+        if (queueFamilies[i].queueCount == 0)
+            continue;
+
+        // check graphics operations support
+        bool graphicsSupported = (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
+
+        // check presentation support
+        VkBool32 presentationSupported;
+        auto result = vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentationSupported);
+        CheckVkResult(result, "vkGetPhysicalDeviceSurfaceSupportKHR");
+
+        if (graphicsSupported)
         {
-            return strcmp(extensionName, extensionProperty.extensionName) == 0;
-        });
-        return it != extensionProperties.cend();
-    }
-
-    bool SelectQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
-        uint32_t& graphicsQueueFamilyIndex, uint32_t& presentQueueFamilyIndex)
-    {
-        uint32_t queueFamilyCount;
-        vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
-
-        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
-
-        uint32_t selectedGraphicsQueueFamilyIndex;
-        bool graphicsFound = false;
-
-        uint32_t selectedPresentationQueueFamilyIndex;
-        bool presentationFound = false;
-
-        for (uint32_t i = 0; i < queueFamilyCount; i++)
+            selectedGraphicsQueueFamilyIndex = i;
+            graphicsFound = true;
+        }
+        if (presentationSupported == VK_TRUE)
         {
-            if (queueFamilies[i].queueCount == 0)
-                continue;
-
-            // check graphics operations support
-            bool graphicsSupported = (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
-
-            // check presentation support
-            VkBool32 presentationSupported;
-            auto result = vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentationSupported);
-            CheckVkResult(result, "vkGetPhysicalDeviceSurfaceSupportKHR");
-
-            if (graphicsSupported)
-            {
-                selectedGraphicsQueueFamilyIndex = i;
-                graphicsFound = true;
-            }
-            if (presentationSupported == VK_TRUE)
-            {
-                selectedPresentationQueueFamilyIndex = i;
-                presentationFound = true;
-            }
-
-            // check if we found a preferred queue that supports both present and graphics operations
-            if (selectedGraphicsQueueFamilyIndex == i && 
-                selectedPresentationQueueFamilyIndex == i)
-                break;
+            selectedPresentationQueueFamilyIndex = i;
+            presentationFound = true;
         }
 
-        if (!graphicsFound || !presentationFound)
-            return false;
-
-        graphicsQueueFamilyIndex = selectedGraphicsQueueFamilyIndex;
-        presentQueueFamilyIndex = selectedPresentationQueueFamilyIndex;
-        return true;
+        // check if we found a preferred queue that supports both present and graphics operations
+        if (selectedGraphicsQueueFamilyIndex == i && 
+            selectedPresentationQueueFamilyIndex == i)
+            break;
     }
+
+    if (!graphicsFound || !presentationFound)
+        return false;
+
+    graphicsQueueFamilyIndex = selectedGraphicsQueueFamilyIndex;
+    presentQueueFamilyIndex = selectedPresentationQueueFamilyIndex;
+    return true;
+}
 } // namespace
 
 VkInstance CreateInstance()

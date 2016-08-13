@@ -123,7 +123,7 @@ SwapchainInfo CreateSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, 
     CheckVkResult(result, "vkCreateSwapchainKHR");
 
     SwapchainInfo info;
-    info.handle = swapchain;
+    info.swapchain = swapchain;
     info.imageFormat = surfaceFormat.format;
 
     // get swapchain images

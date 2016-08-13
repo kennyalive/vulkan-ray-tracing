@@ -5,7 +5,7 @@
 
 struct SwapchainInfo
 {
-    VkSwapchainKHR handle = VK_NULL_HANDLE;
+    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     VkFormat imageFormat = VK_FORMAT_UNDEFINED;
     std::vector<VkImage> images;
 };
