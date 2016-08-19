@@ -149,6 +149,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="common.cpp" />
     <ClCompile Include="device_initialization.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="swapchain_initialization.cpp" />

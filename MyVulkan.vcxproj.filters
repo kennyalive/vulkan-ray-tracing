@@ -5,6 +5,7 @@
     <ClCompile Include="device_initialization.cpp" />
     <ClCompile Include="swapchain_initialization.cpp" />
     <ClCompile Include="vulkan_app.cpp" />
+    <ClCompile Include="common.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="device_initialization.h" />

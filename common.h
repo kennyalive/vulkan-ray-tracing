@@ -20,16 +20,29 @@ private:
     std::string errorMessage;
 };
 
-inline void CheckVkResult(VkResult result, const std::string& functionName)
+class ShaderModule
 {
-    if (result < 0)
-    {
-        throw VulkanException(functionName + 
-            " has returned error code with value " + std::to_string(result));
-    }
-}
+public:
+    ShaderModule(VkDevice device, const std::string& spirvFileName);
+    ~ShaderModule();
+    VkShaderModule GetHandle() const;
 
-inline void Error(const std::string& message)
+private:
+    VkDevice device;
+    VkShaderModule shaderModule;
+};
+
+class PipelineLayout
 {
-    throw VulkanException(message);
-}
+public:
+    PipelineLayout(VkDevice device, VkPipelineLayoutCreateInfo createInfo);
+    ~PipelineLayout();
+    VkPipelineLayout GetHandle() const;
+
+private:
+    VkDevice device;
+    VkPipelineLayout pipelineLayout;
+};
+
+void CheckVkResult(VkResult result, const std::string& functionName);
+void Error(const std::string& message);

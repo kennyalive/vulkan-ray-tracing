@@ -6,7 +6,7 @@
 class VulkanApp
 {
 public:
-    VulkanApp(int windowWidth, int windowHeight);
+    VulkanApp(uint32_t windowWidth, uint32_t windowHeight);
 
     void CreateResources(HWND windowHandle);
     void CleanupResources();
@@ -14,18 +14,23 @@ public:
 
 private:
     void CreateFramebuffers();
+    void CreatePipeline();
     void CreateSemaphores();
-    void CreateCommandBuffers(uint32_t queueFamilyIndex);
+    void CreateCommandBuffers();
 
 private:
-    int windowWidth = 0;
-    int windowHeight = 0;
+    uint32_t windowWidth = 0;
+    uint32_t windowHeight = 0;
 
     VkInstance instance = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
 
     VkDevice device = VK_NULL_HANDLE;
+
+    uint32_t graphicsQueueFamilyIndex = 0;
     VkQueue graphicsQueue = VK_NULL_HANDLE;
+
+    uint32_t presentationQueueFamilyIndex = 0;
     VkQueue presentationQueue = VK_NULL_HANDLE;
 
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
@@ -37,9 +42,11 @@ private:
     std::vector<VkImageView> framebufferImageViews;
     std::vector<VkFramebuffer> framebuffers;
 
+    VkPipeline pipeline = VK_NULL_HANDLE;
+
     VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
     VkSemaphore renderingFinishedSemaphore = VK_NULL_HANDLE;
 
-    VkCommandPool presentQueueCommandPool = VK_NULL_HANDLE;
-    std::vector<VkCommandBuffer> presentQueueCommandBuffers;
+    VkCommandPool graphicsCommandPool = VK_NULL_HANDLE;
+    std::vector<VkCommandBuffer> graphicsCommandBuffers;
 };
