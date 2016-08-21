@@ -1,3 +1,4 @@
+#include <array>
 #include "common.h"
 #include "device_initialization.h"
 #include "swapchain_initialization.h"
@@ -5,6 +6,12 @@
 
 namespace 
 {
+struct VertexData
+{
+    float x, y, z, w;
+    float r, g, b, a;
+};
+
 VkSurfaceKHR CreateSurface(VkInstance instance, HWND hwnd)
 {
     VkWin32SurfaceCreateInfoKHR surfaceCreateInfo;
@@ -49,6 +56,23 @@ VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat)
     subpassDescription.preserveAttachmentCount = 0;
     subpassDescription.pPreserveAttachments = nullptr;
 
+    std::array<VkSubpassDependency, 2> dependencies;
+    dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependencies[0].dstSubpass = 0;
+    dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    dependencies[1].srcSubpass = 0;
+    dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+    dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
     VkRenderPassCreateInfo renderPassCreateInfo;
     renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassCreateInfo.pNext = nullptr;
@@ -57,8 +81,8 @@ VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat)
     renderPassCreateInfo.pAttachments = &attachmentDescription;
     renderPassCreateInfo.subpassCount = 1;
     renderPassCreateInfo.pSubpasses = &subpassDescription;
-    renderPassCreateInfo.dependencyCount = 0;
-    renderPassCreateInfo.pDependencies = nullptr;
+    renderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+    renderPassCreateInfo.pDependencies = dependencies.data();
 
     VkRenderPass renderPass;
     VkResult result = vkCreateRenderPass(device, &renderPassCreateInfo, nullptr, &renderPass);
@@ -90,7 +114,7 @@ VulkanApp::VulkanApp(uint32_t windowWidth, uint32_t windowHeight)
 void VulkanApp::CreateResources(HWND windowHandle)
 {
     instance = CreateInstance();
-    VkPhysicalDevice physicalDevice = SelectPhysicalDevice(instance);
+    physicalDevice = SelectPhysicalDevice(instance);
 
     surface = CreateSurface(instance, windowHandle);
 
@@ -105,13 +129,13 @@ void VulkanApp::CreateResources(HWND windowHandle)
     swapchain = swapchainInfo.swapchain;
     swapchainImageFormat = swapchainInfo.imageFormat;
     swapchainImages = swapchainInfo.images;
+    swapchainImageViews = swapchainInfo.imageViews;
 
     renderPass = CreateRenderPass(device, swapchainInfo.imageFormat);
 
-    CreateFramebuffers();
     CreatePipeline();
-    CreateSemaphores();
-    CreateCommandBuffers();
+    CreateVertexBuffer();
+    CreateFrameResources();
 }
 
 void VulkanApp::CleanupResources()
@@ -119,25 +143,36 @@ void VulkanApp::CleanupResources()
     VkResult result = vkDeviceWaitIdle(device);
     CheckVkResult(result, "vkDeviceWaitIdle");
 
-    vkDestroyCommandPool(device, graphicsCommandPool, nullptr);
-    graphicsCommandPool = VK_NULL_HANDLE;
+    vkDestroyCommandPool(device, commandPool, nullptr);
+    commandPool = VK_NULL_HANDLE;
 
-    vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-    imageAvailableSemaphore = VK_NULL_HANDLE;
+    for (auto& resources : frameResources)
+    {
+        vkDestroyFramebuffer(device, resources.framebuffer, nullptr);
+        resources.framebuffer = VK_NULL_HANDLE;
 
-    vkDestroySemaphore(device, renderingFinishedSemaphore, nullptr);
-    renderingFinishedSemaphore = VK_NULL_HANDLE;
+        vkDestroySemaphore(device, resources.imageAvailableSemaphore, nullptr);
+        resources.imageAvailableSemaphore = VK_NULL_HANDLE;
+
+        vkDestroySemaphore(device, resources.renderingFinishedSemaphore, nullptr);
+        resources.renderingFinishedSemaphore = VK_NULL_HANDLE;
+
+        vkDestroyFence(device, resources.fence, nullptr);
+        resources.fence = VK_NULL_HANDLE;
+    }
+
+    vkFreeMemory(device, vertexBufferMemory, nullptr);
+    vertexBufferMemory = VK_NULL_HANDLE;
+
+    vkDestroyBuffer(device, vertexBuffer, nullptr);
+    vertexBuffer = VK_NULL_HANDLE;
 
     vkDestroyPipeline(device, pipeline, nullptr);
     pipeline = VK_NULL_HANDLE;
 
-    for (size_t i = 0; i < framebuffers.size(); i++)
-        vkDestroyFramebuffer(device, framebuffers[i], nullptr);
-    framebuffers.clear();
-
-    for (auto imageView : framebufferImageViews)
+    for (auto imageView : swapchainImageViews)
         vkDestroyImageView(device, imageView, nullptr);
-    framebufferImageViews.clear();
+    swapchainImageViews.clear();
 
     vkDestroyRenderPass(device, renderPass, nullptr);
     renderPass = VK_NULL_HANDLE;
@@ -157,58 +192,6 @@ void VulkanApp::CleanupResources()
     instance = VK_NULL_HANDLE;
 }
 
-void VulkanApp::CreateFramebuffers()
-{
-    VkResult result;
-    uint32_t imagesCount = static_cast<uint32_t>(swapchainImages.size());
-
-    // create views for swapchain images
-    framebufferImageViews.resize(imagesCount);
-    for (uint32_t i = 0; i < imagesCount; i++)
-    {
-        VkImageViewCreateInfo imageViewCreateInfo;
-        imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        imageViewCreateInfo.pNext = nullptr;
-        imageViewCreateInfo.flags = 0;
-        imageViewCreateInfo.image = swapchainImages[i];
-        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        imageViewCreateInfo.format = swapchainImageFormat;
-        imageViewCreateInfo.components = {
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY
-        };
-        imageViewCreateInfo.subresourceRange = {
-            VK_IMAGE_ASPECT_COLOR_BIT,
-            0,
-            1,
-            0,
-            1
-        };
-        result = vkCreateImageView(device, &imageViewCreateInfo, nullptr, &framebufferImageViews[i]);
-        CheckVkResult(result, "vkCreateImageView");
-    }
-
-    framebuffers.resize(imagesCount);
-    for (uint32_t i = 0; i < imagesCount; i++)
-    {
-        VkFramebufferCreateInfo framebufferCreateInfo;
-        framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferCreateInfo.pNext = nullptr;
-        framebufferCreateInfo.flags = 0;
-        framebufferCreateInfo.renderPass = renderPass;
-        framebufferCreateInfo.attachmentCount = 1;
-        framebufferCreateInfo.pAttachments = &framebufferImageViews[i];
-        framebufferCreateInfo.width = windowWidth;
-        framebufferCreateInfo.height = windowHeight;
-        framebufferCreateInfo.layers = 1;
-
-        result = vkCreateFramebuffer(device, &framebufferCreateInfo, nullptr, &framebuffers[i]);
-        CheckVkResult(result, "vkCreateFramebuffer");
-    }
-}
-
 void VulkanApp::CreatePipeline()
 {
     ShaderModule vertexShaderModule(device, "shaders/vert.spv");
@@ -222,20 +205,36 @@ void VulkanApp::CreatePipeline()
             fragmentShaderModule.GetHandle(), "main")
     };
 
+    VkVertexInputBindingDescription vertexBindingDescription;
+    vertexBindingDescription.binding = 0;
+    vertexBindingDescription.stride = sizeof(VertexData);
+    vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    std::array<VkVertexInputAttributeDescription, 2> vertexAttributeDescriptions;
+    vertexAttributeDescriptions[0].location = 0;
+    vertexAttributeDescriptions[0].binding = vertexBindingDescription.binding;
+    vertexAttributeDescriptions[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    vertexAttributeDescriptions[0].offset = offsetof(struct VertexData, x);
+
+    vertexAttributeDescriptions[1].location = 1;
+    vertexAttributeDescriptions[1].binding = vertexBindingDescription.binding;
+    vertexAttributeDescriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    vertexAttributeDescriptions[1].offset = offsetof(struct VertexData, r);
+
     VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo;
     vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputStateCreateInfo.pNext = nullptr;
     vertexInputStateCreateInfo.flags = 0;
-    vertexInputStateCreateInfo.vertexBindingDescriptionCount = 0;
-    vertexInputStateCreateInfo.pVertexBindingDescriptions = nullptr;
-    vertexInputStateCreateInfo.vertexAttributeDescriptionCount = 0;
-    vertexInputStateCreateInfo.pVertexAttributeDescriptions = nullptr;
+    vertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
+    vertexInputStateCreateInfo.pVertexBindingDescriptions = &vertexBindingDescription;
+    vertexInputStateCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexAttributeDescriptions.size());
+    vertexInputStateCreateInfo.pVertexAttributeDescriptions = vertexAttributeDescriptions.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo;
     inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssemblyStateCreateInfo.pNext = nullptr;
     inputAssemblyStateCreateInfo.flags = 0;
-    inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
     inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport;
@@ -350,51 +349,180 @@ void VulkanApp::CreatePipeline()
     CheckVkResult(result, "vkCreateGraphicsPipelines");
 }
 
-void VulkanApp::CreateSemaphores()
+void VulkanApp::CreateVertexBuffer()
 {
+    std::array<VertexData, 4> vertexData
+    {{
+        {
+            -0.7f, -0.7f, 0.0f, 1.0f,
+            1.0f, 0.0f, 0.0f, 0.0f
+        },
+        {
+            -0.7f, 0.7f, 0.0f, 1.0f,
+            0.0f, 1.0f, 0.0f, 1.0f
+        },
+        {
+            0.7f, -0.7f, 0.0f, 1.0f,
+            0.0f, 0.0f, 1.0f, 0.0f
+        },
+        {
+            0.7f, 0.7f, 0.0f, 1.0f,
+            0.3f, 0.3f, 0.3f, 0.0f
+        }
+    }};
+
+    const VkDeviceSize vertexDataSize = vertexData.size() * sizeof(VertexData);
+
+    VkBufferCreateInfo bufferCreateInfo;
+    bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferCreateInfo.pNext = nullptr;
+    bufferCreateInfo.flags = 0;
+    bufferCreateInfo.size = vertexDataSize;
+    bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferCreateInfo.queueFamilyIndexCount = 0;
+    bufferCreateInfo.pQueueFamilyIndices = nullptr;
+
+    VkResult result = vkCreateBuffer(device, &bufferCreateInfo, nullptr, &vertexBuffer);
+    CheckVkResult(result, "vkCreateBuffer");
+
+    VkMemoryRequirements memoryRequirements;
+    vkGetBufferMemoryRequirements(device, vertexBuffer, &memoryRequirements);
+
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+
+    uint32_t memoryTypeIndex = VK_MAX_MEMORY_TYPES;
+    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
+    {
+        if ((memoryRequirements.memoryTypeBits & (1 << i)) != 0 &&
+            (memoryProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0)
+        {
+            memoryTypeIndex = i;
+            break;
+        }
+    }
+
+    if (memoryTypeIndex == VK_MAX_MEMORY_TYPES)
+        Error("Failed to find matching memory type for vertex buffer");
+
+    VkMemoryAllocateInfo memoryAllocateInfo;
+    memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memoryAllocateInfo.pNext = nullptr;
+    memoryAllocateInfo.allocationSize = memoryRequirements.size;
+    memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
+
+    result = vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &vertexBufferMemory);
+    CheckVkResult(result, "vkAllocateMemory");
+
+    result = vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+    CheckVkResult(result, "vkBindBufferMemory");
+
+    void* bufferPtr;
+    result = vkMapMemory(device, vertexBufferMemory, 0, vertexDataSize, 0, &bufferPtr);
+    CheckVkResult(result, "vkMapMemory");
+
+    memcpy(bufferPtr, vertexData.data(), vertexDataSize);
+
+    VkMappedMemoryRange flushRange;
+    flushRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+    flushRange.pNext = nullptr;
+    flushRange.memory = vertexBufferMemory;
+    flushRange.offset = 0;
+    flushRange.size = VK_WHOLE_SIZE;
+
+    result = vkFlushMappedMemoryRanges(device, 1, &flushRange);
+    CheckVkResult(result, "vkFlushMappedMemoryRanges");
+
+    vkUnmapMemory(device, vertexBufferMemory);
+}
+
+void VulkanApp::CreateFrameResources()
+{
+    // Allocate command buffers.
+    VkCommandPoolCreateInfo commandPoolCreateInfo;
+    commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    commandPoolCreateInfo.pNext = nullptr;
+
+    commandPoolCreateInfo.flags = 
+        VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT |
+        VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+
+    commandPoolCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
+
+    VkResult result = vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &commandPool);
+    CheckVkResult(result, "vkCreateCommandPool");
+
+    VkCommandBufferAllocateInfo commandBufferAllocateInfo;
+    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandBufferAllocateInfo.pNext = nullptr;
+    commandBufferAllocateInfo.commandPool = commandPool;
+    commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    commandBufferAllocateInfo.commandBufferCount = static_cast<uint32_t>(frameResources.size());
+
+    std::vector<VkCommandBuffer> commandBuffers(frameResources.size());
+    result = vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffers.data());
+    CheckVkResult(result, "vkAllocateCommandBuffers");
+
+    for (size_t i = 0; i < frameResources.size(); i++)
+        frameResources[i].commandBuffer = commandBuffers[i];
+
+    // Create semaphores.
     VkSemaphoreCreateInfo semaphoreCreateInfo;
     semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     semaphoreCreateInfo.pNext = nullptr;
     semaphoreCreateInfo.flags = 0;
 
-    VkResult result = vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphore);
-    CheckVkResult(result, "vkCreateSemaphore");
+    for (size_t i = 0; i < frameResources.size(); i++)
+    {
+        VkResult result = vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr,
+            &frameResources[i].imageAvailableSemaphore);
+        CheckVkResult(result, "vkCreateSemaphore");
 
-    result = vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &renderingFinishedSemaphore);
-    CheckVkResult(result, "vkCreateSemaphore");
+        result = vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr,
+            &frameResources[i].renderingFinishedSemaphore);
+        CheckVkResult(result, "vkCreateSemaphore");
+    }
+
+    // Create fences.
+    VkFenceCreateInfo fenceCreateInfo;
+    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceCreateInfo.pNext = nullptr;
+    fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (size_t i = 0; i < frameResources.size(); i++)
+    {
+        result = vkCreateFence(device, &fenceCreateInfo, nullptr, &frameResources[i].fence);
+        CheckVkResult(result, "vkCreateFence");
+    }
 }
 
-void VulkanApp::CreateCommandBuffers()
+void VulkanApp::RecordCommandBuffer()
 {
-    VkCommandPoolCreateInfo commandPoolCreateInfo;
-    commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    commandPoolCreateInfo.pNext = nullptr;
-    commandPoolCreateInfo.flags = 0;
-    commandPoolCreateInfo.queueFamilyIndex = graphicsQueueFamilyIndex;
+    // Recreate framebuffer for current swapchain image.
+    auto& currentFrameResources = frameResources[frameResourcesIndex];
 
-    VkResult result = vkCreateCommandPool(device, &commandPoolCreateInfo, nullptr, &graphicsCommandPool);
-    CheckVkResult(result, "vkCreateCommandPool");
+    if (currentFrameResources.framebuffer != VK_NULL_HANDLE)
+    {
+        vkDestroyFramebuffer(device, currentFrameResources.framebuffer, nullptr);
+        currentFrameResources.framebuffer = VK_NULL_HANDLE;
+    }
 
-    uint32_t imagesCount = static_cast<uint32_t>(swapchainImages.size());
+    VkFramebufferCreateInfo framebufferCreateInfo;
+    framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferCreateInfo.pNext = nullptr;
+    framebufferCreateInfo.flags = 0;
+    framebufferCreateInfo.renderPass = renderPass;
+    framebufferCreateInfo.attachmentCount = 1;
+    framebufferCreateInfo.pAttachments = &swapchainImageViews[swapchainImageIndex];
+    framebufferCreateInfo.width = windowWidth;
+    framebufferCreateInfo.height = windowHeight;
+    framebufferCreateInfo.layers = 1;
 
-    graphicsCommandBuffers.resize(imagesCount);
+    VkResult result = vkCreateFramebuffer(device, &framebufferCreateInfo, nullptr, &currentFrameResources.framebuffer);
+    CheckVkResult(result, "vkCreateFramebuffer");
 
-    VkCommandBufferAllocateInfo commandBufferAllocateInfo;
-    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    commandBufferAllocateInfo.pNext = nullptr;
-    commandBufferAllocateInfo.commandPool = graphicsCommandPool;
-    commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    commandBufferAllocateInfo.commandBufferCount = imagesCount;
-
-    result = vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, graphicsCommandBuffers.data());
-    CheckVkResult(result, "vkAllocateCommandBuffers");
-
-    VkCommandBufferBeginInfo commandBufferBeginInfo;
-    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    commandBufferBeginInfo.pNext = nullptr;
-    commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-    commandBufferBeginInfo.pInheritanceInfo = nullptr;
-
+    // Record command buffer for current frame.
     VkImageSubresourceRange imageSubresourceRange;
     imageSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     imageSubresourceRange.baseMipLevel = 0;
@@ -402,103 +530,111 @@ void VulkanApp::CreateCommandBuffers()
     imageSubresourceRange.baseArrayLayer = 0;
     imageSubresourceRange.layerCount = 1;
 
+    VkCommandBufferBeginInfo commandBufferBeginInfo;
+    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    commandBufferBeginInfo.pNext = nullptr;
+    commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    commandBufferBeginInfo.pInheritanceInfo = nullptr;
+
+    result = vkBeginCommandBuffer(currentFrameResources.commandBuffer, &commandBufferBeginInfo);
+    CheckVkResult(result, "vkBeginCommandBuffer");
+
+    if (presentationQueue != graphicsQueue)
+    {
+        VkImageMemoryBarrier barrierFromPresentToDraw;
+        barrierFromPresentToDraw.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrierFromPresentToDraw.pNext = nullptr;
+        barrierFromPresentToDraw.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        barrierFromPresentToDraw.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        barrierFromPresentToDraw.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrierFromPresentToDraw.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrierFromPresentToDraw.srcQueueFamilyIndex = presentationQueueFamilyIndex;
+        barrierFromPresentToDraw.dstQueueFamilyIndex = graphicsQueueFamilyIndex;
+        barrierFromPresentToDraw.image = swapchainImages[swapchainImageIndex];
+        barrierFromPresentToDraw.subresourceRange = imageSubresourceRange;
+
+        vkCmdPipelineBarrier(
+            currentFrameResources.commandBuffer,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            0,
+            0,
+            nullptr,
+            0,
+            nullptr,
+            1,
+            &barrierFromPresentToDraw
+            );
+    }
+
     VkClearValue clearValue;
     clearValue.color = {1.0f, 0.8f, 0.4f, 0.0f};
 
-    for (uint32_t i = 0; i < imagesCount; ++i)
+    VkRenderPassBeginInfo renderPassBeginInfo;
+    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassBeginInfo.pNext = nullptr;
+    renderPassBeginInfo.renderPass = renderPass;
+    renderPassBeginInfo.framebuffer = currentFrameResources.framebuffer;
+    renderPassBeginInfo.renderArea.offset = {0, 0};
+    renderPassBeginInfo.renderArea.extent = {windowWidth, windowHeight};
+    renderPassBeginInfo.clearValueCount = 1;
+    renderPassBeginInfo.pClearValues = &clearValue;
+
+    vkCmdBeginRenderPass(currentFrameResources.commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(currentFrameResources.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(currentFrameResources.commandBuffer, 0, 1, &vertexBuffer, &offset);
+    vkCmdDraw(currentFrameResources.commandBuffer, 4, 1, 0, 0);
+    vkCmdEndRenderPass(currentFrameResources.commandBuffer);
+
+    if (presentationQueue != graphicsQueue)
     {
-        result = vkBeginCommandBuffer(graphicsCommandBuffers[i], &commandBufferBeginInfo);
-        CheckVkResult(result, "vkBeginCommandBuffer");
+        VkImageMemoryBarrier barrierFromDrawToPresent;
+        barrierFromDrawToPresent.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrierFromDrawToPresent.pNext = nullptr;
+        barrierFromDrawToPresent.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        barrierFromDrawToPresent.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        barrierFromDrawToPresent.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrierFromDrawToPresent.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrierFromDrawToPresent.srcQueueFamilyIndex = graphicsQueueFamilyIndex;
+        barrierFromDrawToPresent.dstQueueFamilyIndex = presentationQueueFamilyIndex;
+        barrierFromDrawToPresent.image = swapchainImages[swapchainImageIndex];
+        barrierFromDrawToPresent.subresourceRange = imageSubresourceRange;
 
-        if (presentationQueue != graphicsQueue)
-        {
-            VkImageMemoryBarrier barrierFromPresentToDraw;
-            barrierFromPresentToDraw.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            barrierFromPresentToDraw.pNext = nullptr;
-            barrierFromPresentToDraw.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-            barrierFromPresentToDraw.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            barrierFromPresentToDraw.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            barrierFromPresentToDraw.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            barrierFromPresentToDraw.srcQueueFamilyIndex = presentationQueueFamilyIndex;
-            barrierFromPresentToDraw.dstQueueFamilyIndex = graphicsQueueFamilyIndex;
-            barrierFromPresentToDraw.image = swapchainImages[i];
-            barrierFromPresentToDraw.subresourceRange = imageSubresourceRange;
-
-            vkCmdPipelineBarrier(
-                graphicsCommandBuffers[i],
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                0,
-                0,
-                nullptr,
-                0,
-                nullptr,
-                1,
-                &barrierFromPresentToDraw
-                );
-        }
-
-        VkRenderPassBeginInfo renderPassBeginInfo;
-        renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassBeginInfo.pNext = nullptr;
-        renderPassBeginInfo.renderPass = renderPass;
-        renderPassBeginInfo.framebuffer = framebuffers[i];
-        renderPassBeginInfo.renderArea.offset = {0, 0};
-        renderPassBeginInfo.renderArea.extent = {windowWidth, windowHeight};
-        renderPassBeginInfo.clearValueCount = 1;
-        renderPassBeginInfo.pClearValues = &clearValue;
-
-        vkCmdBeginRenderPass(graphicsCommandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindPipeline(graphicsCommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-        vkCmdDraw(graphicsCommandBuffers[i], 3, 1, 0, 0);
-        vkCmdEndRenderPass(graphicsCommandBuffers[i]);
-
-        if (presentationQueue != graphicsQueue)
-        {
-            VkImageMemoryBarrier barrierFromDrawToPresent;
-            barrierFromDrawToPresent.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            barrierFromDrawToPresent.pNext = nullptr;
-            barrierFromDrawToPresent.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            barrierFromDrawToPresent.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-            barrierFromDrawToPresent.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            barrierFromDrawToPresent.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            barrierFromDrawToPresent.srcQueueFamilyIndex = graphicsQueueFamilyIndex;
-            barrierFromDrawToPresent.dstQueueFamilyIndex = presentationQueueFamilyIndex;
-            barrierFromDrawToPresent.image = swapchainImages[i];
-            barrierFromDrawToPresent.subresourceRange = imageSubresourceRange;
-
-            vkCmdPipelineBarrier(
-                graphicsCommandBuffers[i],
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                0,
-                0,
-                nullptr,
-                0,
-                nullptr,
-                1,
-                &barrierFromDrawToPresent
-                );
-        }
-
-        result = vkEndCommandBuffer(graphicsCommandBuffers[i]);
-        CheckVkResult(result, "vkEndCommandBuffer");
+        vkCmdPipelineBarrier(
+            currentFrameResources.commandBuffer,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            0,
+            0,
+            nullptr,
+            0,
+            nullptr,
+            1,
+            &barrierFromDrawToPresent
+            );
     }
+
+    result = vkEndCommandBuffer(currentFrameResources.commandBuffer);
+    CheckVkResult(result, "vkEndCommandBuffer");
 }
 
 void VulkanApp::RunFrame()
 {
-    uint32_t imageIndex;
+    const auto& currentFrameResources = frameResources[frameResourcesIndex];
 
-    VkResult result = vkAcquireNextImageKHR(
-        device,
-        swapchain,
-        UINT64_MAX,
-        imageAvailableSemaphore,
-        VK_NULL_HANDLE,
-        &imageIndex);
+    VkResult result = vkWaitForFences(device, 1, &currentFrameResources.fence, VK_FALSE, 1000000000);
+    CheckVkResult(result, "vkWaitForFences");
 
+    result = vkResetFences(device, 1, &currentFrameResources.fence);
+    CheckVkResult(result, "vkResetFences");
+
+    result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, currentFrameResources.imageAvailableSemaphore,
+        VK_NULL_HANDLE, &swapchainImageIndex);
     CheckVkResult(result, "vkAcquireNextImageKHR");
+
+    RecordCommandBuffer();
 
     VkPipelineStageFlags waitDstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
 
@@ -506,26 +642,28 @@ void VulkanApp::RunFrame()
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.pNext = nullptr;
     submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &imageAvailableSemaphore;
+    submitInfo.pWaitSemaphores = &currentFrameResources.imageAvailableSemaphore;
     submitInfo.pWaitDstStageMask = &waitDstStageMask;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &graphicsCommandBuffers[imageIndex];
+    submitInfo.pCommandBuffers = &currentFrameResources.commandBuffer;
     submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &renderingFinishedSemaphore;
+    submitInfo.pSignalSemaphores = &currentFrameResources.renderingFinishedSemaphore;
 
-    result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, currentFrameResources.fence);
     CheckVkResult(result, "vkQueueSubmit");
 
     VkPresentInfoKHR presentInfo;
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.pNext = nullptr;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &renderingFinishedSemaphore;
+    presentInfo.pWaitSemaphores = &currentFrameResources.renderingFinishedSemaphore;
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &swapchain;
-    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pImageIndices = &swapchainImageIndex;
     presentInfo.pResults = nullptr;
 
     result = vkQueuePresentKHR(presentationQueue, &presentInfo);
     CheckVkResult(result, "vkQueuePresentKHR");
+
+    frameResourcesIndex = (frameResourcesIndex + 1) % frameResources.size();
 }

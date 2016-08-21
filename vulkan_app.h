@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <vector>
 #include "vulkan_definitions.h"
 
@@ -13,10 +14,20 @@ public:
     void RunFrame();
 
 private:
-    void CreateFramebuffers();
     void CreatePipeline();
-    void CreateSemaphores();
-    void CreateCommandBuffers();
+    void CreateVertexBuffer();
+    void CreateFrameResources();
+    void RecordCommandBuffer();
+
+private:
+    struct FrameRenderResources
+    {
+        VkFramebuffer framebuffer = VK_NULL_HANDLE;
+        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+        VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+        VkSemaphore renderingFinishedSemaphore = VK_NULL_HANDLE;
+        VkFence fence = VK_NULL_HANDLE;
+    };
 
 private:
     uint32_t windowWidth = 0;
@@ -24,6 +35,8 @@ private:
 
     VkInstance instance = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
+
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
     VkDevice device = VK_NULL_HANDLE;
 
@@ -36,17 +49,18 @@ private:
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     VkFormat swapchainImageFormat = VK_FORMAT_UNDEFINED;
     std::vector<VkImage> swapchainImages;
+    std::vector<VkImageView> swapchainImageViews;
 
     VkRenderPass renderPass = VK_NULL_HANDLE;
 
-    std::vector<VkImageView> framebufferImageViews;
-    std::vector<VkFramebuffer> framebuffers;
-
     VkPipeline pipeline = VK_NULL_HANDLE;
 
-    VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-    VkSemaphore renderingFinishedSemaphore = VK_NULL_HANDLE;
+    VkBuffer vertexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
 
-    VkCommandPool graphicsCommandPool = VK_NULL_HANDLE;
-    std::vector<VkCommandBuffer> graphicsCommandBuffers;
+    VkCommandPool commandPool = VK_NULL_HANDLE;
+    std::array<FrameRenderResources, 3> frameResources;
+
+    int frameResourcesIndex = 0;
+    uint32_t swapchainImageIndex = 0;
 };

@@ -134,5 +134,34 @@ SwapchainInfo CreateSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, 
     info.images.resize(imagesCount);
     result = vkGetSwapchainImagesKHR(device, swapchain, &imagesCount, info.images.data());
     CheckVkResult(result, "vkGetSwapchainImagesKHR");
+
+    // create views for swapchain images
+    info.imageViews.resize(imagesCount);
+    for (uint32_t i = 0; i < imagesCount; i++)
+    {
+        VkImageViewCreateInfo imageViewCreateInfo;
+        imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        imageViewCreateInfo.pNext = nullptr;
+        imageViewCreateInfo.flags = 0;
+        imageViewCreateInfo.image = info.images[i];
+        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        imageViewCreateInfo.format = info.imageFormat;
+        imageViewCreateInfo.components = {
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY
+        };
+        imageViewCreateInfo.subresourceRange = {
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            0,
+            1,
+            0,
+            1
+        };
+        result = vkCreateImageView(device, &imageViewCreateInfo, nullptr, &info.imageViews[i]);
+        CheckVkResult(result, "vkCreateImageView");
+    }
+
     return info;
 }
