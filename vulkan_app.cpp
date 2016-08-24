@@ -124,7 +124,7 @@ void VulkanApp::CreateResources(HWND windowHandle)
     graphicsQueue = deviceInfo.graphicsQueue;
     presentationQueueFamilyIndex = deviceInfo.presentationQueueFamilyIndex;
     presentationQueue = deviceInfo.presentationQueue;
-    
+
     SwapchainInfo swapchainInfo = CreateSwapchain(physicalDevice, device, surface);
     swapchain = swapchainInfo.swapchain;
     swapchainImageFormat = swapchainInfo.imageFormat;
@@ -134,8 +134,13 @@ void VulkanApp::CreateResources(HWND windowHandle)
     renderPass = CreateRenderPass(device, swapchainInfo.imageFormat);
 
     CreatePipeline();
+
+    CreateStagingBuffer();
     CreateVertexBuffer();
+    
     CreateFrameResources();
+
+    CopyVertexData();
 }
 
 void VulkanApp::CleanupResources()
@@ -160,6 +165,12 @@ void VulkanApp::CleanupResources()
         vkDestroyFence(device, resources.fence, nullptr);
         resources.fence = VK_NULL_HANDLE;
     }
+
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+    stagingBufferMemory = VK_NULL_HANDLE;
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    stagingBuffer = VK_NULL_HANDLE;
 
     vkFreeMemory(device, vertexBufferMemory, nullptr);
     vertexBufferMemory = VK_NULL_HANDLE;
@@ -349,10 +360,10 @@ void VulkanApp::CreatePipeline()
     CheckVkResult(result, "vkCreateGraphicsPipelines");
 }
 
-void VulkanApp::CreateVertexBuffer()
+std::vector<VertexData> GetVertexData()
 {
-    std::array<VertexData, 4> vertexData
-    {{
+    return std::vector<VertexData>
+    {
         {
             -0.7f, -0.7f, 0.0f, 1.0f,
             1.0f, 0.0f, 0.0f, 0.0f
@@ -369,34 +380,41 @@ void VulkanApp::CreateVertexBuffer()
             0.7f, 0.7f, 0.0f, 1.0f,
             0.3f, 0.3f, 0.3f, 0.0f
         }
-    }};
+    };
+}
 
-    const VkDeviceSize vertexDataSize = vertexData.size() * sizeof(VertexData);
+VkDeviceSize GetStagingBufferSize()
+{
+    return 1024 * 1024;
+}
 
+void VulkanApp::CreateBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlagBits memoryProperty,
+    VkBuffer& buffer, VkDeviceMemory& deviceMemory)
+{
     VkBufferCreateInfo bufferCreateInfo;
     bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferCreateInfo.pNext = nullptr;
     bufferCreateInfo.flags = 0;
-    bufferCreateInfo.size = vertexDataSize;
-    bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bufferCreateInfo.size = bufferSize;
+    bufferCreateInfo.usage = usage;
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     bufferCreateInfo.queueFamilyIndexCount = 0;
     bufferCreateInfo.pQueueFamilyIndices = nullptr;
 
-    VkResult result = vkCreateBuffer(device, &bufferCreateInfo, nullptr, &vertexBuffer);
+    VkResult result = vkCreateBuffer(device, &bufferCreateInfo, nullptr, &buffer);
     CheckVkResult(result, "vkCreateBuffer");
 
     VkMemoryRequirements memoryRequirements;
-    vkGetBufferMemoryRequirements(device, vertexBuffer, &memoryRequirements);
+    vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
 
-    VkPhysicalDeviceMemoryProperties memoryProperties;
-    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+    VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &deviceMemoryProperties);
 
     uint32_t memoryTypeIndex = VK_MAX_MEMORY_TYPES;
-    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
+    for (uint32_t i = 0; i < deviceMemoryProperties.memoryTypeCount; ++i)
     {
         if ((memoryRequirements.memoryTypeBits & (1 << i)) != 0 &&
-            (memoryProperties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0)
+            (deviceMemoryProperties.memoryTypes[i].propertyFlags & memoryProperty) == memoryProperty)
         {
             memoryTypeIndex = i;
             break;
@@ -412,29 +430,29 @@ void VulkanApp::CreateVertexBuffer()
     memoryAllocateInfo.allocationSize = memoryRequirements.size;
     memoryAllocateInfo.memoryTypeIndex = memoryTypeIndex;
 
-    result = vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &vertexBufferMemory);
+    result = vkAllocateMemory(device, &memoryAllocateInfo, nullptr, &deviceMemory);
     CheckVkResult(result, "vkAllocateMemory");
 
-    result = vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+    result = vkBindBufferMemory(device, buffer, deviceMemory, 0);
     CheckVkResult(result, "vkBindBufferMemory");
+}
 
-    void* bufferPtr;
-    result = vkMapMemory(device, vertexBufferMemory, 0, vertexDataSize, 0, &bufferPtr);
-    CheckVkResult(result, "vkMapMemory");
+void VulkanApp::CreateStagingBuffer()
+{
+    CreateBuffer(GetStagingBufferSize(),
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+        stagingBuffer, stagingBufferMemory);
+}
 
-    memcpy(bufferPtr, vertexData.data(), vertexDataSize);
+void VulkanApp::CreateVertexBuffer()
+{
+    const VkDeviceSize vertexDataSize = GetVertexData().size() * sizeof(VertexData);
 
-    VkMappedMemoryRange flushRange;
-    flushRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-    flushRange.pNext = nullptr;
-    flushRange.memory = vertexBufferMemory;
-    flushRange.offset = 0;
-    flushRange.size = VK_WHOLE_SIZE;
-
-    result = vkFlushMappedMemoryRanges(device, 1, &flushRange);
-    CheckVkResult(result, "vkFlushMappedMemoryRanges");
-
-    vkUnmapMemory(device, vertexBufferMemory);
+    CreateBuffer(vertexDataSize,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        vertexBuffer, vertexBufferMemory);
 }
 
 void VulkanApp::CreateFrameResources()
@@ -495,6 +513,79 @@ void VulkanApp::CreateFrameResources()
         result = vkCreateFence(device, &fenceCreateInfo, nullptr, &frameResources[i].fence);
         CheckVkResult(result, "vkCreateFence");
     }
+}
+
+void VulkanApp::CopyVertexData()
+{
+    // Copy vertex data to staging buffer.
+    auto vertexData = GetVertexData();
+    const VkDeviceSize vertexDataSize = vertexData.size() * sizeof(VertexData);
+
+    void* stagingBufferPtr;
+    VkResult result = vkMapMemory(device, stagingBufferMemory, 0, vertexDataSize, 0, &stagingBufferPtr);
+    CheckVkResult(result, "vkMapMemory");
+
+    memcpy(stagingBufferPtr, vertexData.data(), vertexDataSize);
+
+    VkMappedMemoryRange flushRange;
+    flushRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+    flushRange.pNext = nullptr;
+    flushRange.memory = stagingBufferMemory;
+    flushRange.offset = 0;
+    flushRange.size = vertexDataSize;
+    result = vkFlushMappedMemoryRanges(device, 1, &flushRange);
+    CheckVkResult(result, "vkFlushMappedMemoryRanges");
+
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    // Copy staging buffer contents to vertex buffer.
+    VkCommandBufferBeginInfo commandBufferBeginInfo;
+    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    commandBufferBeginInfo.pNext = nullptr;
+    commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    commandBufferBeginInfo.pInheritanceInfo = nullptr;
+
+    VkCommandBuffer commandBuffer = frameResources[0].commandBuffer;
+    result = vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+    CheckVkResult(result, "vkBeginCommandBuffer");
+
+    VkBufferCopy bufferCopyInfo;
+    bufferCopyInfo.srcOffset = 0;
+    bufferCopyInfo.dstOffset = 0;
+    bufferCopyInfo.size = vertexDataSize;
+    vkCmdCopyBuffer(commandBuffer, stagingBuffer, vertexBuffer, 1, &bufferCopyInfo);
+
+    VkBufferMemoryBarrier bufferMemoryBarrier;
+    bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    bufferMemoryBarrier.pNext = nullptr;
+    bufferMemoryBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+    bufferMemoryBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+    bufferMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    bufferMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    bufferMemoryBarrier.buffer = vertexBuffer;
+    bufferMemoryBarrier.offset = 0;
+    bufferMemoryBarrier.size = VK_WHOLE_SIZE;
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, 
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &bufferMemoryBarrier,
+        0, nullptr);
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo;
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.pNext = nullptr;
+    submitInfo.waitSemaphoreCount = 0;
+    submitInfo.pWaitSemaphores = nullptr;
+    submitInfo.pWaitDstStageMask = nullptr;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+    submitInfo.signalSemaphoreCount = 0;
+    submitInfo.pSignalSemaphores = nullptr;
+
+    result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    CheckVkResult(result, "vkQueueSubmit");
+
+    result = vkDeviceWaitIdle(device);
+    CheckVkResult(result, "vkDeviceWaitIdle");
 }
 
 void VulkanApp::RecordCommandBuffer()

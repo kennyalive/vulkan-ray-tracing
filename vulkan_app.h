@@ -15,8 +15,16 @@ public:
 
 private:
     void CreatePipeline();
+
+    void CreateBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlagBits memoryProperty,
+        VkBuffer& buffer, VkDeviceMemory& deviceMemory);
+
+    void CreateStagingBuffer();
     void CreateVertexBuffer();
+    
     void CreateFrameResources();
+    void CopyVertexData();
+
     void RecordCommandBuffer();
 
 private:
@@ -54,6 +62,9 @@ private:
     VkRenderPass renderPass = VK_NULL_HANDLE;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
+
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
 
     VkBuffer vertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
