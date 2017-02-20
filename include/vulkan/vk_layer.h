@@ -6,24 +6,17 @@
  * Copyright (c) 2015-2016 Valve Corporation
  * Copyright (c) 2015-2016 LunarG, Inc.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and/or associated documentation files (the "Materials"), to
- * deal in the Materials without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Materials, and to permit persons to whom the Materials are
- * furnished to do so, subject to the following conditions:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * The above copyright notice(s) and this permission notice shall be included in
- * all copies or substantial portions of the Materials.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- *
- * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE MATERIALS OR THE
- * USE OR OTHER DEALINGS IN THE MATERIALS.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -41,6 +34,41 @@
 #else
 #define VK_LAYER_EXPORT
 #endif
+
+#define MAX_NUM_UNKNOWN_EXTS 250
+
+ // Loader-Layer version negotiation API.  Versions add the following features:
+ //   Versions 0/1 - Initial.  Doesn't support vk_layerGetPhysicalDeviceProcAddr
+ //                  or vk_icdNegotiateLoaderLayerInterfaceVersion.
+ //   Version 2    - Add support for vk_layerGetPhysicalDeviceProcAddr and
+ //                  vk_icdNegotiateLoaderLayerInterfaceVersion.
+#define CURRENT_LOADER_LAYER_INTERFACE_VERSION 2
+#define MIN_SUPPORTED_LOADER_LAYER_INTERFACE_VERSION 1
+
+ // Internal function
+typedef PFN_vkVoidFunction (VKAPI_PTR *PFN_GetPhysicalDeviceProcAddr)(VkInstance instance, const char* pName);
+
+// Version negotiation values
+typedef enum VkNegotiateLayerStructType {
+    LAYER_NEGOTIATE_UNINTIALIZED = 0,
+    LAYER_NEGOTIATE_INTERFACE_STRUCT = 1,
+} VkNegotiateLayerStructType;
+
+// Version negotiation structures
+typedef struct VkNegotiateLayerInterface {
+    VkNegotiateLayerStructType sType;
+    void *pNext;
+    uint32_t loaderLayerInterfaceVersion;
+    PFN_vkGetInstanceProcAddr pfnGetInstanceProcAddr;
+    PFN_vkGetDeviceProcAddr pfnGetDeviceProcAddr;
+    PFN_GetPhysicalDeviceProcAddr pfnGetPhysicalDeviceProcAddr;
+} VkNegotiateLayerInterface;
+
+// Version negotiation functions
+typedef VkResult (VKAPI_PTR *PFN_vkNegotiateLoaderLayerInterfaceVersion)(VkNegotiateLayerInterface *pVersionStruct);
+
+// Function prototype for unknown physical device extension command
+typedef VkResult(VKAPI_PTR *PFN_PhysDevExt)(VkPhysicalDevice phys_device, ...);
 
 typedef struct VkLayerDispatchTable_ {
     PFN_vkGetDeviceProcAddr GetDeviceProcAddr;
@@ -169,10 +197,38 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkGetSwapchainImagesKHR GetSwapchainImagesKHR;
     PFN_vkAcquireNextImageKHR AcquireNextImageKHR;
     PFN_vkQueuePresentKHR QueuePresentKHR;
+    PFN_vkCmdDrawIndirectCountAMD CmdDrawIndirectCountAMD;
+    PFN_vkCmdDrawIndexedIndirectCountAMD CmdDrawIndexedIndirectCountAMD;
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+    PFN_vkGetMemoryWin32HandleNV GetMemoryWin32HandleNV;
+#endif
+    PFN_vkCreateSharedSwapchainsKHR CreateSharedSwapchainsKHR;
+    PFN_vkDebugMarkerSetObjectTagEXT DebugMarkerSetObjectTagEXT;
+    PFN_vkDebugMarkerSetObjectNameEXT DebugMarkerSetObjectNameEXT;
+    PFN_vkCmdDebugMarkerBeginEXT CmdDebugMarkerBeginEXT;
+    PFN_vkCmdDebugMarkerEndEXT CmdDebugMarkerEndEXT;
+    PFN_vkCmdDebugMarkerInsertEXT CmdDebugMarkerInsertEXT;
+    // KHR_maintenance1
+    PFN_vkTrimCommandPoolKHR TrimCommandPoolKHR;
+    // EXT_display_control
+    PFN_vkDisplayPowerControlEXT DisplayPowerControlEXT;
+    PFN_vkRegisterDeviceEventEXT RegisterDeviceEventEXT;
+    PFN_vkRegisterDisplayEventEXT RegisterDisplayEventEXT;
+    PFN_vkGetSwapchainCounterEXT GetSwapchainCounterEXT;
+    // NVX_device_generated_commands
+    PFN_vkCmdProcessCommandsNVX CmdProcessCommandsNVX;
+    PFN_vkCmdReserveSpaceForCommandsNVX CmdReserveSpaceForCommandsNVX;
+    PFN_vkCreateIndirectCommandsLayoutNVX CreateIndirectCommandsLayoutNVX;
+    PFN_vkDestroyIndirectCommandsLayoutNVX DestroyIndirectCommandsLayoutNVX;
+    PFN_vkCreateObjectTableNVX CreateObjectTableNVX;
+    PFN_vkDestroyObjectTableNVX DestroyObjectTableNVX;
+    PFN_vkRegisterObjectsNVX RegisterObjectsNVX;
+    PFN_vkUnregisterObjectsNVX UnregisterObjectsNVX;
 } VkLayerDispatchTable;
 
 typedef struct VkLayerInstanceDispatchTable_ {
     PFN_vkGetInstanceProcAddr GetInstanceProcAddr;
+    PFN_GetPhysicalDeviceProcAddr GetPhysicalDeviceProcAddr;
     PFN_vkDestroyInstance DestroyInstance;
     PFN_vkEnumeratePhysicalDevices EnumeratePhysicalDevices;
     PFN_vkGetPhysicalDeviceFeatures GetPhysicalDeviceFeatures;
@@ -194,9 +250,6 @@ typedef struct VkLayerInstanceDispatchTable_ {
     PFN_vkGetPhysicalDeviceSurfaceFormatsKHR GetPhysicalDeviceSurfaceFormatsKHR;
     PFN_vkGetPhysicalDeviceSurfacePresentModesKHR
         GetPhysicalDeviceSurfacePresentModesKHR;
-    PFN_vkCreateDebugReportCallbackEXT CreateDebugReportCallbackEXT;
-    PFN_vkDestroyDebugReportCallbackEXT DestroyDebugReportCallbackEXT;
-    PFN_vkDebugReportMessageEXT DebugReportMessageEXT;
 #ifdef VK_USE_PLATFORM_MIR_KHR
     PFN_vkCreateMirSurfaceKHR CreateMirSurfaceKHR;
     PFN_vkGetPhysicalDeviceMirPresentationSupportKHR
@@ -239,49 +292,58 @@ typedef struct VkLayerInstanceDispatchTable_ {
         GetDisplayPlaneCapabilitiesKHR;
     PFN_vkCreateDisplayPlaneSurfaceKHR
         CreateDisplayPlaneSurfaceKHR;
+    // KHR_get_physical_device_properties2
+    PFN_vkGetPhysicalDeviceFeatures2KHR GetPhysicalDeviceFeatures2KHR;
+    PFN_vkGetPhysicalDeviceProperties2KHR GetPhysicalDeviceProperties2KHR;
+    PFN_vkGetPhysicalDeviceFormatProperties2KHR
+        GetPhysicalDeviceFormatProperties2KHR;
+    PFN_vkGetPhysicalDeviceImageFormatProperties2KHR
+        GetPhysicalDeviceImageFormatProperties2KHR;
+    PFN_vkGetPhysicalDeviceQueueFamilyProperties2KHR
+        GetPhysicalDeviceQueueFamilyProperties2KHR;
+    PFN_vkGetPhysicalDeviceMemoryProperties2KHR
+        GetPhysicalDeviceMemoryProperties2KHR;
+    PFN_vkGetPhysicalDeviceSparseImageFormatProperties2KHR
+        GetPhysicalDeviceSparseImageFormatProperties2KHR;
+#ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
+    // EXT_acquire_xlib_display
+    PFN_vkAcquireXlibDisplayEXT AcquireXlibDisplayEXT;
+    PFN_vkGetRandROutputDisplayEXT GetRandROutputDisplayEXT;
+#endif
+    // EXT_debug_report
+    PFN_vkCreateDebugReportCallbackEXT CreateDebugReportCallbackEXT;
+    PFN_vkDestroyDebugReportCallbackEXT DestroyDebugReportCallbackEXT;
+    PFN_vkDebugReportMessageEXT DebugReportMessageEXT;
+    // EXT_direct_mode_display
+    PFN_vkReleaseDisplayEXT ReleaseDisplayEXT;
+    // EXT_display_surface_counter
+    PFN_vkGetPhysicalDeviceSurfaceCapabilities2EXT
+        GetPhysicalDeviceSurfaceCapabilities2EXT;
+    // NV_external_memory_capabilities
+    PFN_vkGetPhysicalDeviceExternalImageFormatPropertiesNV
+        GetPhysicalDeviceExternalImageFormatPropertiesNV;
+    // NVX_device_generated_commands (phys dev commands)
+    PFN_vkGetPhysicalDeviceGeneratedCommandsPropertiesNVX
+        GetPhysicalDeviceGeneratedCommandsPropertiesNVX;
 } VkLayerInstanceDispatchTable;
-
-// LL node for tree of dbg callback functions
-typedef struct VkLayerDbgFunctionNode_ {
-    VkDebugReportCallbackEXT msgCallback;
-    PFN_vkDebugReportCallbackEXT pfnMsgCallback;
-    VkFlags msgFlags;
-    void *pUserData;
-    struct VkLayerDbgFunctionNode_ *pNext;
-} VkLayerDbgFunctionNode;
-
-typedef enum VkLayerDbgAction_ {
-    VK_DBG_LAYER_ACTION_IGNORE = 0x0,
-    VK_DBG_LAYER_ACTION_CALLBACK = 0x1,
-    VK_DBG_LAYER_ACTION_LOG_MSG = 0x2,
-    VK_DBG_LAYER_ACTION_BREAK = 0x4,
-    VK_DBG_LAYER_ACTION_DEBUG_OUTPUT = 0x8,
-} VkLayerDbgAction;
 
 // ------------------------------------------------------------------------------------------------
 // CreateInstance and CreateDevice support structures
 
+/* Sub type of structure for instance and device loader ext of CreateInfo.
+ * When sType == VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO
+ * or sType == VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO
+ * then VkLayerFunction indicates struct type pointed to by pNext
+ */
 typedef enum VkLayerFunction_ {
     VK_LAYER_LINK_INFO = 0,
-    VK_LAYER_DEVICE_INFO = 1,
-    VK_LAYER_INSTANCE_INFO = 2
+    VK_LOADER_DATA_CALLBACK = 1
 } VkLayerFunction;
-
-/*
- * When creating the device chain the loader needs to pass
- * down information about it's device structure needed at
- * the end of the chain. Passing the data via the
- * VkLayerInstanceInfo avoids issues with finding the
- * exact instance being used.
- */
-typedef struct VkLayerInstanceInfo_ {
-    void *instance_info;
-    PFN_vkGetInstanceProcAddr pfnNextGetInstanceProcAddr;
-} VkLayerInstanceInfo;
 
 typedef struct VkLayerInstanceLink_ {
     struct VkLayerInstanceLink_ *pNext;
     PFN_vkGetInstanceProcAddr pfnNextGetInstanceProcAddr;
+    PFN_GetPhysicalDeviceProcAddr pfnNextGetPhysicalDeviceProcAddr;
 } VkLayerInstanceLink;
 
 /*
@@ -296,13 +358,18 @@ typedef struct VkLayerDeviceInfo_ {
     PFN_vkGetInstanceProcAddr pfnNextGetInstanceProcAddr;
 } VkLayerDeviceInfo;
 
+typedef VkResult (VKAPI_PTR *PFN_vkSetInstanceLoaderData)(VkInstance instance,
+        void *object);
+typedef VkResult (VKAPI_PTR *PFN_vkSetDeviceLoaderData)(VkDevice device,
+        void *object);
+
 typedef struct {
-    VkStructureType sType; // VK_STRUCTURE_TYPE_LAYER_INSTANCE_CREATE_INFO
+    VkStructureType sType; // VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO
     const void *pNext;
     VkLayerFunction function;
     union {
         VkLayerInstanceLink *pLayerInfo;
-        VkLayerInstanceInfo instanceInfo;
+        PFN_vkSetInstanceLoaderData pfnSetInstanceLoaderData;
     } u;
 } VkLayerInstanceCreateInfo;
 
@@ -313,14 +380,12 @@ typedef struct VkLayerDeviceLink_ {
 } VkLayerDeviceLink;
 
 typedef struct {
-    VkStructureType sType; // VK_STRUCTURE_TYPE_LAYER_DEVICE_CREATE_INFO
+    VkStructureType sType; // VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO
     const void *pNext;
     VkLayerFunction function;
     union {
         VkLayerDeviceLink *pLayerInfo;
-        VkLayerDeviceInfo deviceInfo;
+        PFN_vkSetDeviceLoaderData pfnSetDeviceLoaderData;
     } u;
 } VkLayerDeviceCreateInfo;
 
-// ------------------------------------------------------------------------------------------------
-// API functions
