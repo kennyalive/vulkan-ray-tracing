@@ -154,6 +154,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="swapchain_initialization.cpp" />
     <ClCompile Include="vulkan_app.cpp" />
+    <ClCompile Include="vulkan_utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.h" />
@@ -161,6 +162,7 @@
     <ClInclude Include="swapchain_initialization.h" />
     <ClInclude Include="vulkan_app.h" />
     <ClInclude Include="vulkan_definitions.h" />
+    <ClInclude Include="vulkan_utilities.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

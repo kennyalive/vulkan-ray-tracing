@@ -1,8 +1,22 @@
 #pragma once
 
+#include <functional>
 #include <exception>
 #include <string>
 #include "vulkan_definitions.h"
+
+class Scope_Exit_Action {
+public:
+    Scope_Exit_Action(std::function<void()> action)
+        : action(action) {}
+
+    ~Scope_Exit_Action() {
+        action();
+    }
+
+private:
+    std::function<void()> action;
+};
 
 class VulkanException : public std::exception
 {
@@ -45,4 +59,8 @@ private:
 };
 
 void CheckVkResult(VkResult result, const std::string& functionName);
+inline void check_vk_result(VkResult result, const std::string& functionName) { CheckVkResult(result, functionName); }
+
 void Error(const std::string& message);
+inline void error(const std::string& message) { Error(message); }
+

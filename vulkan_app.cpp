@@ -4,6 +4,9 @@
 #include "swapchain_initialization.h"
 #include "vulkan_app.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 namespace 
 {
 struct VertexData
@@ -125,6 +128,8 @@ void VulkanApp::CreateResources(HWND windowHandle)
     presentationQueueFamilyIndex = deviceInfo.presentationQueueFamilyIndex;
     presentationQueue = deviceInfo.presentationQueue;
 
+    allocator = std::make_unique<Device_Memory_Allocator>(physicalDevice, device);
+
     SwapchainInfo swapchainInfo = CreateSwapchain(physicalDevice, device, surface);
     swapchain = swapchainInfo.swapchain;
     swapchainImageFormat = swapchainInfo.imageFormat;
@@ -137,7 +142,9 @@ void VulkanApp::CreateResources(HWND windowHandle)
 
     CreateStagingBuffer();
     CreateVertexBuffer();
-    
+
+    create_texture();
+
     CreateFrameResources();
 
     CopyVertexData();
@@ -181,6 +188,9 @@ void VulkanApp::CleanupResources()
     vkDestroyPipeline(device, pipeline, nullptr);
     pipeline = VK_NULL_HANDLE;
 
+    vkDestroyImage(device, texture_image, nullptr);
+    texture_image = VK_NULL_HANDLE;
+
     for (auto imageView : swapchainImageViews)
         vkDestroyImageView(device, imageView, nullptr);
     swapchainImageViews.clear();
@@ -192,6 +202,8 @@ void VulkanApp::CleanupResources()
     swapchain = VK_NULL_HANDLE;
     swapchainImageFormat = VK_FORMAT_UNDEFINED;
     swapchainImages.clear();
+
+    allocator.reset();
 
     vkDestroyDevice(device, nullptr);
     device = VK_NULL_HANDLE;
@@ -407,22 +419,7 @@ void VulkanApp::CreateBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags usage, 
     VkMemoryRequirements memoryRequirements;
     vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
 
-    VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
-    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &deviceMemoryProperties);
-
-    uint32_t memoryTypeIndex = VK_MAX_MEMORY_TYPES;
-    for (uint32_t i = 0; i < deviceMemoryProperties.memoryTypeCount; ++i)
-    {
-        if ((memoryRequirements.memoryTypeBits & (1 << i)) != 0 &&
-            (deviceMemoryProperties.memoryTypes[i].propertyFlags & memoryProperty) == memoryProperty)
-        {
-            memoryTypeIndex = i;
-            break;
-        }
-    }
-
-    if (memoryTypeIndex == VK_MAX_MEMORY_TYPES)
-        Error("Failed to find matching memory type for vertex buffer");
+    uint32_t memoryTypeIndex = find_memory_type_with_properties(physicalDevice, memoryRequirements.memoryTypeBits, memoryProperty);
 
     VkMemoryAllocateInfo memoryAllocateInfo;
     memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -453,6 +450,25 @@ void VulkanApp::CreateVertexBuffer()
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         vertexBuffer, vertexBufferMemory);
+}
+
+void VulkanApp::create_texture() {
+    int image_width, image_height, image_component_count;
+
+    auto rgba_pixels = stbi_load("images/statue.jpg", &image_width, &image_height, &image_component_count, STBI_rgb_alpha);
+    if (rgba_pixels == nullptr) {
+        error("failed to load image file");
+    }
+
+    VkImage staging_image = create_staging_texture(device, image_width, image_height, VK_FORMAT_R8G8B8A8_UNORM, *allocator, rgba_pixels, 4);
+
+    Scope_Exit_Action destroy_staging_image_action([this, &staging_image]() {
+        vkDestroyImage(device, staging_image, nullptr);
+    });
+
+    stbi_image_free(rgba_pixels);
+
+    texture_image = create_device_local_texture(device, image_width, image_height, VK_FORMAT_R8G8B8A8_UNORM, *allocator);
 }
 
 void VulkanApp::CreateFrameResources()

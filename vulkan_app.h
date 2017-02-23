@@ -1,8 +1,9 @@
 #pragma once
 
 #include <array>
+#include <memory>
 #include <vector>
-#include "vulkan_definitions.h"
+#include "vulkan_utilities.h"
 
 class VulkanApp
 {
@@ -21,6 +22,8 @@ private:
 
     void CreateStagingBuffer();
     void CreateVertexBuffer();
+
+    void create_texture();
     
     void CreateFrameResources();
     void CopyVertexData();
@@ -66,6 +69,8 @@ private:
     VkBuffer stagingBuffer = VK_NULL_HANDLE;
     VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
 
+    VkImage texture_image = VK_NULL_HANDLE;
+
     VkBuffer vertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
 
@@ -74,4 +79,6 @@ private:
 
     int frameResourcesIndex = 0;
     uint32_t swapchainImageIndex = 0;
+
+    std::unique_ptr<Device_Memory_Allocator> allocator;
 };
