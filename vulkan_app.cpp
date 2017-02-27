@@ -146,6 +146,8 @@ void VulkanApp::CreateResources(HWND windowHandle)
     CreateFrameResources();
 
     create_texture();
+    create_texture_view();
+    create_texture_sampler();
 
     CopyVertexData();
 }
@@ -187,6 +189,12 @@ void VulkanApp::CleanupResources()
 
     vkDestroyPipeline(device, pipeline, nullptr);
     pipeline = VK_NULL_HANDLE;
+
+    vkDestroySampler(device, texture_image_sampler, nullptr);
+    texture_image_sampler = VK_NULL_HANDLE;
+
+    vkDestroyImageView(device, texture_image_view, nullptr);
+    texture_image_view = VK_NULL_HANDLE;
 
     vkDestroyImage(device, texture_image, nullptr);
     texture_image = VK_NULL_HANDLE;
@@ -538,6 +546,54 @@ void VulkanApp::create_texture() {
             1, &barrier
         );
     });
+}
+
+void VulkanApp::create_texture_view() {
+    VkImageViewCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.image = texture_image;
+    desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    desc.format = VK_FORMAT_R8G8B8A8_UNORM;
+    desc.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    desc.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    desc.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    desc.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    desc.subresourceRange.baseMipLevel = 0;
+    desc.subresourceRange.levelCount = 1;
+    desc.subresourceRange.baseArrayLayer = 0;
+    desc.subresourceRange.layerCount = 1;
+
+    VkResult result = vkCreateImageView(device, &desc, nullptr, &texture_image_view);
+    check_vk_result(result, "vkCreateImageView");
+}
+
+void VulkanApp::create_texture_sampler() {
+    VkSamplerCreateInfo desc;
+
+    desc.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.magFilter = VK_FILTER_LINEAR;
+    desc.minFilter = VK_FILTER_LINEAR;
+    desc.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    desc.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    desc.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    desc.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    desc.mipLodBias = 0.0f;
+    desc.anisotropyEnable = VK_TRUE;
+    desc.maxAnisotropy = 16;
+    desc.compareEnable = VK_FALSE;
+    desc.compareOp = VK_COMPARE_OP_ALWAYS;
+    desc.minLod = 0.0f;
+    desc.maxLod = 0.0f;
+    desc.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    desc.unnormalizedCoordinates = VK_FALSE;
+
+    VkResult result = vkCreateSampler(device, &desc, nullptr, &texture_image_sampler);
+    check_vk_result(result, "vkCreateSampler");
 }
 
 void VulkanApp::CreateFrameResources()

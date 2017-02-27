@@ -24,6 +24,8 @@ private:
     void CreateVertexBuffer();
 
     void create_texture();
+    void create_texture_view();
+    void create_texture_sampler();
     
     void CreateFrameResources();
     void CopyVertexData();
@@ -70,6 +72,8 @@ private:
     VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
 
     VkImage texture_image = VK_NULL_HANDLE;
+    VkImageView texture_image_view = VK_NULL_HANDLE;
+    VkSampler texture_image_sampler = VK_NULL_HANDLE;
 
     VkBuffer vertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
