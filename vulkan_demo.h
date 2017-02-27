@@ -5,10 +5,10 @@
 #include <vector>
 #include "vulkan_utilities.h"
 
-class VulkanApp
+class Vulkan_Demo
 {
 public:
-    VulkanApp(uint32_t windowWidth, uint32_t windowHeight);
+    Vulkan_Demo(uint32_t windowWidth, uint32_t windowHeight);
 
     void CreateResources(HWND windowHandle);
     void CleanupResources();

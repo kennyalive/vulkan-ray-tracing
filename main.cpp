@@ -3,12 +3,12 @@
 #include "sdl/SDL_syswm.h"
 
 #include "common.h"
-#include "vulkan_app.h"
+#include "vulkan_demo.h"
 
 const int windowWidth = 640;
 const int windowHeight = 480;
 
-VulkanApp vkApp(windowWidth, windowHeight);
+Vulkan_Demo demo(windowWidth, windowHeight);
 
 void RunMainLoop()
 {
@@ -23,7 +23,7 @@ void RunMainLoop()
         }
         if (running)
         {
-            vkApp.RunFrame();
+            demo.RunFrame();
             SDL_Delay(1);
         }
     }
@@ -51,9 +51,9 @@ int main()
         Error("failed to get platform specific window information");
     }
 
-    vkApp.CreateResources(wmInfo.info.win.window);
+    demo.CreateResources(wmInfo.info.win.window);
     RunMainLoop();
-    vkApp.CleanupResources();
+    demo.CleanupResources();
     SDL_Quit();
     return 0;
 }

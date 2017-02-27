@@ -2,7 +2,7 @@
 #include "common.h"
 #include "device_initialization.h"
 #include "swapchain_initialization.h"
-#include "vulkan_app.h"
+#include "vulkan_demo.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -108,13 +108,13 @@ VkPipelineShaderStageCreateInfo GetPipelineShaderStageCreateInfo(VkShaderStageFl
 }
 } // namespace
 
-VulkanApp::VulkanApp(uint32_t windowWidth, uint32_t windowHeight)
+Vulkan_Demo::Vulkan_Demo(uint32_t windowWidth, uint32_t windowHeight)
 : windowWidth(windowWidth)
 , windowHeight(windowHeight)
 {
 }
 
-void VulkanApp::CreateResources(HWND windowHandle)
+void Vulkan_Demo::CreateResources(HWND windowHandle)
 {
     instance = CreateInstance();
     physicalDevice = SelectPhysicalDevice(instance);
@@ -152,7 +152,7 @@ void VulkanApp::CreateResources(HWND windowHandle)
     CopyVertexData();
 }
 
-void VulkanApp::CleanupResources()
+void Vulkan_Demo::CleanupResources()
 {
     VkResult result = vkDeviceWaitIdle(device);
     CheckVkResult(result, "vkDeviceWaitIdle");
@@ -223,7 +223,7 @@ void VulkanApp::CleanupResources()
     instance = VK_NULL_HANDLE;
 }
 
-void VulkanApp::CreatePipeline()
+void Vulkan_Demo::CreatePipeline()
 {
     ShaderModule vertexShaderModule(device, "shaders/vert.spv");
     ShaderModule fragmentShaderModule(device, "shaders/frag.spv");
@@ -408,7 +408,7 @@ VkDeviceSize GetStagingBufferSize()
     return 1024 * 1024;
 }
 
-void VulkanApp::CreateBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperty,
+void Vulkan_Demo::CreateBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperty,
     VkBuffer& buffer, VkDeviceMemory& deviceMemory)
 {
     VkBufferCreateInfo bufferCreateInfo;
@@ -442,7 +442,7 @@ void VulkanApp::CreateBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags usage, 
     CheckVkResult(result, "vkBindBufferMemory");
 }
 
-void VulkanApp::CreateStagingBuffer()
+void Vulkan_Demo::CreateStagingBuffer()
 {
     CreateBuffer(GetStagingBufferSize(),
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -450,7 +450,7 @@ void VulkanApp::CreateStagingBuffer()
         stagingBuffer, stagingBufferMemory);
 }
 
-void VulkanApp::CreateVertexBuffer()
+void Vulkan_Demo::CreateVertexBuffer()
 {
     const VkDeviceSize vertexDataSize = GetVertexData().size() * sizeof(VertexData);
 
@@ -460,7 +460,7 @@ void VulkanApp::CreateVertexBuffer()
         vertexBuffer, vertexBufferMemory);
 }
 
-void VulkanApp::create_texture() {
+void Vulkan_Demo::create_texture() {
     int image_width, image_height, image_component_count;
 
     auto rgba_pixels = stbi_load("images/statue.jpg", &image_width, &image_height, &image_component_count, STBI_rgb_alpha);
@@ -548,7 +548,7 @@ void VulkanApp::create_texture() {
     });
 }
 
-void VulkanApp::create_texture_view() {
+void Vulkan_Demo::create_texture_view() {
     VkImageViewCreateInfo desc;
     desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     desc.pNext = nullptr;
@@ -570,7 +570,7 @@ void VulkanApp::create_texture_view() {
     check_vk_result(result, "vkCreateImageView");
 }
 
-void VulkanApp::create_texture_sampler() {
+void Vulkan_Demo::create_texture_sampler() {
     VkSamplerCreateInfo desc;
 
     desc.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -596,7 +596,7 @@ void VulkanApp::create_texture_sampler() {
     check_vk_result(result, "vkCreateSampler");
 }
 
-void VulkanApp::CreateFrameResources()
+void Vulkan_Demo::CreateFrameResources()
 {
     // Allocate command buffers.
     VkCommandPoolCreateInfo commandPoolCreateInfo;
@@ -656,7 +656,7 @@ void VulkanApp::CreateFrameResources()
     }
 }
 
-void VulkanApp::CopyVertexData()
+void Vulkan_Demo::CopyVertexData()
 {
     // Copy vertex data to staging buffer.
     auto vertexData = GetVertexData();
@@ -692,7 +692,7 @@ void VulkanApp::CopyVertexData()
     });
 }
 
-void VulkanApp::RecordCommandBuffer()
+void Vulkan_Demo::RecordCommandBuffer()
 {
     // Recreate framebuffer for current swapchain image.
     auto& currentFrameResources = frameResources[frameResourcesIndex];
@@ -815,7 +815,7 @@ void VulkanApp::RecordCommandBuffer()
     CheckVkResult(result, "vkEndCommandBuffer");
 }
 
-void VulkanApp::RunFrame()
+void Vulkan_Demo::RunFrame()
 {
     const auto& currentFrameResources = frameResources[frameResourcesIndex];
 

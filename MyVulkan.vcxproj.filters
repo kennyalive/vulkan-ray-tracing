@@ -4,16 +4,16 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="device_initialization.cpp" />
     <ClCompile Include="swapchain_initialization.cpp" />
-    <ClCompile Include="vulkan_app.cpp" />
     <ClCompile Include="common.cpp" />
     <ClCompile Include="vulkan_utilities.cpp" />
+    <ClCompile Include="vulkan_demo.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="device_initialization.h" />
     <ClInclude Include="swapchain_initialization.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="vulkan_definitions.h" />
-    <ClInclude Include="vulkan_app.h" />
     <ClInclude Include="vulkan_utilities.h" />
+    <ClInclude Include="vulkan_demo.h" />
   </ItemGroup>
 </Project>
