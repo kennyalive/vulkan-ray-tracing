@@ -84,9 +84,7 @@ void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueu
 
     result = vkBeginCommandBuffer(command_buffer, &begin_info);
     check_vk_result(result, "vkBeginCommandBuffer");
-
     recorder(command_buffer);
-
     result = vkEndCommandBuffer(command_buffer);
     check_vk_result(result, "vkEndCommandBuffer");
 
@@ -103,10 +101,8 @@ void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueu
 
     result = vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
     check_vk_result(result, "vkQueueSubmit");
-
     result = vkQueueWaitIdle(queue);
     check_vk_result(result, "vkQueueWaitIdle");
-
     vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
 }
 

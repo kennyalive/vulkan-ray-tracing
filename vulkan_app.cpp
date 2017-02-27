@@ -143,9 +143,9 @@ void VulkanApp::CreateResources(HWND windowHandle)
     CreateStagingBuffer();
     CreateVertexBuffer();
 
-    create_texture();
-
     CreateFrameResources();
+
+    create_texture();
 
     CopyVertexData();
 }
@@ -465,10 +465,79 @@ void VulkanApp::create_texture() {
     Scope_Exit_Action destroy_staging_image_action([this, &staging_image]() {
         vkDestroyImage(device, staging_image, nullptr);
     });
-
     stbi_image_free(rgba_pixels);
 
     texture_image = create_device_local_texture(device, image_width, image_height, VK_FORMAT_R8G8B8A8_UNORM, *allocator);
+
+    record_and_run_commands(device, commandPool, graphicsQueue,
+        [&staging_image, &image_width, &image_height, this](VkCommandBuffer command_buffer) {
+
+        // peform image layout transitions
+        VkImageMemoryBarrier barrier;
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.pNext = nullptr;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        barrier.image = staging_image;
+        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+            0, nullptr,
+            0, nullptr,
+            1, &barrier
+        );
+
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.image = texture_image;
+        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+            0, nullptr,
+            0, nullptr,
+            1, &barrier
+        );
+
+        // copy staging image's data to device local image
+        VkImageSubresourceLayers subresource_layers;
+        subresource_layers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        subresource_layers.mipLevel = 0;
+        subresource_layers.baseArrayLayer = 0;
+        subresource_layers.layerCount = 1;
+
+        VkImageCopy region;
+        region.srcSubresource = subresource_layers;
+        region.srcOffset = {0, 0, 0};
+        region.dstSubresource = subresource_layers;
+        region.dstOffset = {0, 0, 0};
+        region.extent.width = image_width;
+        region.extent.height = image_height;
+
+        vkCmdCopyImage(command_buffer,
+            staging_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            texture_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1, &region);
+
+        // perform image layout transition
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.image = texture_image;
+        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+            0, nullptr,
+            0, nullptr,
+            1, &barrier
+        );
+    });
 }
 
 void VulkanApp::CreateFrameResources()
