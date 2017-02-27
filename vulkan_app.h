@@ -17,7 +17,7 @@ public:
 private:
     void CreatePipeline();
 
-    void CreateBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlagBits memoryProperty,
+    void CreateBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperty,
         VkBuffer& buffer, VkDeviceMemory& deviceMemory);
 
     void CreateStagingBuffer();

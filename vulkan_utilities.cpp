@@ -62,6 +62,54 @@ VkDeviceMemory Device_Memory_Allocator::allocate_device_local_memory(VkImage ima
     return chunk;
 }
 
+void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueue queue,
+    std::function<void(VkCommandBuffer)> recorder) {
+
+    VkCommandBufferAllocateInfo alloc_info;
+    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.pNext = nullptr;
+    alloc_info.commandPool = command_pool;
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandBufferCount = 1;
+
+    VkCommandBuffer command_buffer;
+    VkResult result = vkAllocateCommandBuffers(device, &alloc_info, &command_buffer);
+    check_vk_result(result, "vkAllocateCommandBuffers");
+
+    VkCommandBufferBeginInfo begin_info;
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.pNext = nullptr;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    begin_info.pInheritanceInfo = nullptr;
+
+    result = vkBeginCommandBuffer(command_buffer, &begin_info);
+    check_vk_result(result, "vkBeginCommandBuffer");
+
+    recorder(command_buffer);
+
+    result = vkEndCommandBuffer(command_buffer);
+    check_vk_result(result, "vkEndCommandBuffer");
+
+    VkSubmitInfo submit_info;
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.pNext = nullptr;
+    submit_info.waitSemaphoreCount = 0;
+    submit_info.pWaitSemaphores = nullptr;
+    submit_info.pWaitDstStageMask = nullptr;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &command_buffer;
+    submit_info.signalSemaphoreCount = 0;
+    submit_info.pSignalSemaphores = nullptr;
+
+    result = vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
+    check_vk_result(result, "vkQueueSubmit");
+
+    result = vkQueueWaitIdle(queue);
+    check_vk_result(result, "vkQueueWaitIdle");
+
+    vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
+}
+
 uint32_t find_memory_type_with_properties(VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memory_properties;
     vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
