@@ -1,6 +1,20 @@
 #include "common.h"
 #include "vulkan_utilities.h"
 
+static uint32_t find_memory_type_with_properties(VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memory_properties;
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+
+    for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
+        if ((memory_type_bits & (1 << i)) != 0 &&
+            (memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+    error("failed to find matching memory type with requested properties");
+    return -1;
+}
+
 Device_Memory_Allocator::Device_Memory_Allocator(VkPhysicalDevice physical_device, VkDevice device)
     : physical_device(physical_device)
     , device(device) {}
@@ -16,7 +30,28 @@ Device_Memory_Allocator::~Device_Memory_Allocator() {
 VkDeviceMemory Device_Memory_Allocator::allocate_staging_memory(VkImage image) {
     VkMemoryRequirements memory_requirements;
     vkGetImageMemoryRequirements(device, image, &memory_requirements);
+    return allocate_staging_memory(memory_requirements);
+}
 
+VkDeviceMemory Device_Memory_Allocator::allocate_staging_memory(VkBuffer buffer) {
+    VkMemoryRequirements memory_requirements;
+    vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
+    return allocate_staging_memory(memory_requirements);
+}
+
+VkDeviceMemory Device_Memory_Allocator::allocate_device_local_memory(VkImage image) {
+    VkMemoryRequirements memory_requirements;
+    vkGetImageMemoryRequirements(device, image, &memory_requirements);
+    return allocate_device_local_memory(memory_requirements);
+}
+
+VkDeviceMemory Device_Memory_Allocator::allocate_device_local_memory(VkBuffer buffer) {
+    VkMemoryRequirements memory_requirements;
+    vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
+    return allocate_device_local_memory(memory_requirements);
+}
+
+VkDeviceMemory Device_Memory_Allocator::allocate_staging_memory(const VkMemoryRequirements& memory_requirements) {
     uint32_t memory_type_index = find_memory_type_with_properties(physical_device, memory_requirements.memoryTypeBits,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
@@ -42,12 +77,8 @@ VkDeviceMemory Device_Memory_Allocator::allocate_staging_memory(VkImage image) {
     return staging_chunk;
 }
 
-VkDeviceMemory Device_Memory_Allocator::allocate_device_local_memory(VkImage image) {
-    VkMemoryRequirements memory_requirements;
-    vkGetImageMemoryRequirements(device, image, &memory_requirements);
-
-    uint32_t memory_type_index = find_memory_type_with_properties(physical_device, memory_requirements.memoryTypeBits,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+VkDeviceMemory Device_Memory_Allocator::allocate_device_local_memory(const VkMemoryRequirements& memory_requirements) {
+    uint32_t memory_type_index = find_memory_type_with_properties(physical_device, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     VkMemoryAllocateInfo alloc_info;
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -106,20 +137,6 @@ void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueu
     vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
 }
 
-uint32_t find_memory_type_with_properties(VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
-    VkPhysicalDeviceMemoryProperties memory_properties;
-    vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
-
-    for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
-        if ((memory_type_bits & (1 << i)) != 0 &&
-            (memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
-    error("failed to find matching memory type with requested properties");
-    return -1;
-}
-
 VkImage create_staging_texture(VkDevice device, int image_width, int image_height, VkFormat format, Device_Memory_Allocator& allocator,
     const uint8_t* pixels, int bytes_per_pixel) {
 
@@ -154,7 +171,6 @@ VkImage create_staging_texture(VkDevice device, int image_width, int image_heigh
     staging_image_subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     staging_image_subresource.mipLevel = 0;
     staging_image_subresource.arrayLayer = 0;
-
     VkSubresourceLayout staging_image_layout;
     vkGetImageSubresourceLayout(device, image, &staging_image_subresource, &staging_image_layout);
 
@@ -175,7 +191,7 @@ VkImage create_staging_texture(VkDevice device, int image_width, int image_heigh
     return image;
 }
 
-VkImage create_device_local_texture(VkDevice device, int image_width, int image_height, VkFormat format, Device_Memory_Allocator& allocator) {
+VkImage create_texture(VkDevice device, int image_width, int image_height, VkFormat format, Device_Memory_Allocator& allocator) {
     VkImageCreateInfo create_info;
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     create_info.pNext = nullptr;
@@ -203,4 +219,52 @@ VkImage create_device_local_texture(VkDevice device, int image_width, int image_
     result = vkBindImageMemory(device, image, memory, 0);
     check_vk_result(result, "vkBindImageMemory");
     return image;
+}
+
+VkBuffer create_staging_buffer(VkDevice device, VkDeviceSize size, Device_Memory_Allocator& allocator, const void* data) {
+    VkBufferCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.size = size;
+    desc.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    desc.queueFamilyIndexCount = 0;
+    desc.pQueueFamilyIndices = nullptr;
+
+    VkBuffer buffer;
+    VkResult result = vkCreateBuffer(device, &desc, nullptr, &buffer);
+    check_vk_result(result, "vkCreateBuffer");
+
+    VkDeviceMemory memory = allocator.allocate_staging_memory(buffer);
+    result = vkBindBufferMemory(device, buffer, memory, 0);
+    check_vk_result(result, "vkBindBufferMemory");
+
+    void* buffer_data;
+    result = vkMapMemory(device, memory, 0, size, 0, &buffer_data);
+    check_vk_result(result, "vkMapMemory");
+    memcpy(buffer_data, data, size);
+    vkUnmapMemory(device, memory);
+    return buffer;
+}
+
+VkBuffer create_buffer(VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, Device_Memory_Allocator& allocator) {
+    VkBufferCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.size = size;
+    desc.usage = usage;
+    desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    desc.queueFamilyIndexCount = 0;
+    desc.pQueueFamilyIndices = nullptr;
+
+    VkBuffer buffer;
+    VkResult result = vkCreateBuffer(device, &desc, nullptr, &buffer);
+    check_vk_result(result, "vkCreateBuffer");
+
+    VkDeviceMemory memory = allocator.allocate_device_local_memory(buffer);
+    result = vkBindBufferMemory(device, buffer, memory, 0);
+    check_vk_result(result, "vkBindBufferMemory");
+    return buffer;
 }

@@ -16,19 +16,12 @@ public:
 
 private:
     void CreatePipeline();
+    void CreateFrameResources();
 
-    void CreateBuffer(VkDeviceSize bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperty,
-        VkBuffer& buffer, VkDeviceMemory& deviceMemory);
-
-    void CreateStagingBuffer();
-    void CreateVertexBuffer();
-
+    void create_vertex_buffer();
     void create_texture();
     void create_texture_view();
     void create_texture_sampler();
-    
-    void CreateFrameResources();
-    void CopyVertexData();
 
     void RecordCommandBuffer();
 
@@ -68,15 +61,10 @@ private:
 
     VkPipeline pipeline = VK_NULL_HANDLE;
 
-    VkBuffer stagingBuffer = VK_NULL_HANDLE;
-    VkDeviceMemory stagingBufferMemory = VK_NULL_HANDLE;
-
+    VkBuffer vertex_buffer = VK_NULL_HANDLE;
     VkImage texture_image = VK_NULL_HANDLE;
     VkImageView texture_image_view = VK_NULL_HANDLE;
     VkSampler texture_image_sampler = VK_NULL_HANDLE;
-
-    VkBuffer vertexBuffer = VK_NULL_HANDLE;
-    VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
 
     VkCommandPool commandPool = VK_NULL_HANDLE;
     std::array<FrameRenderResources, 3> frameResources;
