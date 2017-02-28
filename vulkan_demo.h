@@ -19,6 +19,7 @@ private:
     void CreateFrameResources();
 
     void create_vertex_buffer();
+    void create_index_buffer();
     void create_texture();
     void create_texture_view();
     void create_texture_sampler();
@@ -62,6 +63,7 @@ private:
     VkPipeline pipeline = VK_NULL_HANDLE;
 
     VkBuffer vertex_buffer = VK_NULL_HANDLE;
+    VkBuffer index_buffer = VK_NULL_HANDLE;
     VkImage texture_image = VK_NULL_HANDLE;
     VkImageView texture_image_view = VK_NULL_HANDLE;
     VkSampler texture_image_sampler = VK_NULL_HANDLE;

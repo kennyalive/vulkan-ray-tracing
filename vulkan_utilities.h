@@ -33,8 +33,7 @@ private:
     uint32_t staging_memory_type_index = -1;
 };
 
-void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueue queue,
-    std::function<void(VkCommandBuffer)> recorder);
+void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder);
 
 VkImage create_texture(VkDevice device, int image_width, int image_height, VkFormat format, Device_Memory_Allocator& allocator);
 VkImage create_staging_texture(VkDevice device, int image_width, int image_height, VkFormat format, Device_Memory_Allocator& allocator, const uint8_t* pixels, int bytes_per_pixel);

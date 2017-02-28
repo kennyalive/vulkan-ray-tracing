@@ -152,6 +152,7 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
     CreateFrameResources();
 
     create_vertex_buffer();
+    create_index_buffer();
     create_texture();
     create_texture_view();
     create_texture_sampler();
@@ -185,6 +186,9 @@ void Vulkan_Demo::CleanupResources()
 
     vkDestroyBuffer(device, vertex_buffer, nullptr);
     vertex_buffer = VK_NULL_HANDLE;
+
+    vkDestroyBuffer(device, index_buffer, nullptr);
+    index_buffer = VK_NULL_HANDLE;
 
     vkDestroySampler(device, texture_image_sampler, nullptr);
     texture_image_sampler = VK_NULL_HANDLE;
@@ -261,7 +265,7 @@ void Vulkan_Demo::CreatePipeline()
     inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssemblyStateCreateInfo.pNext = nullptr;
     inputAssemblyStateCreateInfo.flags = 0;
-    inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport;
@@ -376,8 +380,7 @@ void Vulkan_Demo::CreatePipeline()
     CheckVkResult(result, "vkCreateGraphicsPipelines");
 }
 
-void Vulkan_Demo::create_vertex_buffer()
-{
+void Vulkan_Demo::create_vertex_buffer() {
     const VkDeviceSize size = vertices.size() * sizeof(Vertex);
     vertex_buffer = create_buffer(device, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, *allocator);
 
@@ -392,21 +395,26 @@ void Vulkan_Demo::create_vertex_buffer()
         region.dstOffset = 0;
         region.size = size;
         vkCmdCopyBuffer(command_buffer, staging_buffer, vertex_buffer, 1, &region);
+        // NOTE: we do not need memory barrier here since record_and_run_commands performs queue wait operation
+    });
+}
 
-        VkBufferMemoryBarrier barrier;
-        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        barrier.pNext = nullptr;
-        barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.buffer = vertex_buffer;
-        barrier.offset = 0;
-        barrier.size = VK_WHOLE_SIZE;
-        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-            0, 0, nullptr,
-            1, &barrier,
-            0, nullptr);
+void Vulkan_Demo::create_index_buffer() {
+    const VkDeviceSize size = indices.size() * sizeof(indices[0]);
+    index_buffer = create_buffer(device, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, *allocator);
+
+    VkBuffer staging_buffer = create_staging_buffer(device, size, *allocator, indices.data());
+    Scope_Exit_Action destroy_staging_buffer([&staging_buffer, this]() {
+        vkDestroyBuffer(device, staging_buffer, nullptr);
+    });
+
+    record_and_run_commands(device, commandPool, graphicsQueue, [&staging_buffer, &size, this](VkCommandBuffer command_buffer) {
+        VkBufferCopy region;
+        region.srcOffset = 0;
+        region.dstOffset = 0;
+        region.size = size;
+        vkCmdCopyBuffer(command_buffer, staging_buffer, index_buffer, 1, &region);
+        // NOTE: we do not need memory barrier here since record_and_run_commands performs queue wait operation
     });
 }
 
@@ -694,7 +702,8 @@ void Vulkan_Demo::RecordCommandBuffer()
 
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(currentFrameResources.commandBuffer, 0, 1, &vertex_buffer, &offset);
-    vkCmdDraw(currentFrameResources.commandBuffer, 4, 1, 0, 0);
+    vkCmdBindIndexBuffer(currentFrameResources.commandBuffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(currentFrameResources.commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
     vkCmdEndRenderPass(currentFrameResources.commandBuffer);
 
     if (presentationQueue != graphicsQueue)
