@@ -3,14 +3,22 @@
 #include "swapchain_initialization.h"
 #include "vulkan_demo.h"
 
-#include <array>
-
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 #include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+
+#include <array>
+#include <chrono>
 
 namespace {
+struct Uniform_Buffer_Object {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
+
 struct Vertex {
     glm::vec2 pos;
     glm::vec3 color;
@@ -18,12 +26,12 @@ struct Vertex {
 
 const std::vector<Vertex> vertices {
     {{-0.7f, -0.7f}, {1.0f, 0.0f, 0.0f}},
-    {{ 0.7f, -0.7f}, {0.0f, 0.0f, 1.0f}},
-    {{ 0.7f,  0.7f}, {0.3f, 0.3f, 0.3f}},
-    {{-0.7f,  0.7f}, {0.0f, 1.0f, 0.0f}}
+    {{ 0.7f, -0.7f}, {0.0f, 1.0f, 0.0f}},
+    {{ 0.7f,  0.7f}, {0.0f, 0.0f, 1.0f}},
+    {{-0.7f,  0.7f}, {0.3f, 0.3f, 0.3f}}
 };
 
-const std::vector<uint32_t> indices {0, 2, 1, 0, 3, 2};
+const std::vector<uint32_t> indices {0, 1, 2, 0, 2, 3};
 
 VkSurfaceKHR CreateSurface(VkInstance instance, HWND hwnd)
 {
@@ -148,18 +156,27 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
 
     renderPass = CreateRenderPass(device, swapchainInfo.imageFormat);
 
+    create_descriptor_set_layout();
     CreatePipeline();
     CreateFrameResources();
 
     create_vertex_buffer();
     create_index_buffer();
+    create_uniform_buffer();
+    create_descriptor_pool();
+    create_descriptor_set();
     create_texture();
     create_texture_view();
     create_texture_sampler();
 }
 
-void Vulkan_Demo::CleanupResources()
+void Vulkan_Demo::CleanupResources() 
 {
+    auto destroy_buffer = [this](VkBuffer& buffer) {
+        vkDestroyBuffer(device, buffer, nullptr);
+        buffer = VK_NULL_HANDLE;
+    };
+
     VkResult result = vkDeviceWaitIdle(device);
     CheckVkResult(result, "vkDeviceWaitIdle");
 
@@ -181,14 +198,22 @@ void Vulkan_Demo::CleanupResources()
         resources.fence = VK_NULL_HANDLE;
     }
 
+    vkDestroyDescriptorSetLayout(device, descriptor_set_layout, nullptr);
+    descriptor_set_layout = VK_NULL_HANDLE;
+
+    vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+    pipeline_layout = VK_NULL_HANDLE;
+
     vkDestroyPipeline(device, pipeline, nullptr);
     pipeline = VK_NULL_HANDLE;
 
-    vkDestroyBuffer(device, vertex_buffer, nullptr);
-    vertex_buffer = VK_NULL_HANDLE;
+    vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
+    descriptor_pool = VK_NULL_HANDLE;
 
-    vkDestroyBuffer(device, index_buffer, nullptr);
-    index_buffer = VK_NULL_HANDLE;
+    destroy_buffer(vertex_buffer);
+    destroy_buffer(index_buffer);
+    destroy_buffer(uniform_staging_buffer);
+    destroy_buffer(uniform_buffer);
 
     vkDestroySampler(device, texture_image_sampler, nullptr);
     texture_image_sampler = VK_NULL_HANDLE;
@@ -221,6 +246,25 @@ void Vulkan_Demo::CleanupResources()
 
     vkDestroyInstance(instance, nullptr);
     instance = VK_NULL_HANDLE;
+}
+
+void Vulkan_Demo::create_descriptor_set_layout() {
+    VkDescriptorSetLayoutBinding descriptor_binding;
+    descriptor_binding.binding = 0;
+    descriptor_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptor_binding.descriptorCount = 1;
+    descriptor_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    descriptor_binding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.bindingCount = 1;
+    desc.pBindings = &descriptor_binding;
+
+    VkResult result = vkCreateDescriptorSetLayout(device, &desc, nullptr, &descriptor_set_layout);
+    check_vk_result(result, "vkCreateDescriptorSetLayout");
 }
 
 void Vulkan_Demo::CreatePipeline()
@@ -348,12 +392,13 @@ void Vulkan_Demo::CreatePipeline()
     layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     layoutCreateInfo.pNext = nullptr;
     layoutCreateInfo.flags = 0;
-    layoutCreateInfo.setLayoutCount = 0;
-    layoutCreateInfo.pSetLayouts = nullptr;
+    layoutCreateInfo.setLayoutCount = 1;
+    layoutCreateInfo.pSetLayouts = &descriptor_set_layout;
     layoutCreateInfo.pushConstantRangeCount = 0;
     layoutCreateInfo.pPushConstantRanges = nullptr;
 
-    PipelineLayout pipelineLayout(device, layoutCreateInfo);
+    VkResult result = vkCreatePipelineLayout(device, &layoutCreateInfo, nullptr, &pipeline_layout);
+    check_vk_result(result, "vkCreatePipelineLayout");
 
     VkGraphicsPipelineCreateInfo pipelineCreateInfo;
     pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -370,13 +415,13 @@ void Vulkan_Demo::CreatePipeline()
     pipelineCreateInfo.pDepthStencilState = nullptr;
     pipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
     pipelineCreateInfo.pDynamicState = nullptr;
-    pipelineCreateInfo.layout = pipelineLayout.GetHandle();
+    pipelineCreateInfo.layout = pipeline_layout;
     pipelineCreateInfo.renderPass = renderPass;
     pipelineCreateInfo.subpass = 0;
     pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineCreateInfo.basePipelineIndex = -1;
 
-    VkResult result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline);
+    result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline);
     CheckVkResult(result, "vkCreateGraphicsPipelines");
 }
 
@@ -416,6 +461,60 @@ void Vulkan_Demo::create_index_buffer() {
         vkCmdCopyBuffer(command_buffer, staging_buffer, index_buffer, 1, &region);
         // NOTE: we do not need memory barrier here since record_and_run_commands performs queue wait operation
     });
+}
+
+void Vulkan_Demo::create_uniform_buffer() {
+    auto size = static_cast<VkDeviceSize>(sizeof(Uniform_Buffer_Object));
+    uniform_staging_buffer = create_permanent_staging_buffer(device, size, *allocator, uniform_staging_buffer_memory);
+    uniform_buffer = create_buffer(device, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, *allocator);
+}
+
+void Vulkan_Demo::create_descriptor_pool() {
+    VkDescriptorPoolSize pool_size;
+    pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_size.descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.maxSets = 1;
+    desc.poolSizeCount = 1;
+    desc.pPoolSizes = &pool_size;
+
+    VkResult result = vkCreateDescriptorPool(device, &desc, nullptr, &descriptor_pool);
+    check_vk_result(result, "vkCreateDescriptorPool");
+}
+
+void Vulkan_Demo::create_descriptor_set() {
+    VkDescriptorSetAllocateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    desc.pNext = nullptr;
+    desc.descriptorPool = descriptor_pool;
+    desc.descriptorSetCount = 1;
+    desc.pSetLayouts = &descriptor_set_layout;
+
+    VkResult result = vkAllocateDescriptorSets(device, &desc, &descriptor_set);
+    check_vk_result(result, "vkAllocateDescriptorSets");
+
+    VkDescriptorBufferInfo buffer_info;
+    buffer_info.buffer = uniform_buffer;
+    buffer_info.offset = 0;
+    buffer_info.range = sizeof(Uniform_Buffer_Object);
+
+    VkWriteDescriptorSet descriptor_write;
+    descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptor_write.pNext = nullptr;
+    descriptor_write.dstSet = descriptor_set;
+    descriptor_write.dstBinding = 0;
+    descriptor_write.dstArrayElement = 0;
+    descriptor_write.descriptorCount = 1;
+    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptor_write.pImageInfo = nullptr;
+    descriptor_write.pBufferInfo = &buffer_info;
+    descriptor_write.pTexelBufferView = nullptr;
+
+    vkUpdateDescriptorSets(device, 1, &descriptor_write, 0, nullptr);
 }
 
 void Vulkan_Demo::create_texture() {
@@ -703,6 +802,7 @@ void Vulkan_Demo::RecordCommandBuffer()
     VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(currentFrameResources.commandBuffer, 0, 1, &vertex_buffer, &offset);
     vkCmdBindIndexBuffer(currentFrameResources.commandBuffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindDescriptorSets(currentFrameResources.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
     vkCmdDrawIndexed(currentFrameResources.commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
     vkCmdEndRenderPass(currentFrameResources.commandBuffer);
 
@@ -738,8 +838,45 @@ void Vulkan_Demo::RecordCommandBuffer()
     CheckVkResult(result, "vkEndCommandBuffer");
 }
 
+void Vulkan_Demo::update_uniform_buffer() {
+    static auto start_time = std::chrono::high_resolution_clock::now();
+
+    auto current_time = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count() / 1000.f;
+
+    Uniform_Buffer_Object ubo;
+    ubo.model = glm::rotate(glm::mat4(), time * glm::radians(90.0f), glm::vec3(0, 0, 1));
+    ubo.view = glm::lookAt(glm::vec3(0, 0, 3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+
+    // Vulkan clip space has inverted Y and half Z.
+    const glm::mat4 clip(
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, -1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.5f, 0.0f,
+        0.0f, 0.0f, 0.5f, 1.0f);
+
+    ubo.proj = clip * glm::perspective(glm::radians(45.0f), windowWidth / (float)windowHeight, 0.1f, 10.0f);
+
+    void* data;
+    VkResult result = vkMapMemory(device, uniform_staging_buffer_memory, 0, sizeof(ubo), 0, &data);
+    check_vk_result(result, "vkMapMemory");
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(device, uniform_staging_buffer_memory);
+
+    // TODO: this commands is slow since it waits until queue finishes specified operation
+    record_and_run_commands(device, commandPool, graphicsQueue, [this](VkCommandBuffer command_buffer) {
+        VkBufferCopy region;
+        region.srcOffset = 0;
+        region.dstOffset = 0;
+        region.size = sizeof(Uniform_Buffer_Object);
+        vkCmdCopyBuffer(command_buffer, uniform_staging_buffer, uniform_buffer, 1, &region);
+    });
+}
+
 void Vulkan_Demo::RunFrame()
 {
+    update_uniform_buffer();
+
     const auto& currentFrameResources = frameResources[frameResourcesIndex];
 
     VkResult result = vkWaitForFences(device, 1, &currentFrameResources.fence, VK_FALSE, 1000000000);

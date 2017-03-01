@@ -49,23 +49,6 @@ VkShaderModule ShaderModule::GetHandle() const
     return shaderModule;
 }
 
-PipelineLayout::PipelineLayout(VkDevice device, VkPipelineLayoutCreateInfo createInfo)
-: device(device)
-{
-    VkResult result = vkCreatePipelineLayout(device, &createInfo, nullptr, &pipelineLayout);
-    CheckVkResult(result, "vkCreatePipelineLayout");
-}
-
-PipelineLayout::~PipelineLayout()
-{
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-}
-
-VkPipelineLayout PipelineLayout::GetHandle() const
-{
-    return pipelineLayout;
-}
-
 void CheckVkResult(VkResult result, const std::string& functionName)
 {
     if (result < 0)

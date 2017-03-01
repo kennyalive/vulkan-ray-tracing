@@ -46,18 +46,6 @@ private:
     VkShaderModule shaderModule;
 };
 
-class PipelineLayout
-{
-public:
-    PipelineLayout(VkDevice device, VkPipelineLayoutCreateInfo createInfo);
-    ~PipelineLayout();
-    VkPipelineLayout GetHandle() const;
-
-private:
-    VkDevice device;
-    VkPipelineLayout pipelineLayout;
-};
-
 void CheckVkResult(VkResult result, const std::string& functionName);
 inline void check_vk_result(VkResult result, const std::string& functionName) { CheckVkResult(result, functionName); }
 

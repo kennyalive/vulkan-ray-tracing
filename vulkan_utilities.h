@@ -3,34 +3,50 @@
 #include "vulkan_definitions.h"
 #include <vector>
 
-class Device_Memory_Allocator {
+class Shared_Staging_Memory {
 public:
-    Device_Memory_Allocator(VkPhysicalDevice physical_device, VkDevice device);
-    ~Device_Memory_Allocator();
+    Shared_Staging_Memory(VkPhysicalDevice physical_device, VkDevice device);
+    ~Shared_Staging_Memory();
 
-    // We have single memory chunk that is used as staging memory. It is assumed that previous operations
-    // with staging memory are finished, so we can reuse it. If chunk has not enough size we reallocate it.
-    VkDeviceMemory allocate_staging_memory(VkImage image);
-    VkDeviceMemory allocate_staging_memory(VkBuffer buffer);
-
-    // NOTE: in this implementation I do device memory allocation for each allocation request.
-    // TODO: sub-allocate from larger chunks and return chunk handle plus offset withing corresponding chunk.
-    VkDeviceMemory allocate_device_local_memory(VkImage image);
-    VkDeviceMemory allocate_device_local_memory(VkBuffer buffer);
+    void ensure_allocation_for_object(VkImage image);
+    void ensure_allocation_for_object(VkBuffer buffer);
+    VkDeviceMemory get_handle() const;
 
 private:
-    VkDeviceMemory allocate_staging_memory(const VkMemoryRequirements& memory_requirements);
-    VkDeviceMemory allocate_device_local_memory(const VkMemoryRequirements& memory_requirements);
+    void ensure_allocation(const VkMemoryRequirements& memory_requirements);
 
 private:
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     VkDevice device = VK_NULL_HANDLE;
 
-    std::vector<VkDeviceMemory> device_local_chunks;
+    VkDeviceMemory handle = VK_NULL_HANDLE;
+    VkDeviceSize size = 0;
+    uint32_t memory_type_index = -1;
+};
 
-    VkDeviceMemory staging_chunk = VK_NULL_HANDLE;
-    VkDeviceSize staging_chunk_size = 0;
-    uint32_t staging_memory_type_index = -1;
+// NOTE: in this implementation I do memory allocation for each allocation request.
+// TODO: sub-allocate from larger chunks and return chunk handle plus offset withing corresponding chunk.
+class Device_Memory_Allocator {
+public:
+    Device_Memory_Allocator(VkPhysicalDevice physical_device, VkDevice device);
+    ~Device_Memory_Allocator();
+
+    VkDeviceMemory allocate_memory(VkImage image);
+    VkDeviceMemory allocate_memory(VkBuffer buffer);
+    VkDeviceMemory allocate_staging_memory(VkImage image);
+    VkDeviceMemory allocate_staging_memory(VkBuffer buffer);
+
+    Shared_Staging_Memory& get_shared_staging_memory();
+
+private:
+    VkDeviceMemory allocate_memory(const VkMemoryRequirements& memory_requirements, VkMemoryPropertyFlags properties);
+
+private:
+    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+    VkDevice device = VK_NULL_HANDLE;
+
+    std::vector<VkDeviceMemory> chunks;
+    Shared_Staging_Memory shared_staging_memory;
 };
 
 void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder);
@@ -40,3 +56,4 @@ VkImage create_staging_texture(VkDevice device, int image_width, int image_heigh
 
 VkBuffer create_buffer(VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, Device_Memory_Allocator& allocator);
 VkBuffer create_staging_buffer(VkDevice device, VkDeviceSize size, Device_Memory_Allocator& allocator, const void* data);
+VkBuffer create_permanent_staging_buffer(VkDevice device, VkDeviceSize size, Device_Memory_Allocator& allocator, VkDeviceMemory& memory);

@@ -15,16 +15,23 @@ public:
     void RunFrame();
 
 private:
-    void CreatePipeline();
     void CreateFrameResources();
+
+    void create_descriptor_set_layout();
+    void CreatePipeline();
 
     void create_vertex_buffer();
     void create_index_buffer();
+    void create_uniform_buffer();
+    void create_descriptor_pool();
+    void create_descriptor_set();
     void create_texture();
     void create_texture_view();
     void create_texture_sampler();
 
     void RecordCommandBuffer();
+
+    void update_uniform_buffer();
 
 private:
     struct FrameRenderResources
@@ -60,10 +67,20 @@ private:
 
     VkRenderPass renderPass = VK_NULL_HANDLE;
 
+    VkDescriptorSetLayout descriptor_set_layout = VK_NULL_HANDLE;
+    VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
     VkPipeline pipeline = VK_NULL_HANDLE;
+
+    VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
+    VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
 
     VkBuffer vertex_buffer = VK_NULL_HANDLE;
     VkBuffer index_buffer = VK_NULL_HANDLE;
+
+    VkBuffer uniform_staging_buffer = VK_NULL_HANDLE;
+    VkDeviceMemory uniform_staging_buffer_memory = VK_NULL_HANDLE; // owned by the allocator
+    VkBuffer uniform_buffer = VK_NULL_HANDLE;
+
     VkImage texture_image = VK_NULL_HANDLE;
     VkImageView texture_image_view = VK_NULL_HANDLE;
     VkSampler texture_image_sampler = VK_NULL_HANDLE;
