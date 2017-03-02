@@ -22,13 +22,14 @@ struct Uniform_Buffer_Object {
 struct Vertex {
     glm::vec2 pos;
     glm::vec3 color;
+    glm::vec2 tex_coord;
 };
 
 const std::vector<Vertex> vertices {
-    {{-0.7f, -0.7f}, {1.0f, 0.0f, 0.0f}},
-    {{ 0.7f, -0.7f}, {0.0f, 1.0f, 0.0f}},
-    {{ 0.7f,  0.7f}, {0.0f, 0.0f, 1.0f}},
-    {{-0.7f,  0.7f}, {0.3f, 0.3f, 0.3f}}
+    {{-0.7f, -0.7f}, {1.0f, 0.0f, 0.0f}, {0.0, 1.0}},
+    {{ 0.7f, -0.7f}, {0.0f, 1.0f, 0.0f}, {1.0, 1.0}},
+    {{ 0.7f,  0.7f}, {0.0f, 0.0f, 1.0f}, {1.0, 0.0}},
+    {{-0.7f,  0.7f}, {0.3f, 0.3f, 0.3f}, {0.0, 0.0}}
 };
 
 const std::vector<uint32_t> indices {0, 1, 2, 0, 2, 3};
@@ -163,11 +164,12 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
     create_vertex_buffer();
     create_index_buffer();
     create_uniform_buffer();
-    create_descriptor_pool();
-    create_descriptor_set();
     create_texture();
     create_texture_view();
     create_texture_sampler();
+
+    create_descriptor_pool();
+    create_descriptor_set();
 }
 
 void Vulkan_Demo::CleanupResources() 
@@ -249,19 +251,25 @@ void Vulkan_Demo::CleanupResources()
 }
 
 void Vulkan_Demo::create_descriptor_set_layout() {
-    VkDescriptorSetLayoutBinding descriptor_binding;
-    descriptor_binding.binding = 0;
-    descriptor_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptor_binding.descriptorCount = 1;
-    descriptor_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    descriptor_binding.pImmutableSamplers = nullptr;
+    std::array<VkDescriptorSetLayoutBinding, 2> descriptor_bindings;
+    descriptor_bindings[0].binding = 0;
+    descriptor_bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptor_bindings[0].descriptorCount = 1;
+    descriptor_bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    descriptor_bindings[0].pImmutableSamplers = nullptr;
+
+    descriptor_bindings[1].binding = 1;
+    descriptor_bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptor_bindings[1].descriptorCount = 1;
+    descriptor_bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    descriptor_bindings[1].pImmutableSamplers = nullptr;
 
     VkDescriptorSetLayoutCreateInfo desc;
     desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     desc.pNext = nullptr;
     desc.flags = 0;
-    desc.bindingCount = 1;
-    desc.pBindings = &descriptor_binding;
+    desc.bindingCount = static_cast<uint32_t>(descriptor_bindings.size());
+    desc.pBindings = descriptor_bindings.data();
 
     VkResult result = vkCreateDescriptorSetLayout(device, &desc, nullptr, &descriptor_set_layout);
     check_vk_result(result, "vkCreateDescriptorSetLayout");
@@ -285,7 +293,7 @@ void Vulkan_Demo::CreatePipeline()
     vertexBindingDescription.stride = sizeof(Vertex);
     vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    std::array<VkVertexInputAttributeDescription, 2> vertexAttributeDescriptions;
+    std::array<VkVertexInputAttributeDescription, 3> vertexAttributeDescriptions;
     vertexAttributeDescriptions[0].location = 0;
     vertexAttributeDescriptions[0].binding = vertexBindingDescription.binding;
     vertexAttributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
@@ -295,6 +303,11 @@ void Vulkan_Demo::CreatePipeline()
     vertexAttributeDescriptions[1].binding = vertexBindingDescription.binding;
     vertexAttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
     vertexAttributeDescriptions[1].offset = offsetof(struct Vertex, color);
+
+    vertexAttributeDescriptions[2].location = 2;
+    vertexAttributeDescriptions[2].binding = vertexBindingDescription.binding;
+    vertexAttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+    vertexAttributeDescriptions[2].offset = offsetof(struct Vertex, tex_coord);
 
     VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo;
     vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -470,17 +483,19 @@ void Vulkan_Demo::create_uniform_buffer() {
 }
 
 void Vulkan_Demo::create_descriptor_pool() {
-    VkDescriptorPoolSize pool_size;
-    pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    pool_size.descriptorCount = 1;
+    std::array<VkDescriptorPoolSize, 2> pool_sizes;
+    pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_sizes[0].descriptorCount = 1;
+    pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    pool_sizes[1].descriptorCount = 1;
 
     VkDescriptorPoolCreateInfo desc;
     desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     desc.pNext = nullptr;
     desc.flags = 0;
     desc.maxSets = 1;
-    desc.poolSizeCount = 1;
-    desc.pPoolSizes = &pool_size;
+    desc.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
+    desc.pPoolSizes = pool_sizes.data();
 
     VkResult result = vkCreateDescriptorPool(device, &desc, nullptr, &descriptor_pool);
     check_vk_result(result, "vkCreateDescriptorPool");
@@ -502,19 +517,35 @@ void Vulkan_Demo::create_descriptor_set() {
     buffer_info.offset = 0;
     buffer_info.range = sizeof(Uniform_Buffer_Object);
 
-    VkWriteDescriptorSet descriptor_write;
-    descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptor_write.pNext = nullptr;
-    descriptor_write.dstSet = descriptor_set;
-    descriptor_write.dstBinding = 0;
-    descriptor_write.dstArrayElement = 0;
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptor_write.pImageInfo = nullptr;
-    descriptor_write.pBufferInfo = &buffer_info;
-    descriptor_write.pTexelBufferView = nullptr;
+    VkDescriptorImageInfo image_info;
+    image_info.sampler = texture_image_sampler;
+    image_info.imageView = texture_image_view;
+    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    vkUpdateDescriptorSets(device, 1, &descriptor_write, 0, nullptr);
+    std::array<VkWriteDescriptorSet, 2> descriptor_writes;
+    descriptor_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptor_writes[0].pNext = nullptr;
+    descriptor_writes[0].dstSet = descriptor_set;
+    descriptor_writes[0].dstBinding = 0;
+    descriptor_writes[0].dstArrayElement = 0;
+    descriptor_writes[0].descriptorCount = 1;
+    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptor_writes[0].pImageInfo = nullptr;
+    descriptor_writes[0].pBufferInfo = &buffer_info;
+    descriptor_writes[0].pTexelBufferView = nullptr;
+
+    descriptor_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptor_writes[1].dstSet = descriptor_set;
+    descriptor_writes[1].dstBinding = 1;
+    descriptor_writes[1].dstArrayElement = 0;
+    descriptor_writes[1].descriptorCount = 1;
+    descriptor_writes[1].pNext = nullptr;
+    descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptor_writes[1].pImageInfo = &image_info;
+    descriptor_writes[1].pBufferInfo = nullptr;
+    descriptor_writes[1].pTexelBufferView = nullptr;
+
+    vkUpdateDescriptorSets(device, (uint32_t)descriptor_writes.size(), descriptor_writes.data(), 0, nullptr);
 }
 
 void Vulkan_Demo::create_texture() {
@@ -846,7 +877,7 @@ void Vulkan_Demo::update_uniform_buffer() {
 
     Uniform_Buffer_Object ubo;
     ubo.model = glm::rotate(glm::mat4(), time * glm::radians(90.0f), glm::vec3(0, 0, 1));
-    ubo.view = glm::lookAt(glm::vec3(0, 0, 3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    ubo.view = glm::lookAt(glm::vec3(0.0, 0, 3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
     // Vulkan clip space has inverted Y and half Z.
     const glm::mat4 clip(
