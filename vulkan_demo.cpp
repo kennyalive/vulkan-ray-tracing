@@ -6,13 +6,22 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include <glm/gtx/hash.hpp>
 
 #include <array>
 #include <chrono>
+#include <functional>
+#include <unordered_map>
 
 namespace {
+const std::string model_path = "data/chalet.obj";
+const std::string texture_path = "data/chalet.jpg";
+
 struct Uniform_Buffer_Object {
     glm::mat4 model;
     glm::mat4 view;
@@ -23,26 +32,60 @@ struct Vertex {
     glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 tex_coord;
+
+    bool operator==(const Vertex& other) const {
+        return pos == other.pos && color == other.color && tex_coord == other.tex_coord;
+    }
 };
 
-const std::vector<Vertex> vertices {
-    {{-1.0f, 0.0,  1.0f}, {1.0f, 0.0f, 0.0f}, {0.0, 1.0}},
-    {{ 1.0f, 0.0,  1.0f}, {0.0f, 1.0f, 0.0f}, {1.0, 1.0}},
-    {{ 1.0f, 0.0, -1.0f}, {0.0f, 0.0f, 1.0f}, {1.0, 0.0}},
-    {{-1.0f, 0.0, -1.0f}, {0.3f, 0.3f, 0.3f}, {0.0, 0.0}},
+std::vector<Vertex> vertices;
+std::vector<uint32_t> indices;
+}
 
-    {{-1.0f, -0.5,  1.0f},{1.0f, 0.0f, 0.0f},{0.0, 1.0}},
-    {{ 1.0f, -0.5,  1.0f},{0.0f, 1.0f, 0.0f},{1.0, 1.0}},
-    {{ 1.0f, -0.5, -1.0f},{0.0f, 0.0f, 1.0f},{1.0, 0.0}},
-    {{-1.0f, -0.5, -1.0f},{0.3f, 0.3f, 0.3f},{0.0, 0.0}}
-};
+namespace std {
+    template<> struct hash<Vertex> {
+        size_t operator()(Vertex const& vertex) const {
+            return ((hash<glm::vec3>()(vertex.pos) ^
+                (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+                (hash<glm::vec2>()(vertex.tex_coord) << 1);
+        }
+    };
+}
 
-const std::vector<uint32_t> indices {
-    0, 1, 2, 0, 2, 3,
-    4, 5, 6, 4, 6, 7
-};
+static void load_model() {
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string err;
 
-VkSurfaceKHR CreateSurface(VkInstance instance, HWND hwnd)
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, model_path.c_str()))
+        error("failed to load obj model: " + model_path);
+
+    std::unordered_map<Vertex, std::size_t> unique_vertices;
+    for (const auto& shape : shapes) {
+        for (const auto& index : shape.mesh.indices) {
+            Vertex vertex;
+            vertex.pos = {
+                attrib.vertices[3 * index.vertex_index + 0],
+                attrib.vertices[3 * index.vertex_index + 1],
+                attrib.vertices[3 * index.vertex_index + 2]
+            };
+            vertex.tex_coord = {
+                attrib.texcoords[2 * index.texcoord_index + 0],
+                1.0 - attrib.texcoords[2 * index.texcoord_index + 1]
+            };
+            vertex.color = {1.0f, 1.0f, 1.0f};
+
+            if (unique_vertices.count(vertex) == 0) {
+                unique_vertices[vertex] = vertices.size();
+                vertices.push_back(vertex);
+            }
+            indices.push_back((uint32_t)unique_vertices[vertex]);
+        }
+    }
+}
+
+static VkSurfaceKHR CreateSurface(VkInstance instance, HWND hwnd)
 {
     VkWin32SurfaceCreateInfoKHR surfaceCreateInfo;
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -57,7 +100,7 @@ VkSurfaceKHR CreateSurface(VkInstance instance, HWND hwnd)
     return surface;
 }
 
-VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat, VkFormat depth_image_format)
+static VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat, VkFormat depth_image_format)
 {
     VkAttachmentDescription attachmentDescription;
     attachmentDescription.flags = 0;
@@ -137,7 +180,7 @@ VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat, V
     return renderPass;
 }
 
-VkPipelineShaderStageCreateInfo GetPipelineShaderStageCreateInfo(VkShaderStageFlagBits stage,
+static VkPipelineShaderStageCreateInfo GetPipelineShaderStageCreateInfo(VkShaderStageFlagBits stage,
     VkShaderModule shaderModule, const char* entryPoint)
 {
     VkPipelineShaderStageCreateInfo createInfo;
@@ -150,7 +193,7 @@ VkPipelineShaderStageCreateInfo GetPipelineShaderStageCreateInfo(VkShaderStageFl
     createInfo.pSpecializationInfo = nullptr;
     return createInfo;
 }
-} // namespace
+
 
 static VkFormat find_format_with_features(VkPhysicalDevice physical_device, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
     for (VkFormat format : candidates) {
@@ -205,6 +248,7 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
     CreatePipeline();
     CreateFrameResources();
 
+    load_model();
     create_vertex_buffer();
     create_index_buffer();
     create_uniform_buffer();
@@ -617,7 +661,7 @@ void Vulkan_Demo::create_descriptor_set() {
 void Vulkan_Demo::create_texture() {
     int image_width, image_height, image_component_count;
 
-    auto rgba_pixels = stbi_load("images/statue.jpg", &image_width, &image_height, &image_component_count, STBI_rgb_alpha);
+    auto rgba_pixels = stbi_load(texture_path.c_str(), &image_width, &image_height, &image_component_count, STBI_rgb_alpha);
     if (rgba_pixels == nullptr) {
         error("failed to load image file");
     }
@@ -900,8 +944,10 @@ void Vulkan_Demo::update_uniform_buffer() {
     //time = 0.0;
 
     Uniform_Buffer_Object ubo;
-    ubo.model = glm::rotate(glm::mat4(), time * glm::radians(30.0f), glm::vec3(0, 1, 0));
-    ubo.view = glm::lookAt(glm::vec3(0.5, 0.6, 3.5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    ubo.model = glm::rotate(glm::mat4(), time * glm::radians(30.0f), glm::vec3(0, 1, 0)) *
+        glm::rotate(glm::mat4(), glm::radians(-90.0f), glm::vec3(1, 0, 0));
+
+    ubo.view = glm::lookAt(glm::vec3(0.5, 1.4, 2.8), glm::vec3(0, 0.3, 0), glm::vec3(0, 1, 0));
 
     // Vulkan clip space has inverted Y and half Z.
     const glm::mat4 clip(
