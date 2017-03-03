@@ -26,8 +26,8 @@ private:
     void create_descriptor_pool();
     void create_descriptor_set();
     void create_texture();
-    void create_texture_view();
     void create_texture_sampler();
+    void create_depth_buffer_resources();
 
     void RecordCommandBuffer();
 
@@ -84,6 +84,9 @@ private:
     VkImage texture_image = VK_NULL_HANDLE;
     VkImageView texture_image_view = VK_NULL_HANDLE;
     VkSampler texture_image_sampler = VK_NULL_HANDLE;
+
+    VkImage depth_image = VK_NULL_HANDLE;
+    VkImageView depth_image_view = VK_NULL_HANDLE;
 
     VkCommandPool commandPool = VK_NULL_HANDLE;
     std::array<FrameRenderResources, 3> frameResources;

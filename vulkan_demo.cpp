@@ -20,19 +20,27 @@ struct Uniform_Buffer_Object {
 };
 
 struct Vertex {
-    glm::vec2 pos;
+    glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 tex_coord;
 };
 
 const std::vector<Vertex> vertices {
-    {{-0.7f, -0.7f}, {1.0f, 0.0f, 0.0f}, {0.0, 1.0}},
-    {{ 0.7f, -0.7f}, {0.0f, 1.0f, 0.0f}, {1.0, 1.0}},
-    {{ 0.7f,  0.7f}, {0.0f, 0.0f, 1.0f}, {1.0, 0.0}},
-    {{-0.7f,  0.7f}, {0.3f, 0.3f, 0.3f}, {0.0, 0.0}}
+    {{-1.0f, 0.0,  1.0f}, {1.0f, 0.0f, 0.0f}, {0.0, 1.0}},
+    {{ 1.0f, 0.0,  1.0f}, {0.0f, 1.0f, 0.0f}, {1.0, 1.0}},
+    {{ 1.0f, 0.0, -1.0f}, {0.0f, 0.0f, 1.0f}, {1.0, 0.0}},
+    {{-1.0f, 0.0, -1.0f}, {0.3f, 0.3f, 0.3f}, {0.0, 0.0}},
+
+    {{-1.0f, -0.5,  1.0f},{1.0f, 0.0f, 0.0f},{0.0, 1.0}},
+    {{ 1.0f, -0.5,  1.0f},{0.0f, 1.0f, 0.0f},{1.0, 1.0}},
+    {{ 1.0f, -0.5, -1.0f},{0.0f, 0.0f, 1.0f},{1.0, 0.0}},
+    {{-1.0f, -0.5, -1.0f},{0.3f, 0.3f, 0.3f},{0.0, 0.0}}
 };
 
-const std::vector<uint32_t> indices {0, 1, 2, 0, 2, 3};
+const std::vector<uint32_t> indices {
+    0, 1, 2, 0, 2, 3,
+    4, 5, 6, 4, 6, 7
+};
 
 VkSurfaceKHR CreateSurface(VkInstance instance, HWND hwnd)
 {
@@ -49,7 +57,7 @@ VkSurfaceKHR CreateSurface(VkInstance instance, HWND hwnd)
     return surface;
 }
 
-VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat)
+VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat, VkFormat depth_image_format)
 {
     VkAttachmentDescription attachmentDescription;
     attachmentDescription.flags = 0;
@@ -62,9 +70,26 @@ VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat)
     attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
+    VkAttachmentDescription depth_attachment;
+    depth_attachment.flags = 0;
+    depth_attachment.format = depth_image_format;
+    depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    std::vector<VkAttachmentDescription> attachments{attachmentDescription, depth_attachment};
+
     VkAttachmentReference attachmentReference;
     attachmentReference.attachment = 0;
     attachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depth_attachment_ref;
+    depth_attachment_ref.attachment = 1;
+    depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpassDescription;
     subpassDescription.flags = 0;
@@ -74,7 +99,7 @@ VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat)
     subpassDescription.colorAttachmentCount = 1;
     subpassDescription.pColorAttachments = &attachmentReference;
     subpassDescription.pResolveAttachments = nullptr;
-    subpassDescription.pDepthStencilAttachment = nullptr;
+    subpassDescription.pDepthStencilAttachment = &depth_attachment_ref;
     subpassDescription.preserveAttachmentCount = 0;
     subpassDescription.pPreserveAttachments = nullptr;
 
@@ -99,8 +124,8 @@ VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat)
     renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassCreateInfo.pNext = nullptr;
     renderPassCreateInfo.flags = 0;
-    renderPassCreateInfo.attachmentCount = 1;
-    renderPassCreateInfo.pAttachments = &attachmentDescription;
+    renderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    renderPassCreateInfo.pAttachments = attachments.data();
     renderPassCreateInfo.subpassCount = 1;
     renderPassCreateInfo.pSubpasses = &subpassDescription;
     renderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
@@ -126,6 +151,25 @@ VkPipelineShaderStageCreateInfo GetPipelineShaderStageCreateInfo(VkShaderStageFl
     return createInfo;
 }
 } // namespace
+
+static VkFormat find_format_with_features(VkPhysicalDevice physical_device, const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+    for (VkFormat format : candidates) {
+        VkFormatProperties properties;
+        vkGetPhysicalDeviceFormatProperties(physical_device, format, &properties);
+
+        if (tiling == VK_IMAGE_TILING_LINEAR && (properties.linearTilingFeatures & features) == features)
+            return format;
+        if (tiling == VK_IMAGE_TILING_OPTIMAL && (properties.optimalTilingFeatures & features) == features)
+            return format;
+    }
+    error("failed to find format with requested features");
+    return VK_FORMAT_UNDEFINED; // never get here
+}
+
+static VkFormat find_depth_format(VkPhysicalDevice physical_device) {
+    return find_format_with_features(physical_device, {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+        VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+}
 
 Vulkan_Demo::Vulkan_Demo(uint32_t windowWidth, uint32_t windowHeight)
 : windowWidth(windowWidth)
@@ -155,7 +199,7 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
     swapchainImages = swapchainInfo.images;
     swapchainImageViews = swapchainInfo.imageViews;
 
-    renderPass = CreateRenderPass(device, swapchainInfo.imageFormat);
+    renderPass = CreateRenderPass(device, swapchainInfo.imageFormat, find_depth_format(physicalDevice));
 
     create_descriptor_set_layout();
     CreatePipeline();
@@ -165,8 +209,8 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
     create_index_buffer();
     create_uniform_buffer();
     create_texture();
-    create_texture_view();
     create_texture_sampler();
+    create_depth_buffer_resources();
 
     create_descriptor_pool();
     create_descriptor_set();
@@ -177,6 +221,14 @@ void Vulkan_Demo::CleanupResources()
     auto destroy_buffer = [this](VkBuffer& buffer) {
         vkDestroyBuffer(device, buffer, nullptr);
         buffer = VK_NULL_HANDLE;
+    };
+    auto destroy_image = [this](VkImage& image) {
+        vkDestroyImage(device, image, nullptr);
+        image = VK_NULL_HANDLE;
+    };
+    auto destroy_image_view = [this](VkImageView image_view) {
+        vkDestroyImageView(device, image_view, nullptr);
+        image_view = VK_NULL_HANDLE;
     };
 
     VkResult result = vkDeviceWaitIdle(device);
@@ -220,11 +272,11 @@ void Vulkan_Demo::CleanupResources()
     vkDestroySampler(device, texture_image_sampler, nullptr);
     texture_image_sampler = VK_NULL_HANDLE;
 
-    vkDestroyImageView(device, texture_image_view, nullptr);
-    texture_image_view = VK_NULL_HANDLE;
+    destroy_image(texture_image);
+    destroy_image_view(texture_image_view);
 
-    vkDestroyImage(device, texture_image, nullptr);
-    texture_image = VK_NULL_HANDLE;
+    destroy_image(depth_image);
+    destroy_image_view(depth_image_view);
 
     for (auto imageView : swapchainImageViews)
         vkDestroyImageView(device, imageView, nullptr);
@@ -296,7 +348,7 @@ void Vulkan_Demo::CreatePipeline()
     std::array<VkVertexInputAttributeDescription, 3> vertexAttributeDescriptions;
     vertexAttributeDescriptions[0].location = 0;
     vertexAttributeDescriptions[0].binding = vertexBindingDescription.binding;
-    vertexAttributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+    vertexAttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     vertexAttributeDescriptions[0].offset = offsetof(struct Vertex, pos);
 
     vertexAttributeDescriptions[1].location = 1;
@@ -374,6 +426,20 @@ void Vulkan_Demo::CreatePipeline()
     multisampleStateCreateInfo.alphaToCoverageEnable = VK_FALSE;
     multisampleStateCreateInfo.alphaToOneEnable = VK_FALSE;
 
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_state;
+    depth_stencil_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depth_stencil_state.pNext = nullptr;
+    depth_stencil_state.flags = 0;
+    depth_stencil_state.depthTestEnable = VK_TRUE;
+    depth_stencil_state.depthWriteEnable = VK_TRUE;
+    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS;
+    depth_stencil_state.depthBoundsTestEnable = VK_FALSE;
+    depth_stencil_state.stencilTestEnable = VK_FALSE;
+    depth_stencil_state.front = {};
+    depth_stencil_state.back = {};
+    depth_stencil_state.minDepthBounds = 0.0;
+    depth_stencil_state.maxDepthBounds = 0.0;
+
     VkPipelineColorBlendAttachmentState colorBlendAttachmentState;
     colorBlendAttachmentState.blendEnable = VK_FALSE;
     colorBlendAttachmentState.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -425,7 +491,7 @@ void Vulkan_Demo::CreatePipeline()
     pipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
     pipelineCreateInfo.pRasterizationState = &resterizationStateCreateInfo;
     pipelineCreateInfo.pMultisampleState = &multisampleStateCreateInfo;
-    pipelineCreateInfo.pDepthStencilState = nullptr;
+    pipelineCreateInfo.pDepthStencilState = &depth_stencil_state;
     pipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
     pipelineCreateInfo.pDynamicState = nullptr;
     pipelineCreateInfo.layout = pipeline_layout;
@@ -568,39 +634,11 @@ void Vulkan_Demo::create_texture() {
     record_and_run_commands(device, commandPool, graphicsQueue,
         [&staging_image, &image_width, &image_height, this](VkCommandBuffer command_buffer) {
 
-        // peform image layout transitions
-        VkImageMemoryBarrier barrier;
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.pNext = nullptr;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
+        record_image_layout_transition(command_buffer, staging_image, VK_FORMAT_R8G8B8A8_UNORM,
+            VK_ACCESS_HOST_WRITE_BIT, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.image = staging_image;
-        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier
-        );
-
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.image = texture_image;
-        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier
-        );
+        record_image_layout_transition(command_buffer, texture_image, VK_FORMAT_R8G8B8A8_UNORM,
+            0, VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         // copy staging image's data to device local image
         VkImageSubresourceLayers subresource_layers;
@@ -622,40 +660,11 @@ void Vulkan_Demo::create_texture() {
             texture_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             1, &region);
 
-        // perform image layout transition
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier.image = texture_image;
-        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier
-        );
+        record_image_layout_transition(command_buffer, texture_image, VK_FORMAT_R8G8B8A8_UNORM,
+            VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     });
-}
 
-void Vulkan_Demo::create_texture_view() {
-    VkImageViewCreateInfo desc;
-    desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    desc.pNext = nullptr;
-    desc.flags = 0;
-    desc.image = texture_image;
-    desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    desc.format = VK_FORMAT_R8G8B8A8_UNORM;
-    desc.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    desc.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    desc.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    desc.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    desc.subresourceRange.baseMipLevel = 0;
-    desc.subresourceRange.levelCount = 1;
-    desc.subresourceRange.baseArrayLayer = 0;
-    desc.subresourceRange.layerCount = 1;
-
-    VkResult result = vkCreateImageView(device, &desc, nullptr, &texture_image_view);
-    check_vk_result(result, "vkCreateImageView");
+    texture_image_view = create_image_view(device, texture_image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void Vulkan_Demo::create_texture_sampler() {
@@ -682,6 +691,17 @@ void Vulkan_Demo::create_texture_sampler() {
 
     VkResult result = vkCreateSampler(device, &desc, nullptr, &texture_image_sampler);
     check_vk_result(result, "vkCreateSampler");
+}
+
+void Vulkan_Demo::create_depth_buffer_resources() {
+    VkFormat depth_format = find_depth_format(physicalDevice);
+    depth_image = create_depth_attachment_image(device, windowWidth, windowHeight, depth_format, *allocator);
+    depth_image_view = create_image_view(device, depth_image, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    record_and_run_commands(device, commandPool, graphicsQueue, [&depth_format, this](VkCommandBuffer command_buffer) {
+        record_image_layout_transition(command_buffer, depth_image, depth_format, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    });
 }
 
 void Vulkan_Demo::CreateFrameResources()
@@ -755,13 +775,15 @@ void Vulkan_Demo::RecordCommandBuffer()
         currentFrameResources.framebuffer = VK_NULL_HANDLE;
     }
 
+    std::array<VkImageView, 2> attachments = {swapchainImageViews[swapchainImageIndex], depth_image_view};
+
     VkFramebufferCreateInfo framebufferCreateInfo;
     framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebufferCreateInfo.pNext = nullptr;
     framebufferCreateInfo.flags = 0;
     framebufferCreateInfo.renderPass = renderPass;
-    framebufferCreateInfo.attachmentCount = 1;
-    framebufferCreateInfo.pAttachments = &swapchainImageViews[swapchainImageIndex];
+    framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    framebufferCreateInfo.pAttachments = attachments.data();
     framebufferCreateInfo.width = windowWidth;
     framebufferCreateInfo.height = windowHeight;
     framebufferCreateInfo.layers = 1;
@@ -814,8 +836,9 @@ void Vulkan_Demo::RecordCommandBuffer()
             );
     }
 
-    VkClearValue clearValue;
-    clearValue.color = {1.0f, 0.8f, 0.4f, 0.0f};
+    std::array<VkClearValue, 2> clear_values;
+    clear_values[0].color = {1.0f, 0.8f, 0.4f, 0.0f};
+    clear_values[1].depthStencil = {1.0, 0};
 
     VkRenderPassBeginInfo renderPassBeginInfo;
     renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -824,8 +847,8 @@ void Vulkan_Demo::RecordCommandBuffer()
     renderPassBeginInfo.framebuffer = currentFrameResources.framebuffer;
     renderPassBeginInfo.renderArea.offset = {0, 0};
     renderPassBeginInfo.renderArea.extent = {windowWidth, windowHeight};
-    renderPassBeginInfo.clearValueCount = 1;
-    renderPassBeginInfo.pClearValues = &clearValue;
+    renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clear_values.size());
+    renderPassBeginInfo.pClearValues = clear_values.data();
 
     vkCmdBeginRenderPass(currentFrameResources.commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(currentFrameResources.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
@@ -874,10 +897,11 @@ void Vulkan_Demo::update_uniform_buffer() {
 
     auto current_time = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count() / 1000.f;
+    //time = 0.0;
 
     Uniform_Buffer_Object ubo;
-    ubo.model = glm::rotate(glm::mat4(), time * glm::radians(90.0f), glm::vec3(0, 0, 1));
-    ubo.view = glm::lookAt(glm::vec3(0.0, 0, 3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    ubo.model = glm::rotate(glm::mat4(), time * glm::radians(30.0f), glm::vec3(0, 1, 0));
+    ubo.view = glm::lookAt(glm::vec3(0.5, 0.6, 3.5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
     // Vulkan clip space has inverted Y and half Z.
     const glm::mat4 clip(

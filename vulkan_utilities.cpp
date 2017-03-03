@@ -162,6 +162,69 @@ void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueu
     vkFreeCommandBuffers(device, command_pool, 1, &command_buffer);
 }
 
+static bool has_depth_component(VkFormat format) {
+    switch (format) {
+    case VK_FORMAT_D16_UNORM:
+    case VK_FORMAT_X8_D24_UNORM_PACK32:
+    case VK_FORMAT_D32_SFLOAT:
+    case VK_FORMAT_D16_UNORM_S8_UINT:
+    case VK_FORMAT_D24_UNORM_S8_UINT:
+    case VK_FORMAT_D32_SFLOAT_S8_UINT:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool has_stencil_component(VkFormat format) {
+    switch (format) {
+    case VK_FORMAT_S8_UINT:
+    case VK_FORMAT_D16_UNORM_S8_UINT:
+    case VK_FORMAT_D24_UNORM_S8_UINT:
+    case VK_FORMAT_D32_SFLOAT_S8_UINT:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void record_image_layout_transition(VkCommandBuffer command_buffer, VkImage image, VkFormat format,
+    VkAccessFlags src_access_flags, VkImageLayout old_layout, VkAccessFlags dst_access_flags, VkImageLayout new_layout) {
+
+    VkImageMemoryBarrier barrier;
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.pNext = nullptr;
+    barrier.srcAccessMask = src_access_flags;
+    barrier.dstAccessMask = dst_access_flags;
+    barrier.oldLayout = old_layout;
+    barrier.newLayout = new_layout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+
+    bool depth = has_depth_component(format);
+    bool stencil = has_stencil_component(format);
+    if (depth && stencil)
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    else if (depth)
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    else if (stencil)
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+    else
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
+}
+
 VkImage create_texture(VkDevice device, int image_width, int image_height, VkFormat format, Device_Memory_Allocator& allocator) {
     VkImageCreateInfo create_info;
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -245,6 +308,60 @@ VkImage create_staging_texture(VkDevice device, int image_width, int image_heigh
     }
     vkUnmapMemory(device, memory);
     return image;
+}
+
+VkImage create_depth_attachment_image(VkDevice device, int image_width, int image_height, VkFormat format, Device_Memory_Allocator& allocator) {
+    VkImageCreateInfo create_info;
+    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    create_info.pNext = nullptr;
+    create_info.flags = 0;
+    create_info.imageType = VK_IMAGE_TYPE_2D;
+    create_info.format = format;
+    create_info.extent.width = image_width;
+    create_info.extent.height = image_height;
+    create_info.extent.depth = 1;
+    create_info.mipLevels = 1;
+    create_info.arrayLayers = 1;
+    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    create_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    create_info.queueFamilyIndexCount = 0;
+    create_info.pQueueFamilyIndices = nullptr;
+    create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VkImage image;
+    VkResult result = vkCreateImage(device, &create_info, nullptr, &image);
+    check_vk_result(result, "vkCreateImage");
+
+    VkDeviceMemory memory = allocator.allocate_memory(image);
+    result = vkBindImageMemory(device, image, memory, 0);
+    check_vk_result(result, "vkBindImageMemory");
+    return image;
+}
+
+VkImageView create_image_view(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspect_flags) {
+    VkImageViewCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.image = image;
+    desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    desc.format = format;
+    desc.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    desc.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    desc.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    desc.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    desc.subresourceRange.aspectMask = aspect_flags;
+    desc.subresourceRange.baseMipLevel = 0;
+    desc.subresourceRange.levelCount = 1;
+    desc.subresourceRange.baseArrayLayer = 0;
+    desc.subresourceRange.layerCount = 1;
+
+    VkImageView image_view;
+    VkResult result = vkCreateImageView(device, &desc, nullptr, &image_view);
+    check_vk_result(result, "vkCreateImageView");
+    return image_view;
 }
 
 VkBuffer create_buffer(VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, Device_Memory_Allocator& allocator) {
