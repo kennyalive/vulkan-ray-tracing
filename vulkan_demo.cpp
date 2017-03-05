@@ -85,21 +85,6 @@ static void load_model() {
     }
 }
 
-static VkSurfaceKHR CreateSurface(VkInstance instance, HWND hwnd)
-{
-    VkWin32SurfaceCreateInfoKHR surfaceCreateInfo;
-    surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-    surfaceCreateInfo.pNext = nullptr;
-    surfaceCreateInfo.flags = 0;
-    surfaceCreateInfo.hinstance = ::GetModuleHandle(nullptr);
-    surfaceCreateInfo.hwnd = hwnd;
-
-    VkSurfaceKHR surface;
-    VkResult result = vkCreateWin32SurfaceKHR(instance, &surfaceCreateInfo, nullptr, &surface);
-    CheckVkResult(result, "vkCreateWin32SurfaceKHR");
-    return surface;
-}
-
 static VkRenderPass CreateRenderPass(VkDevice device, VkFormat attachmentImageFormat, VkFormat depth_image_format)
 {
     VkAttachmentDescription attachmentDescription;
@@ -225,7 +210,7 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
     instance = CreateInstance();
     physicalDevice = SelectPhysicalDevice(instance);
 
-    surface = CreateSurface(instance, windowHandle);
+    surface = create_surface(instance, windowHandle);
 
     DeviceInfo deviceInfo = CreateDevice(physicalDevice, surface);
     device = deviceInfo.device;
@@ -236,13 +221,16 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
 
     allocator = std::make_unique<Device_Memory_Allocator>(physicalDevice, device);
 
-    SwapchainInfo swapchainInfo = CreateSwapchain(physicalDevice, device, surface);
-    swapchain = swapchainInfo.swapchain;
-    swapchainImageFormat = swapchainInfo.imageFormat;
-    swapchainImages = swapchainInfo.images;
-    swapchainImageViews = swapchainInfo.imageViews;
+    Swapchain_Info swapchain_info = create_swapchain(physicalDevice, device, surface);
+    swapchain = swapchain_info.swapchain;
+    swapchainImages = swapchain_info.images;
 
-    renderPass = CreateRenderPass(device, swapchainInfo.imageFormat, find_depth_format(physicalDevice));
+    for (auto image : swapchainImages) {
+        auto image_view = create_image_view(device, image, swapchain_info.surface_format, VK_IMAGE_ASPECT_COLOR_BIT);
+        swapchainImageViews.push_back(image_view);
+    }
+
+    renderPass = CreateRenderPass(device, swapchain_info.surface_format, find_depth_format(physicalDevice));
 
     create_descriptor_set_layout();
     CreatePipeline();
@@ -331,7 +319,6 @@ void Vulkan_Demo::CleanupResources()
 
     vkDestroySwapchainKHR(device, swapchain, nullptr);
     swapchain = VK_NULL_HANDLE;
-    swapchainImageFormat = VK_FORMAT_UNDEFINED;
     swapchainImages.clear();
 
     allocator.reset();

@@ -1,14 +1,14 @@
 #pragma once
 
-#include <vector>
 #include "vulkan_definitions.h"
+#include <vector>
 
-struct SwapchainInfo
-{
+VkSurfaceKHR create_surface(VkInstance instance, HWND hwnd);
+
+struct Swapchain_Info {
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-    VkFormat imageFormat = VK_FORMAT_UNDEFINED;
+    VkFormat surface_format = VK_FORMAT_UNDEFINED;
     std::vector<VkImage> images;
-    std::vector<VkImageView> imageViews;
 };
 
-SwapchainInfo CreateSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface);
+Swapchain_Info create_swapchain(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface);

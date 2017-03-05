@@ -3,165 +3,121 @@
 #include "common.h"
 #include "swapchain_initialization.h"
 
-VkSurfaceFormatKHR SelectSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& surfaceFormats)
-{
-    assert(!surfaceFormats.empty());
+VkSurfaceKHR create_surface(VkInstance instance, HWND hwnd) {
+    VkWin32SurfaceCreateInfoKHR desc;
+    desc.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.hinstance = ::GetModuleHandle(nullptr);
+    desc.hwnd = hwnd;
 
-    // special case that means we can choose any format
-    if (surfaceFormats.size() == 1 && surfaceFormats[0].format == VK_FORMAT_UNDEFINED)
-    {
-        VkSurfaceFormatKHR surfaceFormat;
-        surfaceFormat.format = VK_FORMAT_R8G8B8A8_UNORM;
-        surfaceFormat.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-        return surfaceFormat;
-    }
-
-    for (const auto& surfaceFormat : surfaceFormats)
-    {
-        if (surfaceFormat.format == VK_FORMAT_R8G8B8A8_UNORM)
-            return surfaceFormat;
-    }
-    return surfaceFormats[0];
+    VkSurfaceKHR surface;
+    VkResult result = vkCreateWin32SurfaceKHR(instance, &desc, nullptr, &surface);
+    check_vk_result(result, "vkCreateWin32SurfaceKHR");
+    return surface;
 }
 
-SwapchainInfo CreateSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface)
-{
-    // get surface capabilities
-    VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities);
-    CheckVkResult(result, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
+static VkSurfaceFormatKHR select_surface_format(const std::vector<VkSurfaceFormatKHR>& format_candidates) {
+    // special case that means we can choose any format
+    if (format_candidates.size() == 1 && format_candidates[0].format == VK_FORMAT_UNDEFINED) {
+        VkSurfaceFormatKHR surface_format;
+        surface_format.format = VK_FORMAT_R8G8B8A8_UNORM;
+        surface_format.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+        return surface_format;
+    }
+    for (const auto& surface_format : format_candidates) {
+        if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM)
+            return surface_format;
+    }
+    return format_candidates[0];
+}
 
-    uint32_t imageCount = surfaceCapabilities.minImageCount + 1;
-    if (surfaceCapabilities.maxImageCount > 0)
-        imageCount = std::min(imageCount,  surfaceCapabilities.maxImageCount);
+Swapchain_Info create_swapchain(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface) {
+    VkSurfaceCapabilitiesKHR surface_caps;
+    VkResult result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_caps);
+    check_vk_result(result, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
 
-    VkExtent2D imageExtent = surfaceCapabilities.currentExtent;
-    if (surfaceCapabilities.currentExtent.width == -1)
-    {
-        imageExtent.width = std::min(
-            surfaceCapabilities.maxImageExtent.width, 
-            std::max(
-                surfaceCapabilities.minImageExtent.width, 
-                640u));
-
-        imageExtent.height = std::min(
-            surfaceCapabilities.maxImageExtent.height,
-            std::max(
-                surfaceCapabilities.minImageExtent.height,
-                480u));
+    VkExtent2D image_extent = surface_caps.currentExtent;
+    if (image_extent.width == 0xffffffff && image_extent.height == 0xffffffff) {
+        image_extent.width = std::min(surface_caps.maxImageExtent.width, std::max(surface_caps.minImageExtent.width, 640u));
+        image_extent.height = std::min(surface_caps.maxImageExtent.height, std::max(surface_caps.minImageExtent.height, 480u));
     }
 
-    if ((surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
-        Error("VK_IMAGE_USAGE_TRANSFER_DST_BIT is not supported by the swap chain");
-    VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    // transfer destination usage is required by image clear operations
+    if ((surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
+        error("VK_IMAGE_USAGE_TRANSFER_DST_BIT is not supported by the swapchain");
 
-    VkSurfaceTransformFlagBitsKHR preTransform;
-    if ((surfaceCapabilities.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) != 0)
-        preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-    else
-        preTransform = surfaceCapabilities.currentTransform;
+    VkImageUsageFlags image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     // determine surface format
-    uint32_t surfaceFormatsCount;
-    result = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatsCount, nullptr);
-    CheckVkResult(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
+    uint32_t format_count;
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, nullptr);
+    check_vk_result(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
+    assert(format_count > 0);
 
-    if (surfaceFormatsCount == 0)
-        Error("zero number of surface formats count");
+    std::vector<VkSurfaceFormatKHR> format_candidates(format_count);
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, format_candidates.data());
+    check_vk_result(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
+    VkSurfaceFormatKHR surface_format = select_surface_format(format_candidates);
 
-    std::vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatsCount);
-    result = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &surfaceFormatsCount, surfaceFormats.data());
-    CheckVkResult(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
+    // determine present mode and swachain image count
+    uint32_t present_mode_count;
+    result = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, nullptr);
+    check_vk_result(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
+    assert(present_mode_count > 0);
 
-    VkSurfaceFormatKHR surfaceFormat = SelectSurfaceFormat(surfaceFormats);
+    std::vector<VkPresentModeKHR> present_modes(present_mode_count);
+    result = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, present_modes.data());
+    check_vk_result(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
 
-    // determine present mode
-    uint32_t presentModesCount;
-    result = vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModesCount, nullptr);
-    CheckVkResult(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
+    VkPresentModeKHR present_mode;
+    uint32_t image_count;
 
-    if (presentModesCount == 0)
-        Error("zero number of present modes count");
-
-    std::vector<VkPresentModeKHR> presentModes(presentModesCount);
-    result = vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModesCount, presentModes.data());
-    CheckVkResult(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
-
-    VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-    for (auto currentPresentMode : presentModes)
-    {
-        if (currentPresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
-        {
-            presentMode = currentPresentMode;
-            break;
+    auto it = std::find(present_modes.cbegin(), present_modes.cend(), VK_PRESENT_MODE_MAILBOX_KHR);
+    if (it != present_modes.cend()) {
+        present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
+        image_count = std::max(3u, surface_caps.minImageCount);
+        if (surface_caps.maxImageCount > 0) {
+            image_count = std::min(image_count, surface_caps.maxImageCount);
         }
+    } else {
+        present_mode = VK_PRESENT_MODE_FIFO_KHR;
+        image_count = surface_caps.minImageCount;
     }
 
     // create swap chain
-    VkSwapchainCreateInfoKHR swapChainCreateInfo;
-    swapChainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    swapChainCreateInfo.pNext = nullptr;
-    swapChainCreateInfo.flags = 0;
-    swapChainCreateInfo.surface = surface;
-    swapChainCreateInfo.minImageCount = imageCount;
-    swapChainCreateInfo.imageFormat = surfaceFormat.format;
-    swapChainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
-    swapChainCreateInfo.imageExtent = imageExtent;
-    swapChainCreateInfo.imageArrayLayers = 1;
-    swapChainCreateInfo.imageUsage = imageUsage;
-    swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    swapChainCreateInfo.queueFamilyIndexCount = 0;
-    swapChainCreateInfo.pQueueFamilyIndices = nullptr;
-    swapChainCreateInfo.preTransform = preTransform;
-    swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    swapChainCreateInfo.presentMode = presentMode;
-    swapChainCreateInfo.clipped = VK_TRUE;
-    swapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+    VkSwapchainCreateInfoKHR desc;
+    desc.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.surface = surface;
+    desc.minImageCount = image_count;
+    desc.imageFormat = surface_format.format;
+    desc.imageColorSpace = surface_format.colorSpace;
+    desc.imageExtent = image_extent;
+    desc.imageArrayLayers = 1;
+    desc.imageUsage = image_usage;
+    desc.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    desc.queueFamilyIndexCount = 0;
+    desc.pQueueFamilyIndices = nullptr;
+    desc.preTransform = surface_caps.currentTransform;
+    desc.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    desc.presentMode = present_mode;
+    desc.clipped = VK_TRUE;
+    desc.oldSwapchain = VK_NULL_HANDLE;
 
     VkSwapchainKHR swapchain;
-    result = vkCreateSwapchainKHR(device, &swapChainCreateInfo, nullptr, &swapchain);
-    CheckVkResult(result, "vkCreateSwapchainKHR");
+    result = vkCreateSwapchainKHR(device, &desc, nullptr, &swapchain);
+    check_vk_result(result, "vkCreateSwapchainKHR");
 
-    SwapchainInfo info;
+    Swapchain_Info info;
     info.swapchain = swapchain;
-    info.imageFormat = surfaceFormat.format;
-
-    // get swapchain images
-    uint32_t imagesCount;
-    result = vkGetSwapchainImagesKHR(device, swapchain, &imagesCount, nullptr);
-    CheckVkResult(result, "vkGetSwapchainImagesKHR");
-
-    info.images.resize(imagesCount);
-    result = vkGetSwapchainImagesKHR(device, swapchain, &imagesCount, info.images.data());
-    CheckVkResult(result, "vkGetSwapchainImagesKHR");
-
-    // create views for swapchain images
-    info.imageViews.resize(imagesCount);
-    for (uint32_t i = 0; i < imagesCount; i++)
-    {
-        VkImageViewCreateInfo imageViewCreateInfo;
-        imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        imageViewCreateInfo.pNext = nullptr;
-        imageViewCreateInfo.flags = 0;
-        imageViewCreateInfo.image = info.images[i];
-        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        imageViewCreateInfo.format = info.imageFormat;
-        imageViewCreateInfo.components = {
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY,
-            VK_COMPONENT_SWIZZLE_IDENTITY
-        };
-        imageViewCreateInfo.subresourceRange = {
-            VK_IMAGE_ASPECT_COLOR_BIT,
-            0,
-            1,
-            0,
-            1
-        };
-        result = vkCreateImageView(device, &imageViewCreateInfo, nullptr, &info.imageViews[i]);
-        CheckVkResult(result, "vkCreateImageView");
-    }
-
+    info.surface_format= surface_format.format;
+    uint32_t swapchain_image_count; // swapchain can create more images than requested
+    result = vkGetSwapchainImagesKHR(device, swapchain, &swapchain_image_count, nullptr);
+    check_vk_result(result, "vkGetSwapchainImagesKHR (get count)");
+    info.images.resize(image_count);
+    result = vkGetSwapchainImagesKHR(device, swapchain, &swapchain_image_count, info.images.data());
+    check_vk_result(result, "vkGetSwapchainImagesKHR (get images)");
     return info;
 }

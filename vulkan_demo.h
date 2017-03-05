@@ -61,7 +61,6 @@ private:
     VkQueue presentationQueue = VK_NULL_HANDLE;
 
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-    VkFormat swapchainImageFormat = VK_FORMAT_UNDEFINED;
     std::vector<VkImage> swapchainImages;
     std::vector<VkImageView> swapchainImageViews;
 
