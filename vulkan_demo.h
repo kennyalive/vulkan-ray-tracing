@@ -15,10 +15,10 @@ public:
     void RunFrame();
 
 private:
-    void CreateFrameResources();
-
     void create_descriptor_set_layout();
     void CreatePipeline();
+
+    void create_command_pool();
 
     void create_vertex_buffer();
     void create_index_buffer();
@@ -28,20 +28,13 @@ private:
     void create_texture();
     void create_texture_sampler();
     void create_depth_buffer_resources();
+    void create_framebuffers();
+    void create_semaphores();
 
-    void RecordCommandBuffer();
+    void create_command_buffers();
+    void record_command_buffers();
 
     void update_uniform_buffer();
-
-private:
-    struct FrameRenderResources
-    {
-        VkFramebuffer framebuffer = VK_NULL_HANDLE;
-        VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-        VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-        VkSemaphore renderingFinishedSemaphore = VK_NULL_HANDLE;
-        VkFence fence = VK_NULL_HANDLE;
-    };
 
 private:
     uint32_t windowWidth = 0;
@@ -73,6 +66,8 @@ private:
     VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
     VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
 
+    VkCommandPool command_pool = VK_NULL_HANDLE;
+
     VkBuffer vertex_buffer = VK_NULL_HANDLE;
     VkBuffer index_buffer = VK_NULL_HANDLE;
 
@@ -87,11 +82,10 @@ private:
     VkImage depth_image = VK_NULL_HANDLE;
     VkImageView depth_image_view = VK_NULL_HANDLE;
 
-    VkCommandPool commandPool = VK_NULL_HANDLE;
-    std::array<FrameRenderResources, 3> frameResources;
-
-    int frameResourcesIndex = 0;
-    uint32_t swapchainImageIndex = 0;
+    std::vector<VkFramebuffer> framebuffers;
+    std::vector<VkCommandBuffer> command_buffers;
+    VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+    VkSemaphore renderingFinishedSemaphore = VK_NULL_HANDLE;
 
     std::unique_ptr<Device_Memory_Allocator> allocator;
 };
