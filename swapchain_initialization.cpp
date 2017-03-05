@@ -60,7 +60,7 @@ Swapchain_Info create_swapchain(VkPhysicalDevice physical_device, VkDevice devic
     check_vk_result(result, "vkGetPhysicalDeviceSurfaceFormatsKHR");
     VkSurfaceFormatKHR surface_format = select_surface_format(format_candidates);
 
-    // determine present mode and swachain image count
+    // determine present mode and swapchain image count
     uint32_t present_mode_count;
     result = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, nullptr);
     check_vk_result(result, "vkGetPhysicalDeviceSurfacePresentModesKHR");
