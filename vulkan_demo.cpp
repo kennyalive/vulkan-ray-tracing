@@ -251,7 +251,9 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
     create_descriptor_set();
 
     create_command_buffers();
-    record_command_buffers();
+    
+    record_render_scene_command_buffer();
+    record_primary_command_buffers();
 }
 
 void Vulkan_Demo::CleanupResources() 
@@ -796,9 +798,14 @@ void Vulkan_Demo::create_command_buffers() {
     command_buffers.resize(swapchainImages.size());
     VkResult result = vkAllocateCommandBuffers(device, &alloc_info, command_buffers.data());
     check_vk_result(result, "vkAllocateCommandBuffers");
+
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+    alloc_info.commandBufferCount = 1;
+    result = vkAllocateCommandBuffers(device, &alloc_info, &render_scene_cmdbuf);
+    check_vk_result(result, "vkAllocateCommandBuffers");
 }
 
-void Vulkan_Demo::record_command_buffers() {
+void Vulkan_Demo::record_primary_command_buffers() {
     VkImageSubresourceRange subresource_range;
     subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     subresource_range.baseMipLevel = 0;
@@ -859,14 +866,8 @@ void Vulkan_Demo::record_command_buffers() {
         renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clear_values.size());
         renderPassBeginInfo.pClearValues = clear_values.data();
 
-        vkCmdBeginRenderPass(command_buffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
-        VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer, &offset);
-        vkCmdBindIndexBuffer(command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
-        vkCmdDrawIndexed(command_buffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+        vkCmdBeginRenderPass(command_buffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+        vkCmdExecuteCommands(command_buffer, 1, &render_scene_cmdbuf);
         vkCmdEndRenderPass(command_buffer);
 
         if (presentationQueue != graphicsQueue) {
@@ -901,6 +902,38 @@ void Vulkan_Demo::record_command_buffers() {
     }
 }
 
+void Vulkan_Demo::record_render_scene_command_buffer() {
+    VkCommandBufferInheritanceInfo inheritance_info;
+    inheritance_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+    inheritance_info.pNext = nullptr;
+    inheritance_info.renderPass = renderPass;
+    inheritance_info.subpass = 0;
+    inheritance_info.framebuffer = VK_NULL_HANDLE;
+    inheritance_info.occlusionQueryEnable = VK_FALSE;
+    inheritance_info.queryFlags = 0;
+    inheritance_info.pipelineStatistics = 0;
+
+    VkCommandBufferBeginInfo begin_info;
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.pNext = nullptr;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT | VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+    begin_info.pInheritanceInfo = &inheritance_info;
+
+    VkResult result = vkBeginCommandBuffer(render_scene_cmdbuf, &begin_info);
+    check_vk_result(result, "vkBeginCommandBuffer");
+
+    vkCmdBindPipeline(render_scene_cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(render_scene_cmdbuf, 0, 1, &vertex_buffer, &offset);
+    vkCmdBindIndexBuffer(render_scene_cmdbuf, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindDescriptorSets(render_scene_cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
+    vkCmdDrawIndexed(render_scene_cmdbuf, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+
+    result = vkEndCommandBuffer(render_scene_cmdbuf);
+    check_vk_result(result, "vkEndCommandBuffer");
+}
+
 void Vulkan_Demo::update_uniform_buffer() {
     static auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -921,7 +954,7 @@ void Vulkan_Demo::update_uniform_buffer() {
         0.0f, 0.0f, 0.5f, 0.0f,
         0.0f, 0.0f, 0.5f, 1.0f);
 
-    ubo.proj = clip * glm::perspective(glm::radians(45.0f), windowWidth / (float)windowHeight, 0.1f, 10.0f);
+    ubo.proj = clip * glm::perspective(glm::radians(45.0f), windowWidth / (float)windowHeight, 0.1f, 50.0f);
 
     void* data;
     VkResult result = vkMapMemory(device, uniform_staging_buffer_memory, 0, sizeof(ubo), 0, &data);

@@ -32,7 +32,8 @@ private:
     void create_semaphores();
 
     void create_command_buffers();
-    void record_command_buffers();
+    void record_primary_command_buffers();
+    void record_render_scene_command_buffer();
 
     void update_uniform_buffer();
 
@@ -83,7 +84,10 @@ private:
     VkImageView depth_image_view = VK_NULL_HANDLE;
 
     std::vector<VkFramebuffer> framebuffers;
+
     std::vector<VkCommandBuffer> command_buffers;
+    VkCommandBuffer render_scene_cmdbuf;
+
     VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
     VkSemaphore renderingFinishedSemaphore = VK_NULL_HANDLE;
 

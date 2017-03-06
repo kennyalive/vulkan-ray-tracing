@@ -1,3 +1,4 @@
+#include <iostream>
 #include <fstream>
 #include <vector>
 #include "common.h"
@@ -60,5 +61,6 @@ void CheckVkResult(VkResult result, const std::string& functionName)
 
 void Error(const std::string& message)
 {
+    std::cout << message << std::endl;
     throw VulkanException(message);
 }
