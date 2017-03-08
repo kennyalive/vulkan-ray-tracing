@@ -2,11 +2,9 @@
 #include <string>
 #include <vector>
 
-#include "common.h"
 #include "device_initialization.h"
+#include "vulkan_utilities.h"
 
-namespace
-{
 const std::vector<const char*> instanceExtensionNames =
 {
     VK_KHR_SURFACE_EXTENSION_NAME,
@@ -28,75 +26,40 @@ bool IsExtensionAvailable(const std::vector<VkExtensionProperties>& extensionPro
     return it != extensionProperties.cend();
 }
 
-bool SelectQueueFamilies(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
-    uint32_t& graphicsQueueFamilyIndex, uint32_t& presentQueueFamilyIndex)
-{
-    uint32_t queueFamilyCount;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+static uint32_t select_queue_family(VkPhysicalDevice physical_device, VkSurfaceKHR surface) {
+    uint32_t queue_family_count;
+    vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, nullptr);
 
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
+    std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
+    vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.data());
 
-    uint32_t selectedGraphicsQueueFamilyIndex;
-    bool graphicsFound = false;
+    for (uint32_t i = 0; i < queue_family_count; i++) {
+        VkBool32 presentation_supported;
+        auto result = vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &presentation_supported);
+        check_vk_result(result, "vkGetPhysicalDeviceSurfaceSupportKHR");
 
-    uint32_t selectedPresentationQueueFamilyIndex;
-    bool presentationFound = false;
-
-    for (uint32_t i = 0; i < queueFamilyCount; i++)
-    {
-        if (queueFamilies[i].queueCount == 0)
-            continue;
-
-        // check graphics operations support
-        bool graphicsSupported = (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0;
-
-        // check presentation support
-        VkBool32 presentationSupported;
-        auto result = vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentationSupported);
-        CheckVkResult(result, "vkGetPhysicalDeviceSurfaceSupportKHR");
-
-        if (graphicsSupported)
-        {
-            selectedGraphicsQueueFamilyIndex = i;
-            graphicsFound = true;
-        }
-        if (presentationSupported == VK_TRUE)
-        {
-            selectedPresentationQueueFamilyIndex = i;
-            presentationFound = true;
-        }
-
-        // check if we found a preferred queue that supports both present and graphics operations
-        if (selectedGraphicsQueueFamilyIndex == i && 
-            selectedPresentationQueueFamilyIndex == i)
-            break;
+        if (presentation_supported && (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
+            return i;
     }
-
-    if (!graphicsFound || !presentationFound)
-        return false;
-
-    graphicsQueueFamilyIndex = selectedGraphicsQueueFamilyIndex;
-    presentQueueFamilyIndex = selectedPresentationQueueFamilyIndex;
-    return true;
+    error("failed to find queue family");
+    return -1;
 }
-} // namespace
 
 VkInstance CreateInstance()
 {
     // check instance extensions availability
     uint32_t extensionCount = 0;
     VkResult result = vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-    CheckVkResult(result, "vkEnumerateInstanceExtensionProperties");
+    check_vk_result(result, "vkEnumerateInstanceExtensionProperties");
 
     std::vector<VkExtensionProperties> extensionProperties(extensionCount);
     result = vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensionProperties.data());
-    CheckVkResult(result, "vkEnumerateInstanceExtensionProperties");
+    check_vk_result(result, "vkEnumerateInstanceExtensionProperties");
 
     for (auto extensionName : instanceExtensionNames)
     {
         if (!IsExtensionAvailable(extensionProperties, extensionName))
-            Error(std::string("required instance extension is not available: ") + extensionName);
+            error(std::string("required instance extension is not available: ") + extensionName);
     }
 
     // create vulkan instance
@@ -112,7 +75,7 @@ VkInstance CreateInstance()
 
     VkInstance instance;
     result = vkCreateInstance(&createInfo, nullptr, &instance);
-    CheckVkResult(result, "vkCreateInstance");
+    check_vk_result(result, "vkCreateInstance");
     return instance;
 }
 
@@ -120,84 +83,58 @@ VkPhysicalDevice SelectPhysicalDevice(VkInstance instance)
 {
     uint32_t physicalDeviceCount;
     VkResult result = vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr);
-    CheckVkResult(result, "vkEnumeratePhysicalDevices");
+    check_vk_result(result, "vkEnumeratePhysicalDevices");
 
     if (physicalDeviceCount == 0)
-        Error("no physical device found");
+        error("no physical device found");
 
     std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
     result = vkEnumeratePhysicalDevices(instance, &physicalDeviceCount, physicalDevices.data());
-    CheckVkResult(result, "vkEnumeratePhysicalDevices");
+    check_vk_result(result, "vkEnumeratePhysicalDevices");
 
     return physicalDevices[0]; // just get the first one
 }
 
-DeviceInfo CreateDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
-{
-    // Check device extensions availability.
+Device_Info CreateDevice(VkPhysicalDevice physical_device, VkSurfaceKHR surface) {
     uint32_t extensionCount = 0;
-    VkResult result = vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
-    CheckVkResult(result, "vkEnumerateDeviceExtensionProperties");
+    VkResult result = vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extensionCount, nullptr);
+    check_vk_result(result, "vkEnumerateDeviceExtensionProperties");
 
     std::vector<VkExtensionProperties> extensionProperties(extensionCount);
-    result = vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, extensionProperties.data());
-    CheckVkResult(result, "vkEnumerateDeviceExtensionProperties");
+    result = vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extensionCount, extensionProperties.data());
+    check_vk_result(result, "vkEnumerateDeviceExtensionProperties");
 
     for (auto extensionName : deviceExtensionNames)
     {
         if (!IsExtensionAvailable(extensionProperties, extensionName))
-            Error(std::string("required device extension is not available: ") + extensionName);
+            error(std::string("required device extension is not available: ") + extensionName);
     }
 
-    // Select queue families for graphics and presentation operations.
-    uint32_t graphicsQueueFamilyIndex;
-    uint32_t presentationQueueFamilyIndex;
-
-    if (!SelectQueueFamilies(physicalDevice, surface, graphicsQueueFamilyIndex, presentationQueueFamilyIndex))
-        Error("failed to find matching queue families");
-
-    // Fill in queues create info.
-    std::vector<uint32_t> queueFamilyIndices { graphicsQueueFamilyIndex };
-    if (presentationQueueFamilyIndex != graphicsQueueFamilyIndex)
-        queueFamilyIndices.push_back(presentationQueueFamilyIndex);
-
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     const float queuePriority = 1.0;
-    for (uint32_t index : queueFamilyIndices)
-    {
-        VkDeviceQueueCreateInfo queueCreateInfo;
-        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.pNext = nullptr;
-        queueCreateInfo.flags = 0;
-        queueCreateInfo.queueFamilyIndex = index;
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
-        queueCreateInfos.push_back(queueCreateInfo);
-    }
+    VkDeviceQueueCreateInfo queue_desc;
+    queue_desc.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue_desc.pNext = nullptr;
+    queue_desc.flags = 0;
+    queue_desc.queueFamilyIndex = select_queue_family(physical_device, surface);
+    queue_desc.queueCount = 1;
+    queue_desc.pQueuePriorities = &queuePriority;
 
-    // Fill in device create info.
-    VkDeviceCreateInfo createInfo;
-    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.pNext = nullptr;
-    createInfo.flags = 0;
-    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-    createInfo.pQueueCreateInfos = queueCreateInfos.data();
-    createInfo.enabledLayerCount = 0;
-    createInfo.ppEnabledLayerNames = nullptr;
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensionNames.size());
-    createInfo.ppEnabledExtensionNames = deviceExtensionNames.data();
-    createInfo.pEnabledFeatures = nullptr;
+    VkDeviceCreateInfo device_desc;
+    device_desc.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    device_desc.pNext = nullptr;
+    device_desc.flags = 0;
+    device_desc.queueCreateInfoCount = 1;
+    device_desc.pQueueCreateInfos = &queue_desc;
+    device_desc.enabledLayerCount = 0;
+    device_desc.ppEnabledLayerNames = nullptr;
+    device_desc.enabledExtensionCount = static_cast<uint32_t>(deviceExtensionNames.size());
+    device_desc.ppEnabledExtensionNames = deviceExtensionNames.data();
+    device_desc.pEnabledFeatures = nullptr;
 
-    // Create device.
-    DeviceInfo deviceInfo;
-    result = vkCreateDevice(physicalDevice, &createInfo, nullptr, &deviceInfo.device);
-    CheckVkResult(result, "vkCreateDevice");
-
-    deviceInfo.graphicsQueueFamilyIndex = graphicsQueueFamilyIndex;
-    vkGetDeviceQueue(deviceInfo.device, graphicsQueueFamilyIndex, 0, &deviceInfo.graphicsQueue);
-
-    deviceInfo.presentationQueueFamilyIndex = presentationQueueFamilyIndex;
-    vkGetDeviceQueue(deviceInfo.device, presentationQueueFamilyIndex, 0, &deviceInfo.presentationQueue);
-
+    Device_Info deviceInfo;
+    result = vkCreateDevice(physical_device, &device_desc, nullptr, &deviceInfo.device);
+    check_vk_result(result, "vkCreateDevice");
+    deviceInfo.queue_family_index = queue_desc.queueFamilyIndex;
+    vkGetDeviceQueue(deviceInfo.device, queue_desc.queueFamilyIndex, 0, &deviceInfo.queue);
     return deviceInfo;
 }

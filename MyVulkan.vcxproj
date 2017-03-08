@@ -149,7 +149,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="common.cpp" />
+    <ClCompile Include="allocator.cpp" />
     <ClCompile Include="device_initialization.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="swapchain_initialization.cpp" />
@@ -157,8 +157,9 @@
     <ClCompile Include="vulkan_utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="common.h" />
+    <ClInclude Include="allocator.h" />
     <ClInclude Include="device_initialization.h" />
+    <ClInclude Include="resource_manager.h" />
     <ClInclude Include="swapchain_initialization.h" />
     <ClInclude Include="vulkan_demo.h" />
     <ClInclude Include="vulkan_definitions.h" />

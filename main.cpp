@@ -1,58 +1,49 @@
+#include "vulkan_demo.h"
+
 #define SDL_MAIN_HANDLED
 #include "sdl/SDL.h"
 #include "sdl/SDL_syswm.h"
 
-#include "common.h"
-#include "vulkan_demo.h"
+const int window_width = 640;
+const int window_height = 480;
 
-const int windowWidth = 640;
-const int windowHeight = 480;
+Vulkan_Demo demo(window_width, window_height);
 
-Vulkan_Demo demo(windowWidth, windowHeight);
-
-void RunMainLoop()
+static void main_loop()
 {
     SDL_Event event;
     bool running = true;
-    while (running)
-    {
-        while (SDL_PollEvent(&event))
-        {
+    while (running) {
+        while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT)
                 running = false;
         }
-        if (running)
-        {
-            demo.RunFrame();
+        if (running) {
+            demo.run_frame();
             SDL_Delay(1);
         }
     }
 }
 
-int main()
-{
-    // create SDL window
+int main() {
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
-        Error("SDL_Init error");
+        error("SDL_Init error");
 
-    SDL_Window* window = SDL_CreateWindow("Vulkan app", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        windowWidth, windowHeight, SDL_WINDOW_SHOWN);
-    if (window == nullptr)
-    {
+    SDL_Window* window = SDL_CreateWindow("Vulkan app", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, SDL_WINDOW_SHOWN);
+    if (window == nullptr) {
         SDL_Quit();
-        Error("failed to create SDL window");
+        error("failed to create SDL window");
     }
 
     SDL_SysWMinfo wmInfo;
     SDL_VERSION(&wmInfo.version)
-    if (SDL_GetWindowWMInfo(window, &wmInfo) == SDL_FALSE)
-    {
+    if (SDL_GetWindowWMInfo(window, &wmInfo) == SDL_FALSE) {
         SDL_Quit();
-        Error("failed to get platform specific window information");
+        error("failed to get platform specific window information");
     }
 
     demo.CreateResources(wmInfo.info.win.window);
-    RunMainLoop();
+    main_loop();
     demo.CleanupResources();
     SDL_Quit();
     return 0;

@@ -1,54 +1,33 @@
 #pragma once
 
 #include "vulkan_definitions.h"
+
+#include <functional>
+#include <string>
 #include <vector>
 
-class Shared_Staging_Memory {
-public:
-    Shared_Staging_Memory(VkPhysicalDevice physical_device, VkDevice device);
-    ~Shared_Staging_Memory();
+void check_vk_result(VkResult result, const std::string& function_name);
+void error(const std::string& message);
 
-    void ensure_allocation_for_object(VkImage image);
-    void ensure_allocation_for_object(VkBuffer buffer);
-    VkDeviceMemory get_handle() const;
-
-private:
-    void ensure_allocation(const VkMemoryRequirements& memory_requirements);
-
-private:
-    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-    VkDevice device = VK_NULL_HANDLE;
-
-    VkDeviceMemory handle = VK_NULL_HANDLE;
-    VkDeviceSize size = 0;
-    uint32_t memory_type_index = -1;
+struct Defer_Action {
+    Defer_Action(std::function<void()> action)
+        : action(action) {}
+    ~Defer_Action() {
+        action();
+    }
+    std::function<void()> action;
 };
 
-// NOTE: in this implementation I do memory allocation for each allocation request.
-// TODO: sub-allocate from larger chunks and return chunk handle plus offset withing corresponding chunk.
-class Device_Memory_Allocator {
-public:
-    Device_Memory_Allocator(VkPhysicalDevice physical_device, VkDevice device);
-    ~Device_Memory_Allocator();
-
-    VkDeviceMemory allocate_memory(VkImage image);
-    VkDeviceMemory allocate_memory(VkBuffer buffer);
-    VkDeviceMemory allocate_staging_memory(VkImage image);
-    VkDeviceMemory allocate_staging_memory(VkBuffer buffer);
-
-    Shared_Staging_Memory& get_shared_staging_memory();
-
-private:
-    VkDeviceMemory allocate_memory(const VkMemoryRequirements& memory_requirements, VkMemoryPropertyFlags properties);
-
-private:
-    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-    VkDevice device = VK_NULL_HANDLE;
-
-    std::vector<VkDeviceMemory> chunks;
-    Shared_Staging_Memory shared_staging_memory;
+struct Shader_Module {
+    Shader_Module(VkDevice device, const std::string& spriv_file_name);
+    ~Shader_Module();
+    VkDevice device;
+    VkShaderModule handle;
 };
 
+class Device_Memory_Allocator;
+
+// Command buffers
 void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder);
 
 void record_image_layout_transition(VkCommandBuffer command_buffer, VkImage image, VkFormat format,

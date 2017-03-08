@@ -1,36 +1,36 @@
 #pragma once
 
-#include <array>
 #include <memory>
 #include <vector>
-#include "vulkan_utilities.h"
+#include "allocator.h"
+#include "resource_manager.h"
+#include "vulkan_definitions.h"
 
 class Vulkan_Demo
 {
 public:
-    Vulkan_Demo(uint32_t windowWidth, uint32_t windowHeight);
+    Vulkan_Demo(uint32_t window_width, uint32_t window_height);
 
     void CreateResources(HWND windowHandle);
     void CleanupResources();
-    void RunFrame();
+    void run_frame();
 
 private:
-    void create_descriptor_set_layout();
-    void CreatePipeline();
-
     void create_command_pool();
 
-    void create_vertex_buffer();
-    void create_index_buffer();
     void create_uniform_buffer();
-    void create_descriptor_pool();
-    void create_descriptor_set();
     void create_texture();
     void create_texture_sampler();
     void create_depth_buffer_resources();
-    void create_framebuffers();
-    void create_semaphores();
 
+    void create_render_pass();
+    void create_framebuffers();
+    void create_descriptor_set_layout();
+    void create_pipeline();
+    void create_descriptor_pool();
+    void create_descriptor_set();
+
+    void upload_geometry();
     void create_command_buffers();
     void record_primary_command_buffers();
     void record_render_scene_command_buffer();
@@ -38,27 +38,28 @@ private:
     void update_uniform_buffer();
 
 private:
-    uint32_t windowWidth = 0;
-    uint32_t windowHeight = 0;
+    const uint32_t window_width = 0;
+    const uint32_t window_height = 0;
 
     VkInstance instance = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
-
-    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-
+    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     VkDevice device = VK_NULL_HANDLE;
-
-    uint32_t graphicsQueueFamilyIndex = 0;
-    VkQueue graphicsQueue = VK_NULL_HANDLE;
-
-    uint32_t presentationQueueFamilyIndex = 0;
-    VkQueue presentationQueue = VK_NULL_HANDLE;
+    uint32_t queue_family_index = 0;
+    VkQueue queue = VK_NULL_HANDLE;
+    Device_Memory_Allocator allocator;
+    Resource_Manager resource_manager;
 
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+    VkFormat swapchain_image_format = VK_FORMAT_UNDEFINED;
     std::vector<VkImage> swapchainImages;
     std::vector<VkImageView> swapchainImageViews;
+    VkSemaphore image_acquired = VK_NULL_HANDLE;
+    VkSemaphore rendering_finished = VK_NULL_HANDLE;
 
-    VkRenderPass renderPass = VK_NULL_HANDLE;
+    VkCommandPool command_pool = VK_NULL_HANDLE;
+
+    VkRenderPass render_pass = VK_NULL_HANDLE;
 
     VkDescriptorSetLayout descriptor_set_layout = VK_NULL_HANDLE;
     VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
@@ -67,10 +68,9 @@ private:
     VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
     VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
 
-    VkCommandPool command_pool = VK_NULL_HANDLE;
-
     VkBuffer vertex_buffer = VK_NULL_HANDLE;
     VkBuffer index_buffer = VK_NULL_HANDLE;
+    uint32_t model_indices_count = 0;
 
     VkBuffer uniform_staging_buffer = VK_NULL_HANDLE;
     VkDeviceMemory uniform_staging_buffer_memory = VK_NULL_HANDLE; // owned by the allocator
@@ -87,9 +87,4 @@ private:
 
     std::vector<VkCommandBuffer> command_buffers;
     VkCommandBuffer render_scene_cmdbuf;
-
-    VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-    VkSemaphore renderingFinishedSemaphore = VK_NULL_HANDLE;
-
-    std::unique_ptr<Device_Memory_Allocator> allocator;
 };

@@ -1,7 +1,7 @@
+#include "swapchain_initialization.h"
+#include "vulkan_utilities.h"
 #include <algorithm>
 #include <cassert>
-#include "common.h"
-#include "swapchain_initialization.h"
 
 VkSurfaceKHR create_surface(VkInstance instance, HWND hwnd) {
     VkWin32SurfaceCreateInfoKHR desc;
@@ -24,10 +24,6 @@ static VkSurfaceFormatKHR select_surface_format(const std::vector<VkSurfaceForma
         surface_format.format = VK_FORMAT_R8G8B8A8_UNORM;
         surface_format.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
         return surface_format;
-    }
-    for (const auto& surface_format : format_candidates) {
-        if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM)
-            return surface_format;
     }
     return format_candidates[0];
 }

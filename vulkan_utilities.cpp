@@ -1,121 +1,51 @@
-#include "common.h"
+#include "allocator.h"
 #include "vulkan_utilities.h"
+#include <iostream>
+#include <fstream>
 
-static uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
-    VkPhysicalDeviceMemoryProperties memory_properties;
-    vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
-
-    for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
-        if ((memory_type_bits & (1 << i)) != 0 &&
-            (memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
-    error("failed to find matching memory type with requested properties");
-    return -1;
-}
-
-Shared_Staging_Memory::Shared_Staging_Memory(VkPhysicalDevice physical_device, VkDevice device)
-    : physical_device(physical_device)
-    , device(device) {}
-
-Shared_Staging_Memory::~Shared_Staging_Memory() {
-    if (handle != VK_NULL_HANDLE) {
-        vkFreeMemory(device, handle, nullptr);
+void check_vk_result(VkResult result, const std::string& functionName) {
+    if (result < 0) {
+        error(functionName + " has returned error code with value " + std::to_string(result));
     }
 }
 
-void Shared_Staging_Memory::ensure_allocation_for_object(VkImage image) {
-    VkMemoryRequirements memory_requirements;
-    vkGetImageMemoryRequirements(device, image, &memory_requirements);
-    ensure_allocation(memory_requirements);
+void error(const std::string& message) {
+    std::cout << message << std::endl;
+    throw std::runtime_error(message);
 }
 
-void Shared_Staging_Memory::ensure_allocation_for_object(VkBuffer buffer) {
-    VkMemoryRequirements memory_requirements;
-    vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
-    ensure_allocation(memory_requirements);
+static std::vector<char> read_binary_file_contents(const std::string& file_name) {
+    std::ifstream stream(file_name, std::ios_base::binary | std::ios_base::ate);
+    auto file_size = stream.tellg();
+    stream.seekg(0, std::ios_base::beg);
+
+    std::vector<char> buffer(file_size);
+    stream.read(buffer.data(), file_size);
+    if (!stream)
+        throw std::runtime_error("failed to read file contents: " + file_name);
+    return buffer;
 }
 
-VkDeviceMemory Shared_Staging_Memory::get_handle() const {
-    return handle;
+Shader_Module::Shader_Module(VkDevice device, const std::string& spirv_file_name)
+    : device(device) {
+
+    auto data = read_binary_file_contents(spirv_file_name);
+    if (data.size() % 4 != 0)
+        error("SPIR-V binary file size is not multiple of 4: " + spirv_file_name);
+
+    VkShaderModuleCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.codeSize = data.size();
+    desc.pCode = reinterpret_cast<const uint32_t*>(data.data());
+
+    VkResult result = vkCreateShaderModule(device, &desc, nullptr, &handle);
+    check_vk_result(result, "vkCreateShaderModule");
 }
 
-void Shared_Staging_Memory::ensure_allocation(const VkMemoryRequirements& memory_requirements) {
-    uint32_t required_memory_type_index = find_memory_type(physical_device, memory_requirements.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    if (size < memory_requirements.size || memory_type_index != required_memory_type_index) {
-        if (handle != VK_NULL_HANDLE) {
-            vkFreeMemory(device, handle, nullptr);
-        }
-        handle = VK_NULL_HANDLE;
-        size = 0;
-        memory_type_index = -1;
-
-        VkMemoryAllocateInfo alloc_info;
-        alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        alloc_info.pNext = nullptr;
-        alloc_info.allocationSize = memory_requirements.size;
-        alloc_info.memoryTypeIndex = required_memory_type_index;
-
-        VkResult result = vkAllocateMemory(device, &alloc_info, nullptr, &handle);
-        check_vk_result(result, "vkAllocateMemory");
-        size = memory_requirements.size;
-        memory_type_index = required_memory_type_index;
-    }
-}
-
-Device_Memory_Allocator::Device_Memory_Allocator(VkPhysicalDevice physical_device, VkDevice device)
-    : physical_device(physical_device)
-    , device(device)
-    , shared_staging_memory(physical_device, device) {}
-
-Device_Memory_Allocator::~Device_Memory_Allocator() {
-    for (auto chunk : chunks)
-        vkFreeMemory(device, chunk, nullptr);
-}
-
-VkDeviceMemory Device_Memory_Allocator::allocate_memory(VkImage image) {
-    VkMemoryRequirements memory_requirements;
-    vkGetImageMemoryRequirements(device, image, &memory_requirements);
-    return allocate_memory(memory_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-}
-
-VkDeviceMemory Device_Memory_Allocator::allocate_memory(VkBuffer buffer) {
-    VkMemoryRequirements memory_requirements;
-    vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
-    return allocate_memory(memory_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-}
-
-VkDeviceMemory Device_Memory_Allocator::allocate_staging_memory(VkImage image) {
-    VkMemoryRequirements memory_requirements;
-    vkGetImageMemoryRequirements(device, image, &memory_requirements);
-    return allocate_memory(memory_requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-}
-
-VkDeviceMemory Device_Memory_Allocator::allocate_staging_memory(VkBuffer buffer) {
-    VkMemoryRequirements memory_requirements;
-    vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
-    return allocate_memory(memory_requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-}
-
-Shared_Staging_Memory& Device_Memory_Allocator::get_shared_staging_memory() {
-    return shared_staging_memory;
-}
-
-VkDeviceMemory Device_Memory_Allocator::allocate_memory(const VkMemoryRequirements& memory_requirements, VkMemoryPropertyFlags properties) {
-    VkMemoryAllocateInfo alloc_info;
-    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc_info.pNext = nullptr;
-    alloc_info.allocationSize = memory_requirements.size;
-    alloc_info.memoryTypeIndex = find_memory_type(physical_device, memory_requirements.memoryTypeBits, properties);
-
-    VkDeviceMemory chunk;
-    VkResult result = vkAllocateMemory(device, &alloc_info, nullptr, &chunk);
-    check_vk_result(result, "vkAllocateMemory");
-    chunks.push_back(chunk);
-    return chunk;
+Shader_Module::~Shader_Module() {
+    vkDestroyShaderModule(device, handle, nullptr);
 }
 
 void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueue queue,
