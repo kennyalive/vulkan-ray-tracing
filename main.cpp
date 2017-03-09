@@ -1,4 +1,5 @@
 #include "vulkan_demo.h"
+#include "vulkan_utilities.h"
 
 #define SDL_MAIN_HANDLED
 #include "sdl/SDL.h"
@@ -42,9 +43,9 @@ int main() {
         error("failed to get platform specific window information");
     }
 
-    demo.CreateResources(wmInfo.info.win.window);
+    demo.initialize(wmInfo.info.win.window);
     main_loop();
-    demo.CleanupResources();
+    demo.release_resources();
     SDL_Quit();
     return 0;
 }

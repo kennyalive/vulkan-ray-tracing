@@ -1,4 +1,5 @@
 #include "allocator.h"
+#include "resource_manager.h"
 #include "vulkan_utilities.h"
 #include <iostream>
 #include <fstream>
@@ -155,64 +156,60 @@ void record_image_layout_transition(VkCommandBuffer command_buffer, VkImage imag
     );
 }
 
-VkImage create_texture(VkDevice device, int image_width, int image_height, VkFormat format, Device_Memory_Allocator& allocator) {
-    VkImageCreateInfo create_info;
-    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    create_info.pNext = nullptr;
-    create_info.flags = 0;
-    create_info.imageType = VK_IMAGE_TYPE_2D;
-    create_info.format = format;
-    create_info.extent.width = image_width;
-    create_info.extent.height = image_height;
-    create_info.extent.depth = 1;
-    create_info.mipLevels = 1;
-    create_info.arrayLayers = 1;
-    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create_info.queueFamilyIndexCount = 0;
-    create_info.pQueueFamilyIndices = nullptr;
-    create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+VkImage create_texture(VkDevice device, int image_width, int image_height, VkFormat format) {
+    VkImageCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.imageType = VK_IMAGE_TYPE_2D;
+    desc.format = format;
+    desc.extent.width = image_width;
+    desc.extent.height = image_height;
+    desc.extent.depth = 1;
+    desc.mipLevels = 1;
+    desc.arrayLayers = 1;
+    desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    desc.tiling = VK_IMAGE_TILING_OPTIMAL;
+    desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    desc.queueFamilyIndexCount = 0;
+    desc.pQueueFamilyIndices = nullptr;
+    desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    VkImage image;
-    VkResult result = vkCreateImage(device, &create_info, nullptr, &image);
-    check_vk_result(result, "vkCreateImage");
+    VkImage image = get_resource_manager()->create_image(desc);
 
-    VkDeviceMemory memory = allocator.allocate_memory(image);
-    result = vkBindImageMemory(device, image, memory, 0);
+    VkDeviceMemory memory = get_allocator()->allocate_memory(image);
+    VkResult result = vkBindImageMemory(device, image, memory, 0);
     check_vk_result(result, "vkBindImageMemory");
     return image;
 }
 
-VkImage create_staging_texture(VkDevice device, int image_width, int image_height, VkFormat format, Device_Memory_Allocator& allocator,
-    const uint8_t* pixels, int bytes_per_pixel) {
-
-    VkImageCreateInfo create_info;
-    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    create_info.pNext = nullptr;
-    create_info.flags = 0;
-    create_info.imageType = VK_IMAGE_TYPE_2D;
-    create_info.format = format;
-    create_info.extent.width = image_width;
-    create_info.extent.height = image_height;
-    create_info.extent.depth = 1;
-    create_info.mipLevels = 1;
-    create_info.arrayLayers = 1;
-    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    create_info.tiling = VK_IMAGE_TILING_LINEAR;
-    create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create_info.queueFamilyIndexCount = 0;
-    create_info.pQueueFamilyIndices = nullptr;
-    create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+VkImage create_staging_texture(VkDevice device, int image_width, int image_height, VkFormat format, const uint8_t* pixels, int bytes_per_pixel) {
+    VkImageCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.imageType = VK_IMAGE_TYPE_2D;
+    desc.format = format;
+    desc.extent.width = image_width;
+    desc.extent.height = image_height;
+    desc.extent.depth = 1;
+    desc.mipLevels = 1;
+    desc.arrayLayers = 1;
+    desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    desc.tiling = VK_IMAGE_TILING_LINEAR;
+    desc.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    desc.queueFamilyIndexCount = 0;
+    desc.pQueueFamilyIndices = nullptr;
+    desc.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
 
     VkImage image;
-    VkResult result = vkCreateImage(device, &create_info, nullptr, &image);
+    VkResult result = vkCreateImage(device, &desc, nullptr, &image);
     check_vk_result(result, "vkCreateImage");
 
-    allocator.get_shared_staging_memory().ensure_allocation_for_object(image);
-    VkDeviceMemory memory = allocator.get_shared_staging_memory().get_handle();
+    get_allocator()->get_shared_staging_memory().ensure_allocation_for_object(image);
+    VkDeviceMemory memory = get_allocator()->get_shared_staging_memory().get_handle();
     result = vkBindImageMemory(device, image, memory, 0);
     check_vk_result(result, "vkBindImageMemory");
 
@@ -240,32 +237,30 @@ VkImage create_staging_texture(VkDevice device, int image_width, int image_heigh
     return image;
 }
 
-VkImage create_depth_attachment_image(VkDevice device, int image_width, int image_height, VkFormat format, Device_Memory_Allocator& allocator) {
-    VkImageCreateInfo create_info;
-    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    create_info.pNext = nullptr;
-    create_info.flags = 0;
-    create_info.imageType = VK_IMAGE_TYPE_2D;
-    create_info.format = format;
-    create_info.extent.width = image_width;
-    create_info.extent.height = image_height;
-    create_info.extent.depth = 1;
-    create_info.mipLevels = 1;
-    create_info.arrayLayers = 1;
-    create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    create_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    create_info.queueFamilyIndexCount = 0;
-    create_info.pQueueFamilyIndices = nullptr;
-    create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+VkImage create_depth_attachment_image(VkDevice device, int image_width, int image_height, VkFormat format) {
+    VkImageCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.imageType = VK_IMAGE_TYPE_2D;
+    desc.format = format;
+    desc.extent.width = image_width;
+    desc.extent.height = image_height;
+    desc.extent.depth = 1;
+    desc.mipLevels = 1;
+    desc.arrayLayers = 1;
+    desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    desc.tiling = VK_IMAGE_TILING_OPTIMAL;
+    desc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    desc.queueFamilyIndexCount = 0;
+    desc.pQueueFamilyIndices = nullptr;
+    desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    VkImage image;
-    VkResult result = vkCreateImage(device, &create_info, nullptr, &image);
-    check_vk_result(result, "vkCreateImage");
+    VkImage image = get_resource_manager()->create_image(desc);
 
-    VkDeviceMemory memory = allocator.allocate_memory(image);
-    result = vkBindImageMemory(device, image, memory, 0);
+    VkDeviceMemory memory = get_allocator()->allocate_memory(image);
+    VkResult result = vkBindImageMemory(device, image, memory, 0);
     check_vk_result(result, "vkBindImageMemory");
     return image;
 }
@@ -288,13 +283,10 @@ VkImageView create_image_view(VkDevice device, VkImage image, VkFormat format, V
     desc.subresourceRange.baseArrayLayer = 0;
     desc.subresourceRange.layerCount = 1;
 
-    VkImageView image_view;
-    VkResult result = vkCreateImageView(device, &desc, nullptr, &image_view);
-    check_vk_result(result, "vkCreateImageView");
-    return image_view;
+    return get_resource_manager()->create_image_view(desc);
 }
 
-VkBuffer create_buffer(VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, Device_Memory_Allocator& allocator) {
+VkBuffer create_buffer(VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage) {
     VkBufferCreateInfo desc;
     desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     desc.pNext = nullptr;
@@ -305,17 +297,15 @@ VkBuffer create_buffer(VkDevice device, VkDeviceSize size, VkBufferUsageFlags us
     desc.queueFamilyIndexCount = 0;
     desc.pQueueFamilyIndices = nullptr;
 
-    VkBuffer buffer;
-    VkResult result = vkCreateBuffer(device, &desc, nullptr, &buffer);
-    check_vk_result(result, "vkCreateBuffer");
+    VkBuffer buffer = get_resource_manager()->create_buffer(desc);
 
-    VkDeviceMemory memory = allocator.allocate_memory(buffer);
-    result = vkBindBufferMemory(device, buffer, memory, 0);
+    VkDeviceMemory memory = get_allocator()->allocate_memory(buffer);
+    VkResult result = vkBindBufferMemory(device, buffer, memory, 0);
     check_vk_result(result, "vkBindBufferMemory");
     return buffer;
 }
 
-VkBuffer create_staging_buffer(VkDevice device, VkDeviceSize size, Device_Memory_Allocator& allocator, const void* data) {
+VkBuffer create_staging_buffer(VkDevice device, VkDeviceSize size, const void* data) {
     VkBufferCreateInfo desc;
     desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     desc.pNext = nullptr;
@@ -330,8 +320,8 @@ VkBuffer create_staging_buffer(VkDevice device, VkDeviceSize size, Device_Memory
     VkResult result = vkCreateBuffer(device, &desc, nullptr, &buffer);
     check_vk_result(result, "vkCreateBuffer");
 
-    allocator.get_shared_staging_memory().ensure_allocation_for_object(buffer);
-    VkDeviceMemory memory = allocator.get_shared_staging_memory().get_handle();
+    get_allocator()->get_shared_staging_memory().ensure_allocation_for_object(buffer);
+    VkDeviceMemory memory = get_allocator()->get_shared_staging_memory().get_handle();
     result = vkBindBufferMemory(device, buffer, memory, 0);
     check_vk_result(result, "vkBindBufferMemory");
 
@@ -343,7 +333,7 @@ VkBuffer create_staging_buffer(VkDevice device, VkDeviceSize size, Device_Memory
     return buffer;
 }
 
-VkBuffer create_permanent_staging_buffer(VkDevice device, VkDeviceSize size, Device_Memory_Allocator& allocator, VkDeviceMemory& memory) {
+VkBuffer create_permanent_staging_buffer(VkDevice device, VkDeviceSize size, VkDeviceMemory& memory) {
     VkBufferCreateInfo desc;
     desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     desc.pNext = nullptr;
@@ -354,12 +344,10 @@ VkBuffer create_permanent_staging_buffer(VkDevice device, VkDeviceSize size, Dev
     desc.queueFamilyIndexCount = 0;
     desc.pQueueFamilyIndices = nullptr;
 
-    VkBuffer buffer;
-    VkResult result = vkCreateBuffer(device, &desc, nullptr, &buffer);
-    check_vk_result(result, "vkCreateBuffer");
+    VkBuffer buffer = get_resource_manager()->create_buffer(desc);
 
-    memory = allocator.allocate_staging_memory(buffer);
-    result = vkBindBufferMemory(device, buffer, memory, 0);
+    memory = get_allocator()->allocate_staging_memory(buffer);
+    VkResult result = vkBindBufferMemory(device, buffer, memory, 0);
     check_vk_result(result, "vkBindBufferMemory");
     return buffer;
 }

@@ -1,6 +1,9 @@
+#include "allocator.h"
+#include "resource_manager.h"
 #include "device_initialization.h"
 #include "swapchain_initialization.h"
 #include "vulkan_demo.h"
+#include "vulkan_utilities.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -126,8 +129,7 @@ Vulkan_Demo::Vulkan_Demo(uint32_t window_width, uint32_t window_height)
 : window_width(window_width)
 , window_height(window_height) {}
 
-void Vulkan_Demo::CreateResources(HWND windowHandle)
-{
+void Vulkan_Demo::initialize(HWND windowHandle) {
     instance = CreateInstance();
     physical_device = SelectPhysicalDevice(instance);
 
@@ -138,8 +140,8 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
     queue_family_index = deviceInfo.queue_family_index;
     queue = deviceInfo.queue;
 
-    allocator.initialize(physical_device, device);
-    resource_manager.initialize(device);
+    get_allocator()->initialize(physical_device, device);
+    get_resource_manager()->initialize(device);
 
     Swapchain_Info swapchain_info = create_swapchain(physical_device, device, surface);
     swapchain = swapchain_info.swapchain;
@@ -151,22 +153,23 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
         swapchainImageViews.push_back(image_view);
     }
 
-    image_acquired = resource_manager.create_semaphore();
-    rendering_finished = resource_manager.create_semaphore();
-
-    create_render_pass();
-    create_descriptor_set_layout();
-    create_pipeline();
+    image_acquired = get_resource_manager()->create_semaphore();
+    rendering_finished = get_resource_manager()->create_semaphore();
 
     create_command_pool();
+    create_descriptor_pool();
+
     create_uniform_buffer();
     create_texture();
     create_texture_sampler();
     create_depth_buffer_resources();
-    create_framebuffers();
 
-    create_descriptor_pool();
+    create_descriptor_set_layout();
     create_descriptor_set();
+    create_render_pass();
+    create_framebuffers();
+    create_pipeline_layout();
+    create_pipeline();
 
     upload_geometry();
     create_command_buffers();
@@ -174,79 +177,46 @@ void Vulkan_Demo::CreateResources(HWND windowHandle)
     record_primary_command_buffers();
 }
 
-void Vulkan_Demo::CleanupResources() 
-{
-    auto destroy_buffer = [this](VkBuffer& buffer) {
-        vkDestroyBuffer(device, buffer, nullptr);
-        buffer = VK_NULL_HANDLE;
-    };
-    auto destroy_image = [this](VkImage& image) {
-        vkDestroyImage(device, image, nullptr);
-        image = VK_NULL_HANDLE;
-    };
-    auto destroy_image_view = [this](VkImageView& image_view) {
-        vkDestroyImageView(device, image_view, nullptr);
-        image_view = VK_NULL_HANDLE;
-    };
-
+void Vulkan_Demo::release_resources() {
     VkResult result = vkDeviceWaitIdle(device);
     check_vk_result(result, "vkDeviceWaitIdle");
-
-    command_pool = VK_NULL_HANDLE;
-    image_acquired = VK_NULL_HANDLE;
-    rendering_finished = VK_NULL_HANDLE;
-
-    vkDestroyDescriptorSetLayout(device, descriptor_set_layout, nullptr);
-    descriptor_set_layout = VK_NULL_HANDLE;
-
-    vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
-    pipeline_layout = VK_NULL_HANDLE;
-
-    vkDestroyPipeline(device, pipeline, nullptr);
-    pipeline = VK_NULL_HANDLE;
-
-    vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
-    descriptor_pool = VK_NULL_HANDLE;
-
-    destroy_buffer(vertex_buffer);
-    destroy_buffer(index_buffer);
-    destroy_buffer(uniform_staging_buffer);
-    destroy_buffer(uniform_buffer);
-
-    vkDestroySampler(device, texture_image_sampler, nullptr);
-    texture_image_sampler = VK_NULL_HANDLE;
-
-    destroy_image(texture_image);
-    destroy_image_view(texture_image_view);
-
-    destroy_image(depth_image);
-    destroy_image_view(depth_image_view);
-
-    for (auto framebuffer : framebuffers) {
-        vkDestroyFramebuffer(device, framebuffer, nullptr);
-    }
-    framebuffers.clear();
-
-    for (auto imageView : swapchainImageViews) {
-        vkDestroyImageView(device, imageView, nullptr);
-    }
-    swapchainImageViews.clear();
-
-    render_pass = VK_NULL_HANDLE;
 
     vkDestroySwapchainKHR(device, swapchain, nullptr);
     swapchain = VK_NULL_HANDLE;
     swapchainImages.clear();
+    swapchainImageViews.clear();
+    image_acquired = VK_NULL_HANDLE;
+    rendering_finished = VK_NULL_HANDLE;
 
-    resource_manager.release_resources();
-    allocator.deallocate_all();
+    command_pool = VK_NULL_HANDLE;
+    descriptor_pool = VK_NULL_HANDLE;
+
+    uniform_staging_buffer = VK_NULL_HANDLE;
+    uniform_buffer = VK_NULL_HANDLE;
+    texture_image = VK_NULL_HANDLE;
+    texture_image_view = VK_NULL_HANDLE;
+    texture_image_sampler = VK_NULL_HANDLE;
+    depth_image = VK_NULL_HANDLE;
+    depth_image_view = VK_NULL_HANDLE;
+
+    descriptor_set_layout = VK_NULL_HANDLE;
+    descriptor_set = VK_NULL_HANDLE;
+    render_pass = VK_NULL_HANDLE;
+    framebuffers.clear();
+    pipeline_layout = VK_NULL_HANDLE;
+    pipeline = VK_NULL_HANDLE;
+
+    vertex_buffer = VK_NULL_HANDLE;
+    index_buffer = VK_NULL_HANDLE;
+    model_indices_count = 0;
+
+    get_resource_manager()->release_resources();
+    get_allocator()->deallocate_all();
 
     vkDestroyDevice(device, nullptr);
     device = VK_NULL_HANDLE;
-
     vkDestroySurfaceKHR(instance, surface, nullptr);
     surface = VK_NULL_HANDLE;
-
     vkDestroyInstance(instance, nullptr);
     instance = VK_NULL_HANDLE;
 }
@@ -310,7 +280,7 @@ void Vulkan_Demo::create_render_pass() {
     desc.dependencyCount = 0;
     desc.pDependencies = nullptr;
 
-    render_pass = resource_manager.create_render_pass(desc);
+    render_pass = get_resource_manager()->create_render_pass(desc);
 }
 
 void Vulkan_Demo::create_descriptor_set_layout() {
@@ -334,12 +304,23 @@ void Vulkan_Demo::create_descriptor_set_layout() {
     desc.bindingCount = static_cast<uint32_t>(descriptor_bindings.size());
     desc.pBindings = descriptor_bindings.data();
 
-    VkResult result = vkCreateDescriptorSetLayout(device, &desc, nullptr, &descriptor_set_layout);
-    check_vk_result(result, "vkCreateDescriptorSetLayout");
+    descriptor_set_layout = get_resource_manager()->create_descriptor_set_layout(desc);
 }
 
-void Vulkan_Demo::create_pipeline()
-{
+void Vulkan_Demo::create_pipeline_layout() {
+    VkPipelineLayoutCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.setLayoutCount = 1;
+    desc.pSetLayouts = &descriptor_set_layout;
+    desc.pushConstantRangeCount = 0;
+    desc.pPushConstantRanges = nullptr;
+
+    pipeline_layout = get_resource_manager()->create_pipeline_layout(desc);
+}
+
+void Vulkan_Demo::create_pipeline() {
     Shader_Module vertex_shader(device, "shaders/vert.spv");
     Shader_Module fragment_shader(device, "shaders/frag.spv");
 
@@ -475,41 +456,28 @@ void Vulkan_Demo::create_pipeline()
     colorBlendStateCreateInfo.blendConstants[2] = 0.0f;
     colorBlendStateCreateInfo.blendConstants[3] = 0.0f;
 
-    VkPipelineLayoutCreateInfo layoutCreateInfo;
-    layoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layoutCreateInfo.pNext = nullptr;
-    layoutCreateInfo.flags = 0;
-    layoutCreateInfo.setLayoutCount = 1;
-    layoutCreateInfo.pSetLayouts = &descriptor_set_layout;
-    layoutCreateInfo.pushConstantRangeCount = 0;
-    layoutCreateInfo.pPushConstantRanges = nullptr;
+    VkGraphicsPipelineCreateInfo desc;
+    desc.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    desc.pNext = nullptr;
+    desc.flags = 0;
+    desc.stageCount = static_cast<uint32_t>(shaderStageCreateInfos.size());
+    desc.pStages = shaderStageCreateInfos.data();
+    desc.pVertexInputState = &vertexInputStateCreateInfo;
+    desc.pInputAssemblyState = &inputAssemblyStateCreateInfo;
+    desc.pTessellationState = nullptr;
+    desc.pViewportState = &viewportStateCreateInfo;
+    desc.pRasterizationState = &resterizationStateCreateInfo;
+    desc.pMultisampleState = &multisampleStateCreateInfo;
+    desc.pDepthStencilState = &depth_stencil_state;
+    desc.pColorBlendState = &colorBlendStateCreateInfo;
+    desc.pDynamicState = nullptr;
+    desc.layout = pipeline_layout;
+    desc.renderPass = render_pass;
+    desc.subpass = 0;
+    desc.basePipelineHandle = VK_NULL_HANDLE;
+    desc.basePipelineIndex = -1;
 
-    VkResult result = vkCreatePipelineLayout(device, &layoutCreateInfo, nullptr, &pipeline_layout);
-    check_vk_result(result, "vkCreatePipelineLayout");
-
-    VkGraphicsPipelineCreateInfo pipelineCreateInfo;
-    pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineCreateInfo.pNext = nullptr;
-    pipelineCreateInfo.flags = 0;
-    pipelineCreateInfo.stageCount = static_cast<uint32_t>(shaderStageCreateInfos.size());
-    pipelineCreateInfo.pStages = shaderStageCreateInfos.data();
-    pipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
-    pipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
-    pipelineCreateInfo.pTessellationState = nullptr;
-    pipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
-    pipelineCreateInfo.pRasterizationState = &resterizationStateCreateInfo;
-    pipelineCreateInfo.pMultisampleState = &multisampleStateCreateInfo;
-    pipelineCreateInfo.pDepthStencilState = &depth_stencil_state;
-    pipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
-    pipelineCreateInfo.pDynamicState = nullptr;
-    pipelineCreateInfo.layout = pipeline_layout;
-    pipelineCreateInfo.renderPass = render_pass;
-    pipelineCreateInfo.subpass = 0;
-    pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
-    pipelineCreateInfo.basePipelineIndex = -1;
-
-    result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline);
-    check_vk_result(result, "vkCreateGraphicsPipelines");
+    pipeline = get_resource_manager()->create_graphics_pipeline(desc);
 }
 
 void Vulkan_Demo::create_command_pool() {
@@ -518,7 +486,13 @@ void Vulkan_Demo::create_command_pool() {
     desc.pNext = nullptr;
     desc.flags = 0;
     desc.queueFamilyIndex = queue_family_index;
-    command_pool = resource_manager.create_command_pool(desc);
+    command_pool = get_resource_manager()->create_command_pool(desc);
+}
+
+void Vulkan_Demo::create_uniform_buffer() {
+    auto size = static_cast<VkDeviceSize>(sizeof(Uniform_Buffer_Object));
+    uniform_staging_buffer = create_permanent_staging_buffer(device, size, uniform_staging_buffer_memory);
+    uniform_buffer = create_buffer(device, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 }
 
 void Vulkan_Demo::upload_geometry() {
@@ -527,8 +501,8 @@ void Vulkan_Demo::upload_geometry() {
 
     {
         const VkDeviceSize size = model.vertices.size() * sizeof(model.vertices[0]);
-        vertex_buffer = create_buffer(device, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, allocator);
-        VkBuffer staging_buffer = create_staging_buffer(device, size, allocator, model.vertices.data());
+        vertex_buffer = create_buffer(device, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        VkBuffer staging_buffer = create_staging_buffer(device, size, model.vertices.data());
         Defer_Action destroy_staging_buffer([&staging_buffer, this]() { vkDestroyBuffer(device, staging_buffer, nullptr); });
         record_and_run_commands(device, command_pool, queue, [&staging_buffer, &size, this](VkCommandBuffer command_buffer) {
             VkBufferCopy region;
@@ -540,8 +514,8 @@ void Vulkan_Demo::upload_geometry() {
     }
     {
         const VkDeviceSize size = model.indices.size() * sizeof(model.indices[0]);
-        index_buffer = create_buffer(device, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, allocator);
-        VkBuffer staging_buffer = create_staging_buffer(device, size, allocator, model.indices.data());
+        index_buffer = create_buffer(device, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+        VkBuffer staging_buffer = create_staging_buffer(device, size, model.indices.data());
         Defer_Action destroy_staging_buffer([&staging_buffer, this]() { vkDestroyBuffer(device, staging_buffer, nullptr); });
         record_and_run_commands(device, command_pool, queue, [&staging_buffer, &size, this](VkCommandBuffer command_buffer) {
             VkBufferCopy region;
@@ -551,12 +525,6 @@ void Vulkan_Demo::upload_geometry() {
             vkCmdCopyBuffer(command_buffer, staging_buffer, index_buffer, 1, &region);
         });
     }
-}
-
-void Vulkan_Demo::create_uniform_buffer() {
-    auto size = static_cast<VkDeviceSize>(sizeof(Uniform_Buffer_Object));
-    uniform_staging_buffer = create_permanent_staging_buffer(device, size, allocator, uniform_staging_buffer_memory);
-    uniform_buffer = create_buffer(device, size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, allocator);
 }
 
 void Vulkan_Demo::create_descriptor_pool() {
@@ -574,8 +542,7 @@ void Vulkan_Demo::create_descriptor_pool() {
     desc.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
     desc.pPoolSizes = pool_sizes.data();
 
-    VkResult result = vkCreateDescriptorPool(device, &desc, nullptr, &descriptor_pool);
-    check_vk_result(result, "vkCreateDescriptorPool");
+    descriptor_pool = get_resource_manager()->create_descriptor_pool(desc);
 }
 
 void Vulkan_Demo::create_descriptor_set() {
@@ -633,14 +600,14 @@ void Vulkan_Demo::create_texture() {
         error("failed to load image file");
     }
 
-    VkImage staging_image = create_staging_texture(device, image_width, image_height, VK_FORMAT_R8G8B8A8_UNORM, allocator, rgba_pixels, 4);
+    VkImage staging_image = create_staging_texture(device, image_width, image_height, VK_FORMAT_R8G8B8A8_UNORM, rgba_pixels, 4);
 
     Defer_Action destroy_staging_image([this, &staging_image]() {
         vkDestroyImage(device, staging_image, nullptr);
     });
     stbi_image_free(rgba_pixels);
 
-    texture_image = ::create_texture(device, image_width, image_height, VK_FORMAT_R8G8B8A8_UNORM, allocator);
+    texture_image = ::create_texture(device, image_width, image_height, VK_FORMAT_R8G8B8A8_UNORM);
 
     record_and_run_commands(device, command_pool, queue,
         [&staging_image, &image_width, &image_height, this](VkCommandBuffer command_buffer) {
@@ -700,13 +667,12 @@ void Vulkan_Demo::create_texture_sampler() {
     desc.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     desc.unnormalizedCoordinates = VK_FALSE;
 
-    VkResult result = vkCreateSampler(device, &desc, nullptr, &texture_image_sampler);
-    check_vk_result(result, "vkCreateSampler");
+    texture_image_sampler = get_resource_manager()->create_sampler(desc);
 }
 
 void Vulkan_Demo::create_depth_buffer_resources() {
     VkFormat depth_format = find_depth_format(physical_device);
-    depth_image = create_depth_attachment_image(device, window_width, window_height, depth_format, allocator);
+    depth_image = create_depth_attachment_image(device, window_width, window_height, depth_format);
     depth_image_view = create_image_view(device, depth_image, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT);
 
     record_and_run_commands(device, command_pool, queue, [&depth_format, this](VkCommandBuffer command_buffer) {
@@ -732,8 +698,7 @@ void Vulkan_Demo::create_framebuffers() {
     framebuffers.resize(swapchainImages.size());
     for (std::size_t i = 0; i < framebuffers.size(); i++) {
         attachments[0] = swapchainImageViews[i]; // set color attachment
-        VkResult result = vkCreateFramebuffer(device, &desc, nullptr, &framebuffers[i]);
-        check_vk_result(result, "vkCreateFramebuffer");
+        framebuffers[i] = get_resource_manager()->create_framebuffer(desc);
     }
 }
 

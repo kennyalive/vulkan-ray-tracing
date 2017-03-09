@@ -7,6 +7,7 @@
     <ClCompile Include="vulkan_utilities.cpp" />
     <ClCompile Include="vulkan_demo.cpp" />
     <ClCompile Include="allocator.cpp" />
+    <ClCompile Include="resource_manager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="device_initialization.h" />

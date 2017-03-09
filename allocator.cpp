@@ -1,6 +1,12 @@
 #include "allocator.h"
 #include "vulkan_utilities.h"
 
+static Device_Memory_Allocator allocator;
+
+Device_Memory_Allocator* get_allocator() {
+    return &allocator;
+}
+
 static uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memory_properties;
     vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);

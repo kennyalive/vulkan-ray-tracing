@@ -48,3 +48,5 @@ private:
     std::vector<VkDeviceMemory> chunks;
     Shared_Staging_Memory shared_staging_memory;
 };
+
+Device_Memory_Allocator* get_allocator();

@@ -5,59 +5,36 @@
 
 class Resource_Manager {
 public:
-    void initialize(VkDevice device) {
-        this->device = device;
-    }
+    void initialize(VkDevice device);
+    void release_resources();
 
-    void release_resources() {
-        for (auto command_pool : command_pools) {
-            vkDestroyCommandPool(device, command_pool, nullptr);
-        }
-        command_pools.clear();
-
-        for (auto semaphore : semaphores) {
-            vkDestroySemaphore(device, semaphore, nullptr);
-        }
-        semaphores.clear();
-
-        for (auto render_pass : render_passes) {
-            vkDestroyRenderPass(device, render_pass, nullptr);
-        }
-        render_passes.clear();
-    }
-
-    VkCommandPool create_command_pool(const VkCommandPoolCreateInfo& desc) {
-        VkCommandPool command_pool;
-        VkResult result = vkCreateCommandPool(device, &desc, nullptr, &command_pool);
-        check_vk_result(result, "vkCreateCommandPool");
-        command_pools.push_back(command_pool);
-        return command_pool;
-    }
-
-    VkSemaphore create_semaphore() {
-        VkSemaphoreCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        desc.pNext = nullptr;
-        desc.flags = 0;
-
-        VkSemaphore semaphore;
-        VkResult result = vkCreateSemaphore(device, &desc, nullptr, &semaphore);
-        check_vk_result(result, "vkCreateSemaphore");
-        semaphores.push_back(semaphore);
-        return semaphore;
-    }
-
-    VkRenderPass create_render_pass(const VkRenderPassCreateInfo& desc) {
-        VkRenderPass render_pass;
-        VkResult result = vkCreateRenderPass(device, &desc, nullptr, &render_pass);
-        check_vk_result(result, "vkCreateRenderPass");
-        render_passes.push_back(render_pass);
-        return render_pass;
-    }
+    VkSemaphore create_semaphore();
+    VkCommandPool create_command_pool(const VkCommandPoolCreateInfo& desc);
+    VkDescriptorPool create_descriptor_pool(const VkDescriptorPoolCreateInfo& desc);
+    VkBuffer create_buffer(const VkBufferCreateInfo& desc);
+    VkImage create_image(const VkImageCreateInfo& desc);
+    VkImageView create_image_view(const VkImageViewCreateInfo& desc);
+    VkSampler create_sampler(const VkSamplerCreateInfo& desc);
+    VkRenderPass create_render_pass(const VkRenderPassCreateInfo& desc);
+    VkFramebuffer create_framebuffer(const VkFramebufferCreateInfo& desc);
+    VkDescriptorSetLayout create_descriptor_set_layout(const VkDescriptorSetLayoutCreateInfo& desc);
+    VkPipelineLayout create_pipeline_layout(const VkPipelineLayoutCreateInfo& desc);
+    VkPipeline create_graphics_pipeline(const VkGraphicsPipelineCreateInfo& desc);
 
 private:
     VkDevice device = VK_NULL_HANDLE;
-    std::vector<VkCommandPool> command_pools;
     std::vector<VkSemaphore> semaphores;
+    std::vector<VkCommandPool> command_pools;
+    std::vector<VkDescriptorPool> descriptor_pools;
+    std::vector<VkBuffer> buffers;
+    std::vector<VkImage> images;
+    std::vector<VkImageView> image_views;
+    std::vector<VkSampler> samplers;
+    std::vector<VkDescriptorSetLayout> descriptor_set_layouts;
     std::vector<VkRenderPass> render_passes;
+    std::vector<VkFramebuffer> framebuffers;
+    std::vector<VkPipelineLayout> pipeline_layouts;
+    std::vector<VkPipeline> graphics_pipelines;
 };
+
+Resource_Manager* get_resource_manager();
