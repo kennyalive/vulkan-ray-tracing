@@ -3,13 +3,16 @@
 #include <algorithm>
 #include <cassert>
 
-VkSurfaceKHR create_surface(VkInstance instance, HWND hwnd) {
+#define SDL_MAIN_HANDLED
+#include "sdl/SDL_syswm.h"
+
+VkSurfaceKHR create_surface(VkInstance instance, const SDL_SysWMinfo& window_sys_info) {
     VkWin32SurfaceCreateInfoKHR desc;
     desc.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
     desc.pNext = nullptr;
     desc.flags = 0;
     desc.hinstance = ::GetModuleHandle(nullptr);
-    desc.hwnd = hwnd;
+    desc.hwnd = window_sys_info.info.win.window;
 
     VkSurfaceKHR surface;
     VkResult result = vkCreateWin32SurfaceKHR(instance, &desc, nullptr, &surface);

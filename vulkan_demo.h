@@ -4,13 +4,14 @@
 #include <vector>
 #include "vulkan_definitions.h"
 
+struct SDL_SysWMinfo;
+
 class Vulkan_Demo
 {
 public:
-    Vulkan_Demo(uint32_t window_width, uint32_t window_height);
+    Vulkan_Demo(int window_width, int window_height, const SDL_SysWMinfo& window_sys_info);
+    ~Vulkan_Demo();
 
-    void initialize(HWND windowHandle);
-    void release_resources();
     void run_frame();
 
 private:
@@ -30,14 +31,13 @@ private:
     void create_pipeline();
 
     void upload_geometry();
-    void create_command_buffers();
-    void record_primary_command_buffers();
-    void record_render_scene_command_buffer();
+    void record_render_scene();
+    void record_render_frame();
     void update_uniform_buffer();
 
 private:
-    const uint32_t window_width = 0;
-    const uint32_t window_height = 0;
+    const int window_width = 0;
+    const int window_height = 0;
 
     VkInstance instance = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -48,8 +48,8 @@ private:
 
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     VkFormat swapchain_image_format = VK_FORMAT_UNDEFINED;
-    std::vector<VkImage> swapchainImages;
-    std::vector<VkImageView> swapchainImageViews;
+    std::vector<VkImage> swapchain_images;
+    std::vector<VkImageView> swapchain_image_views;
     VkSemaphore image_acquired = VK_NULL_HANDLE;
     VkSemaphore rendering_finished = VK_NULL_HANDLE;
 
@@ -76,6 +76,6 @@ private:
     VkBuffer index_buffer = VK_NULL_HANDLE;
     uint32_t model_indices_count = 0;
 
-    std::vector<VkCommandBuffer> command_buffers;
-    VkCommandBuffer render_scene_cmdbuf;
+    std::vector<VkCommandBuffer> render_frame_command_buffers; // command buffer per swapchain image
+    VkCommandBuffer render_scene_command_buffer;
 };

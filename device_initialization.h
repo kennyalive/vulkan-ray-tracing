@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vector>
 #include "vulkan_definitions.h"
 
 struct Device_Info {
@@ -9,8 +8,6 @@ struct Device_Info {
     VkQueue queue = VK_NULL_HANDLE;
 };
 
-VkInstance CreateInstance();
-
-VkPhysicalDevice SelectPhysicalDevice(VkInstance instance);
-
-Device_Info CreateDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface);
+VkInstance create_instance();
+VkPhysicalDevice select_physical_device(VkInstance instance);
+Device_Info create_device(VkPhysicalDevice physical_device, VkSurfaceKHR surface);

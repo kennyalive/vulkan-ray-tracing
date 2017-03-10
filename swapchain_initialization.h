@@ -3,7 +3,7 @@
 #include "vulkan_definitions.h"
 #include <vector>
 
-VkSurfaceKHR create_surface(VkInstance instance, HWND hwnd);
+struct SDL_SysWMinfo;
 
 struct Swapchain_Info {
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
@@ -11,4 +11,5 @@ struct Swapchain_Info {
     std::vector<VkImage> images;
 };
 
+VkSurfaceKHR create_surface(VkInstance instance, const SDL_SysWMinfo& window_sys_info);
 Swapchain_Info create_swapchain(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface);
