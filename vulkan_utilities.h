@@ -5,9 +5,6 @@
 #include <functional>
 #include <string>
 
-void check_vk_result(VkResult result, const std::string& function_name);
-void error(const std::string& message);
-
 struct Defer_Action {
     Defer_Action(std::function<void()> action)
         : action(action) {}
@@ -18,27 +15,30 @@ struct Defer_Action {
 };
 
 struct Shader_Module {
-    Shader_Module(VkDevice device, const std::string& spriv_file_name);
+    Shader_Module(const std::string& spriv_file_name);
     ~Shader_Module();
-    VkDevice device;
     VkShaderModule handle;
 };
 
-// Command buffers
-void record_and_run_commands(VkDevice device, VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder);
+// Errors
+void check_vk_result(VkResult result, const std::string& function_name);
+void error(const std::string& message);
 
-void record_image_layout_transition(VkCommandBuffer command_buffer, VkImage image, VkFormat format,
-    VkAccessFlags src_access_flags, VkImageLayout old_layout, VkAccessFlags dst_access_flags, VkImageLayout new_layout);
+// Command buffers
+void record_and_run_commands(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder);
+
+void record_image_layout_transition(
+    VkCommandBuffer command_buffer, VkImage image, VkFormat format,
+    VkAccessFlags src_access_flags, VkImageLayout old_layout,
+    VkAccessFlags dst_access_flags, VkImageLayout new_layout);
 
 // Images
-VkImage create_texture(VkDevice device, int image_width, int image_height, VkFormat format);
-VkImage create_staging_texture(VkDevice device, int image_width, int image_height, VkFormat format, const uint8_t* pixels, int bytes_per_pixel);
-
-VkImage create_depth_attachment_image(VkDevice device, int image_width, int image_height, VkFormat format);
-
-VkImageView create_image_view(VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
+VkImage create_texture(int image_width, int image_height, VkFormat format);
+VkImage create_staging_texture(int image_width, int image_height, VkFormat format, const uint8_t* pixels, int bytes_per_pixel);
+VkImage create_depth_attachment_image(int image_width, int image_height, VkFormat format);
+VkImageView create_image_view(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
 
 // Buffers
-VkBuffer create_buffer(VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage);
-VkBuffer create_staging_buffer(VkDevice device, VkDeviceSize size, const void* data);
-VkBuffer create_permanent_staging_buffer(VkDevice device, VkDeviceSize size, VkDeviceMemory& memory);
+VkBuffer create_buffer(VkDeviceSize size, VkBufferUsageFlags usage);
+VkBuffer create_staging_buffer(VkDeviceSize size, const void* data);
+VkBuffer create_permanent_staging_buffer(VkDeviceSize size, VkDeviceMemory& memory);

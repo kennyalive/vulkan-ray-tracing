@@ -6,8 +6,7 @@
 
 struct SDL_SysWMinfo;
 
-class Vulkan_Demo
-{
+class Vulkan_Demo {
 public:
     Vulkan_Demo(int window_width, int window_height, const SDL_SysWMinfo& window_sys_info);
     ~Vulkan_Demo();
@@ -39,17 +38,6 @@ private:
     const int window_width = 0;
     const int window_height = 0;
 
-    VkInstance instance = VK_NULL_HANDLE;
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
-    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-    VkDevice device = VK_NULL_HANDLE;
-    uint32_t queue_family_index = 0;
-    VkQueue queue = VK_NULL_HANDLE;
-
-    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-    VkFormat swapchain_image_format = VK_FORMAT_UNDEFINED;
-    std::vector<VkImage> swapchain_images;
-    std::vector<VkImageView> swapchain_image_views;
     VkSemaphore image_acquired = VK_NULL_HANDLE;
     VkSemaphore rendering_finished = VK_NULL_HANDLE;
 

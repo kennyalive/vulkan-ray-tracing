@@ -2,20 +2,18 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="device_initialization.cpp" />
-    <ClCompile Include="swapchain_initialization.cpp" />
     <ClCompile Include="vulkan_utilities.cpp" />
     <ClCompile Include="vulkan_demo.cpp" />
     <ClCompile Include="allocator.cpp" />
     <ClCompile Include="resource_manager.cpp" />
+    <ClCompile Include="vulkan_initialization.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="device_initialization.h" />
-    <ClInclude Include="swapchain_initialization.h" />
     <ClInclude Include="vulkan_definitions.h" />
     <ClInclude Include="vulkan_utilities.h" />
     <ClInclude Include="vulkan_demo.h" />
     <ClInclude Include="resource_manager.h" />
     <ClInclude Include="allocator.h" />
+    <ClInclude Include="vulkan_initialization.h" />
   </ItemGroup>
 </Project>
