@@ -735,8 +735,13 @@ void Vulkan_Demo::record_render_frame() {
         VkResult result = vkBeginCommandBuffer(render_frame_command_buffers[i], &begin_info);
         check_vk_result(result, "vkBeginCommandBuffer");
 
-        render_pass_begin_info.framebuffer = framebuffers[i];
+        VkBufferCopy region;
+        region.srcOffset = 0;
+        region.dstOffset = 0;
+        region.size = sizeof(Uniform_Buffer_Object);
+        vkCmdCopyBuffer(render_frame_command_buffers[i], uniform_staging_buffer, uniform_buffer, 1, &region);
 
+        render_pass_begin_info.framebuffer = framebuffers[i];
         vkCmdBeginRenderPass(render_frame_command_buffers[i], &render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
         vkCmdExecuteCommands(render_frame_command_buffers[i], 1, &render_scene_command_buffer);
         vkCmdEndRenderPass(render_frame_command_buffers[i]);
@@ -751,7 +756,6 @@ void Vulkan_Demo::update_uniform_buffer() {
 
     auto current_time = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count() / 1000.f;
-    //time = 0.0;
 
     Uniform_Buffer_Object ubo;
     ubo.model = glm::rotate(glm::mat4(), time * glm::radians(30.0f), glm::vec3(0, 1, 0)) *
@@ -773,15 +777,6 @@ void Vulkan_Demo::update_uniform_buffer() {
     check_vk_result(result, "vkMapMemory");
     memcpy(data, &ubo, sizeof(ubo));
     vkUnmapMemory(device, uniform_staging_buffer_memory);
-
-    // TODO: this commands is slow since it waits until queue finishes specified operation
-    record_and_run_commands(device, command_pool, queue, [this](VkCommandBuffer command_buffer) {
-        VkBufferCopy region;
-        region.srcOffset = 0;
-        region.dstOffset = 0;
-        region.size = sizeof(Uniform_Buffer_Object);
-        vkCmdCopyBuffer(command_buffer, uniform_staging_buffer, uniform_buffer, 1, &region);
-    });
 }
 
 void Vulkan_Demo::run_frame() {
