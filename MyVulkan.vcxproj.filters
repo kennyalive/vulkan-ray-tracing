@@ -1,19 +1,19 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="vulkan_utilities.cpp" />
-    <ClCompile Include="vulkan_demo.cpp" />
-    <ClCompile Include="allocator.cpp" />
-    <ClCompile Include="resource_manager.cpp" />
-    <ClCompile Include="vulkan_initialization.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\vulkan_utilities.cpp" />
+    <ClCompile Include="src\vulkan_demo.cpp" />
+    <ClCompile Include="src\allocator.cpp" />
+    <ClCompile Include="src\resource_manager.cpp" />
+    <ClCompile Include="src\vulkan_initialization.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="vulkan_definitions.h" />
-    <ClInclude Include="vulkan_utilities.h" />
-    <ClInclude Include="vulkan_demo.h" />
-    <ClInclude Include="resource_manager.h" />
-    <ClInclude Include="allocator.h" />
-    <ClInclude Include="vulkan_initialization.h" />
+    <ClInclude Include="src\vulkan_definitions.h" />
+    <ClInclude Include="src\vulkan_utilities.h" />
+    <ClInclude Include="src\vulkan_demo.h" />
+    <ClInclude Include="src\resource_manager.h" />
+    <ClInclude Include="src\allocator.h" />
+    <ClInclude Include="src\vulkan_initialization.h" />
   </ItemGroup>
 </Project>
