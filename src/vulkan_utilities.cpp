@@ -148,10 +148,7 @@ void record_image_layout_transition(VkCommandBuffer command_buffer, VkImage imag
     barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
     vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier
-    );
+        0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 VkImage create_texture(int image_width, int image_height, VkFormat format) {

@@ -714,10 +714,22 @@ void Vulkan_Demo::record_render_frame() {
     render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     render_pass_begin_info.pNext = nullptr;
     render_pass_begin_info.renderPass = render_pass;
+    render_pass_begin_info.framebuffer = VK_NULL_HANDLE; // will be initialized later in the recording loop
     render_pass_begin_info.renderArea.offset = {0, 0};
     render_pass_begin_info.renderArea.extent = {(uint32_t)window_width, (uint32_t)window_height};
     render_pass_begin_info.clearValueCount = static_cast<uint32_t>(clear_values.size());
     render_pass_begin_info.pClearValues = clear_values.data();
+
+    VkBufferMemoryBarrier barrier;
+    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    barrier.pNext = nullptr;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.buffer = uniform_buffer;
+    barrier.offset = 0;
+    barrier.size = sizeof(Uniform_Buffer_Object);
 
     for (std::size_t i = 0; i < render_frame_command_buffers.size(); i++) {
         VkResult result = vkBeginCommandBuffer(render_frame_command_buffers[i], &begin_info);
@@ -728,6 +740,9 @@ void Vulkan_Demo::record_render_frame() {
         region.dstOffset = 0;
         region.size = sizeof(Uniform_Buffer_Object);
         vkCmdCopyBuffer(render_frame_command_buffers[i], uniform_staging_buffer, uniform_buffer, 1, &region);
+
+        vkCmdPipelineBarrier(render_frame_command_buffers[i], VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0,
+            0, nullptr, 1, &barrier, 0, nullptr);
 
         render_pass_begin_info.framebuffer = framebuffers[i];
         vkCmdBeginRenderPass(render_frame_command_buffers[i], &render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
