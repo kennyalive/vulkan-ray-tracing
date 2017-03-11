@@ -20,11 +20,8 @@
 #include <functional>
 #include <unordered_map>
 
-const std::string model_path = "data/chalet.obj";
-const std::string texture_path = "data/chalet.jpg";
-
-//const std::string model_path = "data/teapot.obj";
-//const std::string texture_path = "data/teapot.jpg";
+const std::string model_path = "../../data/chalet.obj";
+const std::string texture_path = "../../data/chalet.jpg";
 
 struct Uniform_Buffer_Object {
     glm::mat4 model;
@@ -466,8 +463,8 @@ void Vulkan_Demo::create_pipeline_layout() {
 }
 
 void Vulkan_Demo::create_pipeline() {
-    Shader_Module vertex_shader("shaders/vert.spv");
-    Shader_Module fragment_shader("shaders/frag.spv");
+    Shader_Module vertex_shader("../../shaders/vert.spv");
+    Shader_Module fragment_shader("../../shaders/frag.spv");
 
     auto get_shader_stage_desc = [](VkShaderStageFlagBits stage, VkShaderModule shader_module, const char* entry) {
         VkPipelineShaderStageCreateInfo desc;
