@@ -27,6 +27,8 @@ private:
     void create_render_pass();
     void create_framebuffers();
     void create_pipeline_layout();
+
+    void create_shader_modules();
     void create_pipeline();
 
     void upload_geometry();
@@ -66,4 +68,10 @@ private:
 
     std::vector<VkCommandBuffer> render_frame_command_buffers; // command buffer per swapchain image
     VkCommandBuffer render_scene_command_buffer;
+
+    //
+    // Shader modules.
+    //
+    VkShaderModule model_vs = VK_NULL_HANDLE;
+    VkShaderModule model_fs = VK_NULL_HANDLE;
 };

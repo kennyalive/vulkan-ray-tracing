@@ -57,3 +57,4 @@ build/Debug/intermediate/
 *.exe
 *.iobj
 *.ipdb
+src/shaders/tools/bin2hex.obj

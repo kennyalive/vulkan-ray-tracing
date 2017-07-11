@@ -14,12 +14,6 @@ struct Defer_Action {
     std::function<void()> action;
 };
 
-struct Shader_Module {
-    Shader_Module(const std::string& spriv_file_name);
-    ~Shader_Module();
-    VkShaderModule handle;
-};
-
 // Errors
 void check_vk_result(VkResult result, const std::string& function_name);
 void error(const std::string& message);

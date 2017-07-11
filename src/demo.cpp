@@ -1,6 +1,6 @@
 #include "allocator.h"
+#include "demo.h"
 #include "resource_manager.h"
-#include "vulkan_demo.h"
 #include "vulkan_initialization.h"
 #include "vulkan_utilities.h"
 
@@ -162,6 +162,7 @@ Vulkan_Demo::Vulkan_Demo(int window_width, int window_height, const SDL_SysWMinf
     create_render_pass();
     create_framebuffers();
     create_pipeline_layout();
+    create_shader_modules();
     create_pipeline();
 
     upload_geometry();
@@ -250,6 +251,7 @@ void Vulkan_Demo::create_texture() {
         region.dstOffset = {0, 0, 0};
         region.extent.width = image_width;
         region.extent.height = image_height;
+		region.extent.depth = 1;
 
         vkCmdCopyImage(command_buffer,
             staging_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -276,7 +278,7 @@ void Vulkan_Demo::create_texture_sampler() {
     desc.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     desc.mipLodBias = 0.0f;
     desc.anisotropyEnable = VK_TRUE;
-    desc.maxAnisotropy = 16;
+    desc.maxAnisotropy = 1.0f;
     desc.compareEnable = VK_FALSE;
     desc.compareOp = VK_COMPARE_OP_ALWAYS;
     desc.minLod = 0.0f;
@@ -462,10 +464,32 @@ void Vulkan_Demo::create_pipeline_layout() {
     pipeline_layout = get_resource_manager()->create_pipeline_layout(desc);
 }
 
-void Vulkan_Demo::create_pipeline() {
-    Shader_Module vertex_shader("../../shaders/vert.spv");
-    Shader_Module fragment_shader("../../shaders/frag.spv");
 
+void Vulkan_Demo::create_shader_modules() {
+    auto create_shader_module = [](uint8_t* bytes, long long count) {
+        if (count % 4 != 0) {
+            error("Vulkan: SPIR-V binary buffer size is not multiple of 4");
+        }
+        VkShaderModuleCreateInfo desc;
+        desc.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        desc.pNext = nullptr;
+        desc.flags = 0;
+        desc.codeSize = count;
+        desc.pCode = reinterpret_cast<const uint32_t*>(bytes);
+
+        return get_resource_manager()->create_shader_module(desc);
+    };
+
+    extern unsigned char model_vert_spv[];
+    extern long long model_vert_spv_size;
+    model_vs = create_shader_module(model_vert_spv, model_vert_spv_size);
+
+    extern unsigned char model_frag_spv[];
+    extern long long model_frag_spv_size;
+    model_fs = create_shader_module(model_frag_spv, model_frag_spv_size);
+}
+
+void Vulkan_Demo::create_pipeline() {
     auto get_shader_stage_desc = [](VkShaderStageFlagBits stage, VkShaderModule shader_module, const char* entry) {
         VkPipelineShaderStageCreateInfo desc;
         desc.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -478,8 +502,8 @@ void Vulkan_Demo::create_pipeline() {
         return desc;
     };
     std::vector<VkPipelineShaderStageCreateInfo> shader_stages_state {
-        get_shader_stage_desc(VK_SHADER_STAGE_VERTEX_BIT, vertex_shader.handle, "main"),
-        get_shader_stage_desc(VK_SHADER_STAGE_FRAGMENT_BIT, fragment_shader.handle, "main")
+        get_shader_stage_desc(VK_SHADER_STAGE_VERTEX_BIT, model_vs, "main"),
+        get_shader_stage_desc(VK_SHADER_STAGE_FRAGMENT_BIT, model_fs, "main")
     };
 
     VkPipelineVertexInputStateCreateInfo vertex_input_state;

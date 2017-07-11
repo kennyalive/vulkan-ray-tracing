@@ -70,6 +70,11 @@ void Resource_Manager::release_resources() {
         vkDestroyPipeline(device, pipeline, nullptr);
     }
     graphics_pipelines.clear();
+    
+    for (auto shader_module : shader_modules) {
+        vkDestroyShaderModule(device, shader_module, nullptr);
+    }
+    shader_modules.clear();
 }
 
 VkSemaphore Resource_Manager::create_semaphore() {
@@ -172,3 +177,12 @@ VkPipeline Resource_Manager::create_graphics_pipeline(const VkGraphicsPipelineCr
     graphics_pipelines.push_back(pipeline);
     return pipeline;
 }
+
+VkShaderModule Resource_Manager::create_shader_module(const VkShaderModuleCreateInfo& desc) {
+    VkShaderModule shader_module;
+    VkResult result = vkCreateShaderModule(device, &desc, nullptr, &shader_module);
+    check_vk_result(result, "vkCreateShaderModule");
+    shader_modules.push_back(shader_module);
+    return shader_module;
+}
+

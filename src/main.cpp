@@ -1,4 +1,4 @@
-#include "vulkan_demo.h"
+#include "demo.h"
 #include "vulkan_utilities.h"
 
 #define SDL_MAIN_HANDLED

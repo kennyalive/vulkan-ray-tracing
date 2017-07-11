@@ -20,6 +20,7 @@ public:
     VkDescriptorSetLayout create_descriptor_set_layout(const VkDescriptorSetLayoutCreateInfo& desc);
     VkPipelineLayout create_pipeline_layout(const VkPipelineLayoutCreateInfo& desc);
     VkPipeline create_graphics_pipeline(const VkGraphicsPipelineCreateInfo& desc);
+    VkShaderModule create_shader_module(const VkShaderModuleCreateInfo& desc);
 
 private:
     VkDevice device = VK_NULL_HANDLE;
@@ -35,6 +36,7 @@ private:
     std::vector<VkFramebuffer> framebuffers;
     std::vector<VkPipelineLayout> pipeline_layouts;
     std::vector<VkPipeline> graphics_pipelines;
+    std::vector<VkShaderModule> shader_modules;
 };
 
 Resource_Manager* get_resource_manager();
