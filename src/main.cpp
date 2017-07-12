@@ -43,7 +43,7 @@ int main() {
 
     struct On_Exit {~On_Exit() { SDL_Quit(); }} exit_action;
 
-    the_window = SDL_CreateWindow("Vulkan app", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, SDL_WINDOW_SHOWN);
+    the_window = SDL_CreateWindow("Vulkan demo", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, SDL_WINDOW_SHOWN);
     if (the_window == nullptr)
         error("failed to create SDL window");
 
