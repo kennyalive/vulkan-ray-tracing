@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vulkan_utilities.h"
+#include "vk_definitions.h"
 #include <vector>
 
 class Resource_Manager {

@@ -2,10 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\vulkan_utilities.cpp" />
-    <ClCompile Include="src\allocator.cpp" />
     <ClCompile Include="src\resource_manager.cpp" />
-    <ClCompile Include="src\vulkan_initialization.cpp" />
     <ClCompile Include="src\demo.cpp" />
     <ClCompile Include="src\shaders\spirv\model_frag.cpp">
       <Filter>spirv</Filter>
@@ -13,14 +10,15 @@
     <ClCompile Include="src\shaders\spirv\model_vert.cpp">
       <Filter>spirv</Filter>
     </ClCompile>
+    <ClCompile Include="src\vk.cpp" />
+    <ClCompile Include="src\geometry.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\vulkan_definitions.h" />
-    <ClInclude Include="src\vulkan_utilities.h" />
     <ClInclude Include="src\resource_manager.h" />
-    <ClInclude Include="src\allocator.h" />
-    <ClInclude Include="src\vulkan_initialization.h" />
     <ClInclude Include="src\demo.h" />
+    <ClInclude Include="src\vk.h" />
+    <ClInclude Include="src\geometry.h" />
+    <ClInclude Include="src\vk_definitions.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="spirv">

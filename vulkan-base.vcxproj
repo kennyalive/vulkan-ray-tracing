@@ -90,22 +90,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\allocator.cpp" />
+    <ClCompile Include="src\geometry.cpp" />
     <ClCompile Include="src\shaders\spirv\model_frag.cpp" />
     <ClCompile Include="src\shaders\spirv\model_vert.cpp" />
-    <ClCompile Include="src\vulkan_initialization.cpp" />
+    <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\resource_manager.cpp" />
     <ClCompile Include="src\demo.cpp" />
-    <ClCompile Include="src\vulkan_utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\allocator.h" />
-    <ClInclude Include="src\vulkan_initialization.h" />
+    <ClInclude Include="src\geometry.h" />
+    <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\resource_manager.h" />
     <ClInclude Include="src\demo.h" />
-    <ClInclude Include="src\vulkan_definitions.h" />
-    <ClInclude Include="src\vulkan_utilities.h" />
+    <ClInclude Include="src\vk_definitions.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

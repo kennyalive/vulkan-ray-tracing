@@ -1,4 +1,5 @@
 #include "resource_manager.h"
+#include "vk.h"
 
 static Resource_Manager resource_manager;
 
@@ -70,7 +71,7 @@ void Resource_Manager::release_resources() {
         vkDestroyPipeline(device, pipeline, nullptr);
     }
     graphics_pipelines.clear();
-    
+
     for (auto shader_module : shader_modules) {
         vkDestroyShaderModule(device, shader_module, nullptr);
     }
@@ -84,105 +85,91 @@ VkSemaphore Resource_Manager::create_semaphore() {
     desc.flags = 0;
 
     VkSemaphore semaphore;
-    VkResult result = vkCreateSemaphore(device, &desc, nullptr, &semaphore);
-    check_vk_result(result, "vkCreateSemaphore");
+    VK_CHECK(vkCreateSemaphore(device, &desc, nullptr, &semaphore));
     semaphores.push_back(semaphore);
     return semaphore;
 }
 
 VkCommandPool Resource_Manager::create_command_pool(const VkCommandPoolCreateInfo& desc) {
     VkCommandPool command_pool;
-    VkResult result = vkCreateCommandPool(device, &desc, nullptr, &command_pool);
-    check_vk_result(result, "vkCreateCommandPool");
+    VK_CHECK(vkCreateCommandPool(device, &desc, nullptr, &command_pool));
     command_pools.push_back(command_pool);
     return command_pool;
 }
 
 VkDescriptorPool Resource_Manager::create_descriptor_pool(const VkDescriptorPoolCreateInfo& desc) {
     VkDescriptorPool descriptor_pool;
-    VkResult result = vkCreateDescriptorPool(device, &desc, nullptr, &descriptor_pool);
-    check_vk_result(result, "vkCreateDescriptorPool");
+    VK_CHECK(vkCreateDescriptorPool(device, &desc, nullptr, &descriptor_pool));
     descriptor_pools.push_back(descriptor_pool);
     return descriptor_pool;
 }
 
 VkBuffer Resource_Manager::create_buffer(const VkBufferCreateInfo& desc) {
     VkBuffer buffer;
-    VkResult result = vkCreateBuffer(device, &desc, nullptr, &buffer);
-    check_vk_result(result, "vkCreateBuffer");
+    VK_CHECK(vkCreateBuffer(device, &desc, nullptr, &buffer));
     buffers.push_back(buffer);
     return buffer;
 }
 
 VkImage Resource_Manager::create_image(const VkImageCreateInfo& desc) {
     VkImage image;
-    VkResult result = vkCreateImage(device, &desc, nullptr, &image);
-    check_vk_result(result, "vkCreateImage");
+    VK_CHECK(vkCreateImage(device, &desc, nullptr, &image));
     images.push_back(image);
     return image;
 }
 
 VkImageView Resource_Manager::create_image_view(const VkImageViewCreateInfo& desc) {
     VkImageView image_view;
-    VkResult result = vkCreateImageView(device, &desc, nullptr, &image_view);
-    check_vk_result(result, "vkCreateImageView");
+    VK_CHECK(vkCreateImageView(device, &desc, nullptr, &image_view));
     image_views.push_back(image_view);
     return image_view;
 }
 
 VkSampler Resource_Manager::create_sampler(const VkSamplerCreateInfo& desc) {
     VkSampler sampler;
-    VkResult result = vkCreateSampler(device, &desc, nullptr, &sampler);
-    check_vk_result(result, "vkCreateSampler");
+    VK_CHECK(vkCreateSampler(device, &desc, nullptr, &sampler));
     samplers.push_back(sampler);
     return sampler;
 }
 
 VkRenderPass Resource_Manager::create_render_pass(const VkRenderPassCreateInfo& desc) {
     VkRenderPass render_pass;
-    VkResult result = vkCreateRenderPass(device, &desc, nullptr, &render_pass);
-    check_vk_result(result, "vkCreateRenderPass");
+    VK_CHECK(vkCreateRenderPass(device, &desc, nullptr, &render_pass));
     render_passes.push_back(render_pass);
     return render_pass;
 }
 
 VkFramebuffer Resource_Manager::create_framebuffer(const VkFramebufferCreateInfo& desc) {
     VkFramebuffer framebuffer;
-    VkResult result = vkCreateFramebuffer(device, &desc, nullptr, &framebuffer);
-    check_vk_result(result, "vkCreateFramebuffer");
+    VK_CHECK(vkCreateFramebuffer(device, &desc, nullptr, &framebuffer));
     framebuffers.push_back(framebuffer);
     return framebuffer;
 }
 
 VkDescriptorSetLayout Resource_Manager::create_descriptor_set_layout(const VkDescriptorSetLayoutCreateInfo& desc) {
     VkDescriptorSetLayout descriptor_set_layout;
-    VkResult result = vkCreateDescriptorSetLayout(device, &desc, nullptr, &descriptor_set_layout);
-    check_vk_result(result, "vkCreateDescriptorSetLayout");
+    VK_CHECK(vkCreateDescriptorSetLayout(device, &desc, nullptr, &descriptor_set_layout));
     descriptor_set_layouts.push_back(descriptor_set_layout);
     return descriptor_set_layout;
 }
 
 VkPipelineLayout Resource_Manager::create_pipeline_layout(const VkPipelineLayoutCreateInfo& desc) {
     VkPipelineLayout pipeline_layout;
-    VkResult result = vkCreatePipelineLayout(device, &desc, nullptr, &pipeline_layout);
-    check_vk_result(result, "vkCreatePipelineLayout");
+    VK_CHECK(vkCreatePipelineLayout(device, &desc, nullptr, &pipeline_layout));
     pipeline_layouts.push_back(pipeline_layout);
     return pipeline_layout;
 }
 
 VkPipeline Resource_Manager::create_graphics_pipeline(const VkGraphicsPipelineCreateInfo& desc) {
     VkPipeline pipeline;
-    VkResult result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &desc, nullptr, &pipeline);
-    check_vk_result(result, "vkCreateGraphicsPipelines");
+    VK_CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &desc, nullptr, &pipeline));
     graphics_pipelines.push_back(pipeline);
     return pipeline;
 }
 
 VkShaderModule Resource_Manager::create_shader_module(const VkShaderModuleCreateInfo& desc) {
     VkShaderModule shader_module;
-    VkResult result = vkCreateShaderModule(device, &desc, nullptr, &shader_module);
-    check_vk_result(result, "vkCreateShaderModule");
+    VK_CHECK(vkCreateShaderModule(vk.device, &desc, nullptr, &shader_module));
     shader_modules.push_back(shader_module);
     return shader_module;
 }
-
