@@ -421,7 +421,7 @@ void Vk_Demo::run_frame() {
 
     // Prepare render pass instance.
     VkClearValue clear_values[2];
-    clear_values[0].color = {0.5f, 0.5f, 0.57f, 0.0f};
+    clear_values[0].color = {0.6f, 0.6f, 0.66f, 0.0f};
     clear_values[1].depthStencil.depth = 1.0;
     clear_values[1].depthStencil.stencil = 0;
 
