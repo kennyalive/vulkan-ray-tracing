@@ -4,8 +4,8 @@
 #include "sdl/SDL.h"
 #include "sdl/SDL_syswm.h"
 
-const int window_width = 960;
-const int window_height = 540;
+const int window_width = 720;
+const int window_height = 720;
 
 static SDL_Window* the_window = nullptr;
 

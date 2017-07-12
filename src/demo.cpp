@@ -11,8 +11,8 @@
 #include <array>
 #include <chrono>
 
-const std::string model_path = "../../data/chalet.obj";
-const std::string texture_path = "../../data/chalet.jpg";
+const std::string model_path = "../../data/model.obj";
+const std::string texture_path = "../../data/model.jpg";
 
 struct Uniform_Buffer_Object {
     glm::mat4 model;
@@ -62,9 +62,9 @@ void Vk_Demo::upload_textures() {
     desc.magFilter = VK_FILTER_LINEAR;
     desc.minFilter = VK_FILTER_LINEAR;
     desc.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    desc.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    desc.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    desc.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    desc.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    desc.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    desc.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     desc.mipLodBias = 0.0f;
     desc.anisotropyEnable = VK_TRUE;
     desc.maxAnisotropy = 1;
@@ -396,10 +396,8 @@ void Vk_Demo::update_uniform_buffer() {
     float time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count() / 1000.f;
 
     Uniform_Buffer_Object ubo;
-    ubo.model = glm::rotate(glm::mat4(), time * glm::radians(30.0f), glm::vec3(0, 1, 0)) *
-        glm::rotate(glm::mat4(), glm::radians(-90.0f), glm::vec3(1, 0, 0));
-
-    ubo.view = glm::lookAt(glm::vec3(0, 0.5, 3.5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    ubo.model = glm::rotate(glm::mat4(), time * glm::radians(30.0f), glm::vec3(0, 1, 0));
+    ubo.view = glm::lookAt(glm::vec3(0, 0.5, 3.0), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
     // Vulkan clip space has inverted Y and half Z.
     const glm::mat4 clip(

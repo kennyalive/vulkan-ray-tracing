@@ -11,7 +11,7 @@ struct Vertex {
     glm::vec3 normal;
 
     bool operator==(const Vertex& other) const {
-        return pos == other.pos && tex_coord == other.tex_coord && normal == other.normal;
+        return pos == other.pos && tex_coord == other.tex_coord;
     }
 
     static std::array<VkVertexInputBindingDescription, 1> get_bindings() {
