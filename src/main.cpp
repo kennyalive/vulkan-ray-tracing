@@ -27,6 +27,8 @@ static int run_demo(const SDL_SysWMinfo& window_manager_info) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT)
                 quit = true;
+            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
+                quit = true;
         }
         if (quit) {
             break;

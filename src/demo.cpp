@@ -24,6 +24,14 @@ Vk_Demo::Vk_Demo(int window_width, int window_height, const SDL_SysWMinfo& windo
     vk.surface_width = window_width;
     vk.surface_height = window_height;
     vk_initialize(window_sys_info);
+
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(vk.physical_device, &props);
+    uint32_t major = VK_VERSION_MAJOR(props.apiVersion);
+    uint32_t minor = VK_VERSION_MINOR(props.apiVersion);
+    uint32_t patch = VK_VERSION_PATCH(props.apiVersion);
+    printf("Vulkan API version: %d.%d.%d\n", major, minor, patch);
+
     get_resource_manager()->initialize(vk.device);
 
     upload_textures();
