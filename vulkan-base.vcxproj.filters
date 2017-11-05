@@ -12,6 +12,7 @@
     </ClCompile>
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\geometry.cpp" />
+    <ClCompile Include="src\common.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\resource_manager.h" />
@@ -19,6 +20,7 @@
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\geometry.h" />
     <ClInclude Include="src\vk_definitions.h" />
+    <ClInclude Include="src\common.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="spirv">

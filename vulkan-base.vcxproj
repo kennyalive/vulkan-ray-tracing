@@ -90,6 +90,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\common.cpp" />
     <ClCompile Include="src\geometry.cpp" />
     <ClCompile Include="src\shaders\spirv\model_frag.cpp" />
     <ClCompile Include="src\shaders\spirv\model_vert.cpp" />
@@ -99,6 +100,7 @@
     <ClCompile Include="src\demo.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\common.h" />
     <ClInclude Include="src\geometry.h" />
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\resource_manager.h" />

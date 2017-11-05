@@ -1,4 +1,5 @@
 #include "vk.h"
+#include "common.h"
 #include "geometry.h"
 #include "resource_manager.h"
 
@@ -1382,7 +1383,9 @@ VkPipeline vk_find_pipeline(const Vk_Pipeline_Def& def) {
 }
 
 void vk_begin_frame() {
+	START_TIMER
     VK_CHECK(vkAcquireNextImageKHR(vk.device, vk.swapchain, UINT64_MAX, vk.image_acquired, VK_NULL_HANDLE, &vk.swapchain_image_index));
+	STOP_TIMER("vkAcquireNextImageKHR")
 
     VK_CHECK(vkWaitForFences(vk.device, 1, &vk.rendering_finished_fence, VK_FALSE, std::numeric_limits<uint64_t>::max()));
     VK_CHECK(vkResetFences(vk.device, 1, &vk.rendering_finished_fence));
@@ -1410,7 +1413,9 @@ void vk_end_frame() {
     submit_info.pCommandBuffers = &vk.command_buffer;
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = &vk.rendering_finished;
+	START_TIMER
     VK_CHECK(vkQueueSubmit(vk.queue, 1, &submit_info, vk.rendering_finished_fence));
+	STOP_TIMER("vkQueueSubmit")
 
     VkPresentInfoKHR present_info;
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1421,5 +1426,7 @@ void vk_end_frame() {
     present_info.pSwapchains = &vk.swapchain;
     present_info.pImageIndices = &vk.swapchain_image_index;
     present_info.pResults = nullptr;
+	START_TIMER
     VK_CHECK(vkQueuePresentKHR(vk.queue, &present_info));
+	STOP_TIMER("vkQueuePresentKHR")
 }
