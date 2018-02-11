@@ -393,6 +393,9 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkCmdDrawIndirectCountAMD CmdDrawIndirectCountAMD;
     PFN_vkCmdDrawIndexedIndirectCountAMD CmdDrawIndexedIndirectCountAMD;
 
+    // ---- VK_AMD_shader_info extension commands
+    PFN_vkGetShaderInfoAMD GetShaderInfoAMD;
+
     // ---- VK_NV_external_memory_win32 extension commands
 #ifdef VK_USE_PLATFORM_WIN32_KHR
     PFN_vkGetMemoryWin32HandleNV GetMemoryWin32HandleNV;
@@ -443,6 +446,9 @@ typedef struct VkLayerDispatchTable_ {
     PFN_vkDestroyValidationCacheEXT DestroyValidationCacheEXT;
     PFN_vkMergeValidationCachesEXT MergeValidationCachesEXT;
     PFN_vkGetValidationCacheDataEXT GetValidationCacheDataEXT;
+
+    // ---- VK_EXT_external_memory_host extension commands
+    PFN_vkGetMemoryHostPointerPropertiesEXT GetMemoryHostPointerPropertiesEXT;
 } VkLayerDispatchTable;
 
 

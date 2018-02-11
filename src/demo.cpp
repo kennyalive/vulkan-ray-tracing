@@ -74,7 +74,7 @@ void Vk_Demo::upload_textures() {
     desc.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     desc.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     desc.mipLodBias = 0.0f;
-    desc.anisotropyEnable = VK_TRUE;
+    desc.anisotropyEnable = VK_FALSE;
     desc.maxAnisotropy = 1;
     desc.compareEnable = VK_FALSE;
     desc.compareOp = VK_COMPARE_OP_ALWAYS;
