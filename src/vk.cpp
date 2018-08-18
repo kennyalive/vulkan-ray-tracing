@@ -172,10 +172,27 @@ void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
     vk.staging_buffer_size = size;
 }
 
+static VKAPI_ATTR VkBool32 VKAPI_CALL debug_utils_messenger_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT          message_severity,
+    VkDebugUtilsMessageTypeFlagsEXT                 message_type,
+    const VkDebugUtilsMessengerCallbackDataEXT*     callback_data,
+    void*                                           user_data)
+{
+#ifdef _WIN32
+    OutputDebugStringA(callback_data->pMessage);
+    OutputDebugStringA("\n");
+    DebugBreak();
+#endif
+    return VK_FALSE;
+}
+
 static void create_instance() {
     const char* instance_extensions[] = {
         VK_KHR_SURFACE_EXTENSION_NAME,
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#ifndef NDEBUG
+		VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+#endif
     };
 
     uint32_t count = 0;
@@ -202,6 +219,12 @@ static void create_instance() {
     desc.pApplicationInfo = &app_info;
     desc.enabledExtensionCount = sizeof(instance_extensions)/sizeof(instance_extensions[0]);
     desc.ppEnabledExtensionNames = instance_extensions;
+
+#ifndef NDEBUG
+    const char* validation_layer_name = "VK_LAYER_LUNARG_standard_validation";
+    desc.enabledLayerCount = 1;
+    desc.ppEnabledLayerNames = &validation_layer_name;
+#endif
 
     VK_CHECK(vkCreateInstance(&desc, nullptr, &vk.instance));
 }
@@ -358,6 +381,24 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
     // we will know that X is supported.
     create_instance();
     volkLoadInstance(vk.instance);
+
+    // Create debug messenger as early as possible (even before VkDevice is created).
+#ifndef NDEBUG
+    {
+        VkDebugUtilsMessengerCreateInfoEXT desc{ VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
+
+        desc.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+        desc.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+        desc.pfnUserCallback = &debug_utils_messenger_callback;
+
+        VK_CHECK(vkCreateDebugUtilsMessengerEXT(vk.instance, &desc, nullptr, &vk.debug_utils_messenger));
+    }
+#endif
 
     create_device();
     volkLoadDevice(vk.device);
@@ -563,6 +604,11 @@ void vk_shutdown() {
     
     vkDestroyDevice(vk.device, nullptr);
     vkDestroySurfaceKHR(vk.instance, vk.surface, nullptr);
+
+#ifndef NDEBUG
+    vkDestroyDebugUtilsMessengerEXT(vk.instance, vk.debug_utils_messenger, nullptr);
+#endif
+
     vkDestroyInstance(vk.instance, nullptr);
 }
 

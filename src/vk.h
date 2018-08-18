@@ -122,6 +122,10 @@ struct Vk_Instance {
     VmaAllocation staging_buffer_allocation = VK_NULL_HANDLE;
     VkDeviceSize staging_buffer_size = 0;
     uint8_t* staging_buffer_ptr = nullptr; // pointer to mapped staging buffer
+
+#ifndef NDEBUG
+    VkDebugUtilsMessengerEXT debug_utils_messenger = nullptr;
+#endif
 };
 
 extern Vk_Instance vk;
