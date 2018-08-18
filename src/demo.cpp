@@ -32,7 +32,7 @@ Vk_Demo::Vk_Demo(int window_width, int window_height, const SDL_SysWMinfo& windo
     uint32_t patch = VK_VERSION_PATCH(props.apiVersion);
     printf("Vulkan API version: %d.%d.%d\n", major, minor, patch);
 
-    get_resource_manager()->initialize(vk.device);
+    get_resource_manager()->initialize(vk.device, vk.allocator);
 
     upload_textures();
     upload_geometry();

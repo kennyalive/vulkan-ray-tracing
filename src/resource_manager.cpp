@@ -7,8 +7,9 @@ Resource_Manager* get_resource_manager() {
     return &resource_manager;
 }
 
-void Resource_Manager::initialize(VkDevice device) {
+void Resource_Manager::initialize(VkDevice device, VmaAllocator allocator) {
     this->device = device;
+    this->allocator = allocator;
 }
 
 void Resource_Manager::release_resources() {
@@ -27,13 +28,13 @@ void Resource_Manager::release_resources() {
     }
     descriptor_pools.clear();
 
-    for (auto buffer : buffers) {
-        vkDestroyBuffer(device, buffer, nullptr);
+    for (auto entry : buffers) {
+        vmaDestroyBuffer(allocator, entry.buffer, entry.allocation);
     }
     buffers.clear();
 
-    for (auto image : images) {
-        vkDestroyImage(device, image, nullptr);
+    for (auto entry : images) {
+        vmaDestroyImage(allocator, entry.image, entry.allocation);
     }
     images.clear();
 
@@ -104,18 +105,31 @@ VkDescriptorPool Resource_Manager::create_descriptor_pool(const VkDescriptorPool
     return descriptor_pool;
 }
 
-VkBuffer Resource_Manager::create_buffer(const VkBufferCreateInfo& desc) {
-    VkBuffer buffer;
-    VK_CHECK(vkCreateBuffer(device, &desc, nullptr, &buffer));
-    buffers.push_back(buffer);
-    return buffer;
+VkBuffer Resource_Manager::create_buffer(const VkBufferCreateInfo& desc, bool host_visible, void** mapped_data) {
+    VmaAllocationCreateInfo alloc_create_info{};
+    alloc_create_info.flags = host_visible ? VMA_ALLOCATION_CREATE_MAPPED_BIT : 0;
+    alloc_create_info.usage = host_visible ? VMA_MEMORY_USAGE_CPU_ONLY : VMA_MEMORY_USAGE_GPU_ONLY;
+
+    VmaAllocationInfo alloc_info;
+    Buffer_Info entry;
+
+    VK_CHECK(vmaCreateBuffer(allocator, &desc, &alloc_create_info, &entry.buffer, &entry.allocation, &alloc_info));
+    buffers.push_back(entry);
+
+    if (host_visible && mapped_data)
+        *mapped_data = alloc_info.pMappedData;
+
+    return entry.buffer;
 }
 
 VkImage Resource_Manager::create_image(const VkImageCreateInfo& desc) {
-    VkImage image;
-    VK_CHECK(vkCreateImage(device, &desc, nullptr, &image));
-    images.push_back(image);
-    return image;
+    VmaAllocationCreateInfo alloc_create_info{};
+    alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    Image_Info entry;
+    VK_CHECK(vmaCreateImage(allocator, &desc, &alloc_create_info, &entry.image, &entry.allocation, nullptr));
+    images.push_back(entry);
+    return entry.image;
 }
 
 VkImageView Resource_Manager::create_image_view(const VkImageViewCreateInfo& desc) {

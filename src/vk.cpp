@@ -11,24 +11,7 @@
 #include <iostream>
 #include <vector>
 
-const int DEVICE_LOCAL_CHUNK_SIZE = 16 * 1024 * 1024;
-const int HOST_VISIBLE_CHUNK_SIZE = 8 * 1024 * 1024;
-
 Vk_Instance vk;
-
-static uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
-    VkPhysicalDeviceMemoryProperties memory_properties;
-    vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
-
-    for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
-        if ((memory_type_bits & (1 << i)) != 0 &&
-            (memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
-    error("Vulkan: failed to find matching memory type with requested properties");
-    return -1;
-}
 
 static VkSwapchainKHR create_swapchain(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surface_format) {
     VkSurfaceCapabilitiesKHR surface_caps;
@@ -166,106 +149,27 @@ static void record_image_layout_transition(VkCommandBuffer command_buffer, VkIma
         0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-struct Allocation {
-    VkDeviceMemory memory = VK_NULL_HANDLE;
-    VkDeviceSize offset = 0;
-    void* data = nullptr;
-};
-
-static Allocation allocate_memory(const VkMemoryRequirements& memory_requirements, bool host_visible) {
-    Vk_Instance::Chunk* chunk = nullptr;
-
-    auto& chunks = host_visible ? vk.host_visible_chunks : vk.device_local_chunks;
-    VkDeviceSize chunk_size = host_visible ? HOST_VISIBLE_CHUNK_SIZE : DEVICE_LOCAL_CHUNK_SIZE;
-
-    // Try to find an existing chunk of sufficient capacity.
-    const auto mask = ~(memory_requirements.alignment - 1);
-    for (size_t i = 0; i < chunks.size(); i++) {
-        if (((1 << chunks[i].memory_type_index) & memory_requirements.memoryTypeBits) == 0)
-            continue;
-
-        // ensure that memory region has proper alignment
-        VkDeviceSize offset = (chunks[i].used + memory_requirements.alignment - 1) & mask;
-
-        if (offset + memory_requirements.size <= chunk_size) {
-            chunks[i].used = offset + memory_requirements.size;
-            chunk = &chunks[i];
-            break;
-        }
-    }
-
-    // Allocate a new chunk in case we couldn't find suitable existing chunk.
-    if (chunk == nullptr) {
-        VkMemoryAllocateInfo alloc_info;
-        alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        alloc_info.pNext = nullptr;
-        alloc_info.allocationSize = std::max(chunk_size, memory_requirements.size);
-        alloc_info.memoryTypeIndex = find_memory_type(vk.physical_device, memory_requirements.memoryTypeBits,
-            host_visible
-                ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-        VkDeviceMemory memory;
-        VK_CHECK(vkAllocateMemory(vk.device, &alloc_info, nullptr, &memory));
-
-        chunks.push_back(Vk_Instance::Chunk());
-        chunk = &chunks.back();
-        chunk->memory = memory;
-        chunk->used = memory_requirements.size;
-        chunk->memory_type_index = alloc_info.memoryTypeIndex;
-
-        if (host_visible) {
-            VK_CHECK(vkMapMemory(vk.device, chunk->memory, 0, VK_WHOLE_SIZE, 0, &chunk->data));
-        }
-    }
-
-    Allocation alloc;
-    alloc.memory = chunk->memory;
-    alloc.offset = chunk->used - memory_requirements.size;
-    alloc.data = static_cast<uint8_t*>(chunk->data) + alloc.offset;
-    return alloc;
-}
-
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
     if (vk.staging_buffer_size >= size)
         return;
 
     if (vk.staging_buffer != VK_NULL_HANDLE)
-        vkDestroyBuffer(vk.device, vk.staging_buffer, nullptr);
+        vmaDestroyBuffer(vk.allocator, vk.staging_buffer, vk.staging_buffer_allocation);
 
-    if (vk.staging_buffer_memory != VK_NULL_HANDLE)
-        vkFreeMemory(vk.device, vk.staging_buffer_memory, nullptr);
-
-    vk.staging_buffer_size = size;
-
-    VkBufferCreateInfo buffer_desc;
-    buffer_desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer_desc.pNext = nullptr;
-    buffer_desc.flags = 0;
+    VkBufferCreateInfo buffer_desc { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     buffer_desc.size = size;
     buffer_desc.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     buffer_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    buffer_desc.queueFamilyIndexCount = 0;
-    buffer_desc.pQueueFamilyIndices = nullptr;
-    VK_CHECK(vkCreateBuffer(vk.device, &buffer_desc, nullptr, &vk.staging_buffer));
 
-    VkMemoryRequirements memory_requirements;
-    vkGetBufferMemoryRequirements(vk.device, vk.staging_buffer, &memory_requirements);
+    VmaAllocationCreateInfo alloc_create_info{};
+    alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    alloc_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
-    uint32_t memory_type = find_memory_type(vk.physical_device, memory_requirements.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VmaAllocationInfo alloc_info;
+    VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_desc, &alloc_create_info, &vk.staging_buffer, &vk.staging_buffer_allocation, &alloc_info));
 
-    VkMemoryAllocateInfo alloc_info;
-    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc_info.pNext = nullptr;
-    alloc_info.allocationSize = memory_requirements.size;
-    alloc_info.memoryTypeIndex = memory_type;
-    VK_CHECK(vkAllocateMemory(vk.device, &alloc_info, nullptr, &vk.staging_buffer_memory));
-    VK_CHECK(vkBindBufferMemory(vk.device, vk.staging_buffer, vk.staging_buffer_memory, 0));
-
-    void* data;
-    VK_CHECK(vkMapMemory(vk.device, vk.staging_buffer_memory, 0, VK_WHOLE_SIZE, 0, &data));
-    vk.staging_buffer_ptr = (uint8_t*)data;
+    vk.staging_buffer_ptr = (uint8_t*)alloc_info.pMappedData;
+    vk.staging_buffer_size = size;
 }
 
 static void create_instance() {
@@ -460,6 +364,30 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
 
     vkGetDeviceQueue(vk.device, vk.queue_family_index, 0, &vk.queue);
 
+    VmaVulkanFunctions alloc_funcs{};
+    alloc_funcs.vkGetPhysicalDeviceProperties       = vkGetPhysicalDeviceProperties;
+    alloc_funcs.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+    alloc_funcs.vkAllocateMemory                    = vkAllocateMemory;
+    alloc_funcs.vkFreeMemory                        = vkFreeMemory;
+    alloc_funcs.vkMapMemory                         = vkMapMemory;
+    alloc_funcs.vkUnmapMemory                       = vkUnmapMemory;
+    alloc_funcs.vkBindBufferMemory                  = vkBindBufferMemory;
+    alloc_funcs.vkBindImageMemory                   = vkBindImageMemory;
+    alloc_funcs.vkGetBufferMemoryRequirements       = vkGetBufferMemoryRequirements;
+    alloc_funcs.vkGetImageMemoryRequirements        = vkGetImageMemoryRequirements;
+    alloc_funcs.vkCreateBuffer                      = vkCreateBuffer;
+    alloc_funcs.vkDestroyBuffer                     = vkDestroyBuffer;
+    alloc_funcs.vkCreateImage                       = vkCreateImage;
+    alloc_funcs.vkDestroyImage                      = vkDestroyImage;
+    alloc_funcs.vkGetBufferMemoryRequirements2KHR   = vkGetBufferMemoryRequirements2KHR;
+    alloc_funcs.vkGetImageMemoryRequirements2KHR    = vkGetImageMemoryRequirements2KHR;
+
+    VmaAllocatorCreateInfo allocator_info = {};
+    allocator_info.physicalDevice = vk.physical_device;
+    allocator_info.device = vk.device;
+    allocator_info.pVulkanFunctions = &alloc_funcs;
+    VK_CHECK(vmaCreateAllocator(&allocator_info, &vk.allocator));
+
     //
     // Swapchain.
     //
@@ -559,60 +487,39 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
 
         // create depth image
         {
-            VkImageCreateInfo desc;
-            desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-            desc.pNext = nullptr;
-            desc.flags = 0;
-            desc.imageType = VK_IMAGE_TYPE_2D;
-            desc.format = vk.depth_image_format;
-            desc.extent.width = vk.surface_width;
-            desc.extent.height = vk.surface_height;
-            desc.extent.depth = 1;
-            desc.mipLevels = 1;
-            desc.arrayLayers = 1;
-            desc.samples = VK_SAMPLE_COUNT_1_BIT;
-            desc.tiling = VK_IMAGE_TILING_OPTIMAL;
-            desc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-            desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            desc.queueFamilyIndexCount = 0;
-            desc.pQueueFamilyIndices = nullptr;
-            desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            VK_CHECK(vkCreateImage(vk.device, &desc, nullptr, &vk.depth_image));
-        }
+            VkImageCreateInfo create_info { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+            create_info.imageType       = VK_IMAGE_TYPE_2D;
+            create_info.format          = vk.depth_image_format;
+            create_info.extent.width    = vk.surface_width;
+            create_info.extent.height   = vk.surface_height;
+            create_info.extent.depth    = 1;
+            create_info.mipLevels       = 1;
+            create_info.arrayLayers     = 1;
+            create_info.samples         = VK_SAMPLE_COUNT_1_BIT;
+            create_info.tiling          = VK_IMAGE_TILING_OPTIMAL;
+            create_info.usage           = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+            create_info.sharingMode     = VK_SHARING_MODE_EXCLUSIVE;
+            create_info.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        // allocate depth image memory
-        {
-            VkMemoryRequirements memory_requirements;
-            vkGetImageMemoryRequirements(vk.device, vk.depth_image, &memory_requirements);
+            VmaAllocationCreateInfo alloc_create_info{};
+            alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
-            VkMemoryAllocateInfo alloc_info;
-            alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-            alloc_info.pNext = nullptr;
-            alloc_info.allocationSize = memory_requirements.size;
-            alloc_info.memoryTypeIndex = find_memory_type(vk.physical_device, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-            VK_CHECK(vkAllocateMemory(vk.device, &alloc_info, nullptr, &vk.depth_image_memory));
-            VK_CHECK(vkBindImageMemory(vk.device, vk.depth_image, vk.depth_image_memory, 0));
+            VK_CHECK(vmaCreateImage(vk.allocator, &create_info, &alloc_create_info, &vk.depth_image, &vk.depth_image_allocation, nullptr));
         }
 
         // create depth image view
         {
-            VkImageViewCreateInfo desc;
-            desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            desc.pNext = nullptr;
-            desc.flags = 0;
-            desc.image = vk.depth_image;
-            desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            desc.format = vk.depth_image_format;
-            desc.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-            desc.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-            desc.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-            desc.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-            desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-            desc.subresourceRange.baseMipLevel = 0;
-            desc.subresourceRange.levelCount = 1;
-            desc.subresourceRange.baseArrayLayer = 0;
-            desc.subresourceRange.layerCount = 1;
+            VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+            desc.image      = vk.depth_image;
+            desc.viewType   = VK_IMAGE_VIEW_TYPE_2D;
+            desc.format     = vk.depth_image_format;
+
+            desc.subresourceRange.aspectMask        = VK_IMAGE_ASPECT_DEPTH_BIT;
+            desc.subresourceRange.baseMipLevel      = 0;
+            desc.subresourceRange.levelCount        = 1;
+            desc.subresourceRange.baseArrayLayer    = 0;
+            desc.subresourceRange.layerCount        = 1;
+
             VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.depth_image_view));
         }
 
@@ -629,10 +536,7 @@ void vk_shutdown() {
     vkDeviceWaitIdle(vk.device);
 
     if (vk.staging_buffer != VK_NULL_HANDLE)
-        vkDestroyBuffer(vk.device, vk.staging_buffer, nullptr);
-
-    if (vk.staging_buffer_memory != VK_NULL_HANDLE)
-        vkFreeMemory(vk.device, vk.staging_buffer_memory, nullptr);
+        vmaDestroyBuffer(vk.allocator, vk.staging_buffer, vk.staging_buffer_allocation);
 
     for (auto pipeline : vk.pipelines) {
         vkDestroyPipeline(vk.device, pipeline, nullptr);
@@ -640,18 +544,7 @@ void vk_shutdown() {
     vk.pipeline_defs.clear();
     vk.pipelines.clear();
 
-    for (const auto& chunk : vk.device_local_chunks) {
-        vkFreeMemory(vk.device, chunk.memory, nullptr);
-    }
-    vk.device_local_chunks.clear();
-
-    for (const auto& chunk : vk.host_visible_chunks) {
-        vkFreeMemory(vk.device, chunk.memory, nullptr);
-    }
-    vk.host_visible_chunks.clear();
-
-    vkDestroyImage(vk.device, vk.depth_image, nullptr);
-    vkFreeMemory(vk.device, vk.depth_image_memory, nullptr);
+    vmaDestroyImage(vk.allocator, vk.depth_image, vk.depth_image_allocation);
     vkDestroyImageView(vk.device, vk.depth_image_view, nullptr);
 
     vkDestroyCommandPool(vk.device, vk.command_pool, nullptr);
@@ -660,12 +553,14 @@ void vk_shutdown() {
         vkDestroyImageView(vk.device, image_view, nullptr);
     }
     vk.swapchain_images.clear();
+    vkDestroySwapchainKHR(vk.device, vk.swapchain, nullptr);
 
     vkDestroySemaphore(vk.device, vk.image_acquired, nullptr);
     vkDestroySemaphore(vk.device, vk.rendering_finished, nullptr);
     vkDestroyFence(vk.device, vk.rendering_finished_fence, nullptr);
 
-    vkDestroySwapchainKHR(vk.device, vk.swapchain, nullptr);
+    vmaDestroyAllocator(vk.allocator);
+    
     vkDestroyDevice(vk.device, nullptr);
     vkDestroySurfaceKHR(vk.instance, vk.surface, nullptr);
     vkDestroyInstance(vk.instance, nullptr);
@@ -690,99 +585,55 @@ void vk_record_buffer_memory_barrier(VkCommandBuffer cb, VkBuffer buffer,
 }
 
 VkBuffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage) {
-    VkBufferCreateInfo desc;
-    desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    desc.pNext = nullptr;
-    desc.flags = 0;
-    desc.size = size;
-    desc.usage = usage;
-    desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    desc.queueFamilyIndexCount = 0;
-    desc.pQueueFamilyIndices = nullptr;
-
-    VkBuffer buffer = get_resource_manager()->create_buffer(desc);
-
-    VkMemoryRequirements memory_requirements;
-    vkGetBufferMemoryRequirements(vk.device, buffer, &memory_requirements);
-    auto alloc = allocate_memory(memory_requirements, false);
-    VK_CHECK(vkBindBufferMemory(vk.device, buffer, alloc.memory, alloc.offset));
-
-    return buffer;
+    VkBufferCreateInfo desc { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    desc.size           = size;
+    desc.usage          = usage;
+    desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
+    return get_resource_manager()->create_buffer(desc);
 }
 
 VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr) {
-    VkBufferCreateInfo desc;
-    desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    desc.pNext = nullptr;
-    desc.flags = 0;
-    desc.size = size;
-    desc.usage = usage;
-    desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    desc.queueFamilyIndexCount = 0;
-    desc.pQueueFamilyIndices = nullptr;
+    VkBufferCreateInfo desc { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    desc.size           = size;
+    desc.usage          = usage;
+    desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
 
-    VkBuffer buffer = get_resource_manager()->create_buffer(desc);
-
-    VkMemoryRequirements memory_requirements;
-    vkGetBufferMemoryRequirements(vk.device, buffer, &memory_requirements);
-    auto alloc = allocate_memory(memory_requirements, true);
-    VK_CHECK(vkBindBufferMemory(vk.device, buffer, alloc.memory, alloc.offset));
-    *buffer_ptr = alloc.data;
-
-    return buffer;
+    return get_resource_manager()->create_buffer(desc, true, buffer_ptr);
 }
-
 
 Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_levels, const uint8_t* pixels, int bytes_per_pixel) {
     Vk_Image image;
 
     // create image
     {
-        VkImageCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        desc.pNext = nullptr;
-        desc.flags = 0;
-        desc.imageType = VK_IMAGE_TYPE_2D;
-        desc.format = format;
-        desc.extent.width = width;
-        desc.extent.height = height;
-        desc.extent.depth = 1;
-        desc.mipLevels = mip_levels;
-        desc.arrayLayers = 1;
-        desc.samples = VK_SAMPLE_COUNT_1_BIT;
-        desc.tiling = VK_IMAGE_TILING_OPTIMAL;
-        desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        desc.queueFamilyIndexCount = 0;
-        desc.pQueueFamilyIndices = nullptr;
-        desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkImageCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+        desc.imageType      = VK_IMAGE_TYPE_2D;
+        desc.format         = format;
+        desc.extent.width   = width;
+        desc.extent.height  = height;
+        desc.extent.depth   = 1;
+        desc.mipLevels      = mip_levels;
+        desc.arrayLayers    = 1;
+        desc.samples        = VK_SAMPLE_COUNT_1_BIT;
+        desc.tiling         = VK_IMAGE_TILING_OPTIMAL;
+        desc.usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
+        desc.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 
         image.handle = get_resource_manager()->create_image(desc);
-
-        VkMemoryRequirements memory_requirements;
-        vkGetImageMemoryRequirements(vk.device, image.handle, &memory_requirements);
-        auto alloc = allocate_memory(memory_requirements, false);
-        VK_CHECK(vkBindImageMemory(vk.device, image.handle, alloc.memory, alloc.offset));
     }
 
     // create image view
     {
-        VkImageViewCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        desc.pNext = nullptr;
-        desc.flags = 0;
-        desc.image = image.handle;
-        desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        desc.format = format;
-        desc.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        desc.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        desc.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        desc.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        desc.subresourceRange.baseMipLevel = 0;
-        desc.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-        desc.subresourceRange.baseArrayLayer = 0;
-        desc.subresourceRange.layerCount = 1;
+        VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+        desc.image      = image.handle;
+        desc.viewType   = VK_IMAGE_VIEW_TYPE_2D;
+        desc.format     = format;
+        desc.subresourceRange.aspectMask        = VK_IMAGE_ASPECT_COLOR_BIT;
+        desc.subresourceRange.baseMipLevel      = 0;
+        desc.subresourceRange.levelCount        = VK_REMAINING_MIP_LEVELS;
+        desc.subresourceRange.baseArrayLayer    = 0;
+        desc.subresourceRange.layerCount        = 1;
 
         image.view = get_resource_manager()->create_image_view(desc);
     }
@@ -849,50 +700,33 @@ Vk_Image vk_create_render_target(int width, int height, VkFormat format) {
 
     // create image
     {
-        VkImageCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        desc.pNext = nullptr;
-        desc.flags = 0;
-        desc.imageType = VK_IMAGE_TYPE_2D;
-        desc.format = format;
-        desc.extent.width = width;
-        desc.extent.height = height;
-        desc.extent.depth = 1;
-        desc.mipLevels = 1;
-        desc.arrayLayers = 1;
-        desc.samples = VK_SAMPLE_COUNT_1_BIT;
-        desc.tiling = VK_IMAGE_TILING_OPTIMAL;
-        desc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-        desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        desc.queueFamilyIndexCount = 0;
-        desc.pQueueFamilyIndices = nullptr;
-        desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkImageCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+        desc.imageType      = VK_IMAGE_TYPE_2D;
+        desc.format         = format;
+        desc.extent.width   = width;
+        desc.extent.height  = height;
+        desc.extent.depth   = 1;
+        desc.mipLevels      = 1;
+        desc.arrayLayers    = 1;
+        desc.samples        = VK_SAMPLE_COUNT_1_BIT;
+        desc.tiling         = VK_IMAGE_TILING_OPTIMAL;
+        desc.usage          = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
+        desc.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 
         image.handle = get_resource_manager()->create_image(desc);
-
-        VkMemoryRequirements memory_requirements;
-        vkGetImageMemoryRequirements(vk.device, image.handle, &memory_requirements);
-        auto alloc = allocate_memory(memory_requirements, false);
-        VK_CHECK(vkBindImageMemory(vk.device, image.handle, alloc.memory, alloc.offset));
     }
     // create image view
     {
-        VkImageViewCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        desc.pNext = nullptr;
-        desc.flags = 0;
-        desc.image = image.handle;
-        desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        desc.format = format;
-        desc.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        desc.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        desc.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        desc.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        desc.subresourceRange.baseMipLevel = 0;
-        desc.subresourceRange.levelCount = 1;
-        desc.subresourceRange.baseArrayLayer = 0;
-        desc.subresourceRange.layerCount = 1;
+        VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+        desc.image      = image.handle;
+        desc.viewType   = VK_IMAGE_VIEW_TYPE_2D;
+        desc.format     = format;
+        desc.subresourceRange.aspectMask        = VK_IMAGE_ASPECT_COLOR_BIT;
+        desc.subresourceRange.baseMipLevel      = 0;
+        desc.subresourceRange.levelCount        = 1;
+        desc.subresourceRange.baseArrayLayer    = 0;
+        desc.subresourceRange.layerCount        = 1;
 
         image.view = get_resource_manager()->create_image_view(desc);
     }

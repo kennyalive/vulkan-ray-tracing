@@ -5,6 +5,9 @@
 #endif
 #include "volk.h"
 
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#include "vk_mem_alloc.h"
+
 #define SDL_MAIN_HANDLED
 #include "sdl/SDL_syswm.h"
 
@@ -91,6 +94,8 @@ struct Vk_Instance {
     VkDevice device = VK_NULL_HANDLE;
     VkQueue queue = VK_NULL_HANDLE;
 
+    VmaAllocator allocator;
+
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
     std::vector<VkImage> swapchain_images;
     std::vector<VkImageView> swapchain_image_views;
@@ -105,7 +110,7 @@ struct Vk_Instance {
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
 
     VkImage depth_image = VK_NULL_HANDLE;
-    VkDeviceMemory depth_image_memory = VK_NULL_HANDLE;
+    VmaAllocation depth_image_allocation = VK_NULL_HANDLE;
     VkFormat depth_image_format = VK_FORMAT_UNDEFINED;
     VkImageView depth_image_view = VK_NULL_HANDLE;
 
@@ -114,21 +119,9 @@ struct Vk_Instance {
 
     // Host visible memory used to copy image data to device local memory.
     VkBuffer staging_buffer = VK_NULL_HANDLE;
-    VkDeviceMemory staging_buffer_memory = VK_NULL_HANDLE;
+    VmaAllocation staging_buffer_allocation = VK_NULL_HANDLE;
     VkDeviceSize staging_buffer_size = 0;
     uint8_t* staging_buffer_ptr = nullptr; // pointer to mapped staging buffer
-
-    //
-    // Memory allocation.
-    //
-    struct Chunk {
-        VkDeviceMemory memory = VK_NULL_HANDLE;
-        VkDeviceSize used = 0;
-        uint32_t memory_type_index = -1;
-        void* data = nullptr; // only for host visible memory
-    };
-    std::vector<Chunk> device_local_chunks;
-    std::vector<Chunk> host_visible_chunks;
 };
 
 extern Vk_Instance vk;

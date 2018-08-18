@@ -16,6 +16,7 @@
     <ClCompile Include="third_party\include\volk.c">
       <Filter>3rdparty</Filter>
     </ClCompile>
+    <ClCompile Include="src\vma_impl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\resource_manager.h" />
