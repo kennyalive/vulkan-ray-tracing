@@ -16,108 +16,6 @@ const int HOST_VISIBLE_CHUNK_SIZE = 8 * 1024 * 1024;
 
 Vk_Instance vk;
 
-//
-// Vulkan API functions used by the renderer.
-//
-PFN_vkGetInstanceProcAddr                       vkGetInstanceProcAddr;
-
-PFN_vkCreateInstance                            vkCreateInstance;
-PFN_vkEnumerateInstanceExtensionProperties      vkEnumerateInstanceExtensionProperties;
-
-PFN_vkCreateDevice                              vkCreateDevice;
-PFN_vkDestroyInstance                           vkDestroyInstance;
-PFN_vkEnumerateDeviceExtensionProperties        vkEnumerateDeviceExtensionProperties;
-PFN_vkEnumeratePhysicalDevices                  vkEnumeratePhysicalDevices;
-PFN_vkGetDeviceProcAddr                         vkGetDeviceProcAddr;
-PFN_vkGetPhysicalDeviceFeatures                 vkGetPhysicalDeviceFeatures;
-PFN_vkGetPhysicalDeviceFormatProperties         vkGetPhysicalDeviceFormatProperties;
-PFN_vkGetPhysicalDeviceMemoryProperties         vkGetPhysicalDeviceMemoryProperties;
-PFN_vkGetPhysicalDeviceProperties               vkGetPhysicalDeviceProperties;
-PFN_vkGetPhysicalDeviceQueueFamilyProperties    vkGetPhysicalDeviceQueueFamilyProperties;
-PFN_vkCreateWin32SurfaceKHR                     vkCreateWin32SurfaceKHR;
-PFN_vkDestroySurfaceKHR                         vkDestroySurfaceKHR;
-PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR   vkGetPhysicalDeviceSurfaceCapabilitiesKHR;
-PFN_vkGetPhysicalDeviceSurfaceFormatsKHR        vkGetPhysicalDeviceSurfaceFormatsKHR;
-PFN_vkGetPhysicalDeviceSurfacePresentModesKHR   vkGetPhysicalDeviceSurfacePresentModesKHR;
-PFN_vkGetPhysicalDeviceSurfaceSupportKHR        vkGetPhysicalDeviceSurfaceSupportKHR;
-
-PFN_vkAllocateCommandBuffers                    vkAllocateCommandBuffers;
-PFN_vkAllocateDescriptorSets                    vkAllocateDescriptorSets;
-PFN_vkAllocateMemory                            vkAllocateMemory;
-PFN_vkBeginCommandBuffer                        vkBeginCommandBuffer;
-PFN_vkBindBufferMemory                          vkBindBufferMemory;
-PFN_vkBindImageMemory                           vkBindImageMemory;
-PFN_vkCmdBeginRenderPass                        vkCmdBeginRenderPass;
-PFN_vkCmdBindDescriptorSets                     vkCmdBindDescriptorSets;
-PFN_vkCmdBindIndexBuffer                        vkCmdBindIndexBuffer;
-PFN_vkCmdBindPipeline                           vkCmdBindPipeline;
-PFN_vkCmdBindVertexBuffers                      vkCmdBindVertexBuffers;
-PFN_vkCmdBlitImage                              vkCmdBlitImage;
-PFN_vkCmdClearAttachments                       vkCmdClearAttachments;
-PFN_vkCmdCopyBufferToImage                      vkCmdCopyBufferToImage;
-PFN_vkCmdCopyImage                              vkCmdCopyImage;
-PFN_vkCmdCopyBuffer                             vkCmdCopyBuffer;
-PFN_vkCmdDraw                                   vkCmdDraw;
-PFN_vkCmdDrawIndexed                            vkCmdDrawIndexed;
-PFN_vkCmdEndRenderPass                          vkCmdEndRenderPass;
-PFN_vkCmdPipelineBarrier                        vkCmdPipelineBarrier;
-PFN_vkCmdPushConstants                          vkCmdPushConstants;
-PFN_vkCmdSetDepthBias                           vkCmdSetDepthBias;
-PFN_vkCmdSetScissor                             vkCmdSetScissor;
-PFN_vkCmdSetViewport                            vkCmdSetViewport;
-PFN_vkCreateBuffer                              vkCreateBuffer;
-PFN_vkCreateCommandPool                         vkCreateCommandPool;
-PFN_vkCreateDescriptorPool                      vkCreateDescriptorPool;
-PFN_vkCreateDescriptorSetLayout                 vkCreateDescriptorSetLayout;
-PFN_vkCreateFence                               vkCreateFence;
-PFN_vkCreateFramebuffer                         vkCreateFramebuffer;
-PFN_vkCreateGraphicsPipelines                   vkCreateGraphicsPipelines;
-PFN_vkCreateImage                               vkCreateImage;
-PFN_vkCreateImageView                           vkCreateImageView;
-PFN_vkCreatePipelineLayout                      vkCreatePipelineLayout;
-PFN_vkCreateRenderPass                          vkCreateRenderPass;
-PFN_vkCreateSampler                             vkCreateSampler;
-PFN_vkCreateSemaphore                           vkCreateSemaphore;
-PFN_vkCreateShaderModule                        vkCreateShaderModule;
-PFN_vkDestroyBuffer                             vkDestroyBuffer;
-PFN_vkDestroyCommandPool                        vkDestroyCommandPool;
-PFN_vkDestroyDescriptorPool                     vkDestroyDescriptorPool;
-PFN_vkDestroyDescriptorSetLayout                vkDestroyDescriptorSetLayout;
-PFN_vkDestroyDevice                             vkDestroyDevice;
-PFN_vkDestroyFence                              vkDestroyFence;
-PFN_vkDestroyFramebuffer                        vkDestroyFramebuffer;
-PFN_vkDestroyImage                              vkDestroyImage;
-PFN_vkDestroyImageView                          vkDestroyImageView;
-PFN_vkDestroyPipeline                           vkDestroyPipeline;
-PFN_vkDestroyPipelineLayout                     vkDestroyPipelineLayout;
-PFN_vkDestroyRenderPass                         vkDestroyRenderPass;
-PFN_vkDestroySampler                            vkDestroySampler;
-PFN_vkDestroySemaphore                          vkDestroySemaphore;
-PFN_vkDestroyShaderModule                       vkDestroyShaderModule;
-PFN_vkDeviceWaitIdle                            vkDeviceWaitIdle;
-PFN_vkEndCommandBuffer                          vkEndCommandBuffer;
-PFN_vkFreeCommandBuffers                        vkFreeCommandBuffers;
-PFN_vkFreeDescriptorSets                        vkFreeDescriptorSets;
-PFN_vkFreeMemory                                vkFreeMemory;
-PFN_vkGetBufferMemoryRequirements               vkGetBufferMemoryRequirements;
-PFN_vkGetDeviceQueue                            vkGetDeviceQueue;
-PFN_vkGetImageMemoryRequirements                vkGetImageMemoryRequirements;
-PFN_vkGetImageSubresourceLayout                 vkGetImageSubresourceLayout;
-PFN_vkMapMemory                                 vkMapMemory;
-PFN_vkQueueSubmit                               vkQueueSubmit;
-PFN_vkQueueWaitIdle                             vkQueueWaitIdle;
-PFN_vkResetDescriptorPool                       vkResetDescriptorPool;
-PFN_vkResetFences                               vkResetFences;
-PFN_vkUnmapMemory                               vkUnmapMemory;
-PFN_vkUpdateDescriptorSets                      vkUpdateDescriptorSets;
-PFN_vkWaitForFences                             vkWaitForFences;
-PFN_vkAcquireNextImageKHR                       vkAcquireNextImageKHR;
-PFN_vkCreateSwapchainKHR                        vkCreateSwapchainKHR;
-PFN_vkDestroySwapchainKHR                       vkDestroySwapchainKHR;
-PFN_vkGetSwapchainImagesKHR                     vkGetSwapchainImagesKHR;
-PFN_vkQueuePresentKHR                           vkQueuePresentKHR;
-////////////////////////////////////////////////////////////////////////////
-
 static uint32_t find_memory_type(VkPhysicalDevice physical_device, uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memory_properties;
     vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
@@ -367,7 +265,7 @@ void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
 
     void* data;
     VK_CHECK(vkMapMemory(vk.device, vk.staging_buffer_memory, 0, VK_WHOLE_SIZE, 0, &data));
-    vk.staging_buffer_ptr = (byte*)data;
+    vk.staging_buffer_ptr = (uint8_t*)data;
 }
 
 static void create_instance() {
@@ -393,22 +291,11 @@ static void create_instance() {
             error("Vulkan: required instance extension is not available: " + std::string(name));
     }
 
-    VkApplicationInfo app_info;
-    app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    app_info.pNext = nullptr;
-    app_info.pApplicationName = nullptr;
-    app_info.applicationVersion = 0;
-    app_info.pEngineName = nullptr;
-    app_info.engineVersion = 0;
-    app_info.apiVersion = VK_API_VERSION_1_0;
+    VkApplicationInfo app_info { VK_STRUCTURE_TYPE_APPLICATION_INFO };
+    app_info.apiVersion = VK_API_VERSION_1_1;
 
-    VkInstanceCreateInfo desc;
-    desc.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    desc.pNext = nullptr;
-    desc.flags = 0;
+    VkInstanceCreateInfo desc { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     desc.pApplicationInfo = &app_info;
-    desc.enabledLayerCount = 0;
-    desc.ppEnabledLayerNames = nullptr;
     desc.enabledExtensionCount = sizeof(instance_extensions)/sizeof(instance_extensions[0]);
     desc.ppEnabledExtensionNames = instance_extensions;
 
@@ -422,11 +309,26 @@ static void create_device() {
         VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &count, nullptr));
 
         if (count == 0)
-            error("Vulkan: no physical device found");
+            error("There are no Vulkan physical devices available");
 
         std::vector<VkPhysicalDevice> physical_devices(count);
         VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &count, physical_devices.data()));
-        vk.physical_device = physical_devices[0];
+
+        for (const auto& physical_device : physical_devices)
+        {
+            VkPhysicalDeviceProperties props;
+            vkGetPhysicalDeviceProperties(physical_device, &props);
+
+            // Check for Vulkan 1.1 ccompatibility.
+            if (VK_VERSION_MAJOR(props.apiVersion) == 1 && VK_VERSION_MINOR(props.apiVersion) >= 1)
+            {
+                vk.physical_device = physical_device;
+                break;
+            }
+        }
+
+        if (vk.physical_device == nullptr)
+            error("Failed to find physical device that supports requested Vulkan API version");
     }
 
     VkWin32SurfaceCreateInfoKHR desc;
@@ -531,230 +433,30 @@ static void create_device() {
     }
 }
 
-#define INIT_INSTANCE_FUNCTION(func) func = (PFN_ ## func)vkGetInstanceProcAddr(vk.instance, #func);
-#define INIT_DEVICE_FUNCTION(func) func = (PFN_ ## func)vkGetDeviceProcAddr(vk.device, #func);
-
-static void init_vulkan_library() {
-    // Win32 Vulkan specific code
-    vk.vulkan_library = LoadLibrary(L"vulkan-1.dll");
-    if (vk.vulkan_library == NULL)
-        error("Could not load vulkan dll");
-    vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)GetProcAddress(vk.vulkan_library, "vkGetInstanceProcAddr");
-
-    //
-    // Get functions that do not depend on VkInstance (vk.instance == nullptr at this point).
-    //
-    INIT_INSTANCE_FUNCTION(vkCreateInstance)
-    INIT_INSTANCE_FUNCTION(vkEnumerateInstanceExtensionProperties)
-
-    //
-    // Get instance level functions.
-    //
-    create_instance();
-    INIT_INSTANCE_FUNCTION(vkCreateDevice)
-    INIT_INSTANCE_FUNCTION(vkDestroyInstance)
-    INIT_INSTANCE_FUNCTION(vkEnumerateDeviceExtensionProperties)
-    INIT_INSTANCE_FUNCTION(vkEnumeratePhysicalDevices)
-    INIT_INSTANCE_FUNCTION(vkGetDeviceProcAddr)
-    INIT_INSTANCE_FUNCTION(vkGetPhysicalDeviceFeatures)
-    INIT_INSTANCE_FUNCTION(vkGetPhysicalDeviceFormatProperties)
-    INIT_INSTANCE_FUNCTION(vkGetPhysicalDeviceMemoryProperties)
-    INIT_INSTANCE_FUNCTION(vkGetPhysicalDeviceProperties)
-    INIT_INSTANCE_FUNCTION(vkGetPhysicalDeviceQueueFamilyProperties)
-    INIT_INSTANCE_FUNCTION(vkCreateWin32SurfaceKHR)
-    INIT_INSTANCE_FUNCTION(vkDestroySurfaceKHR)
-    INIT_INSTANCE_FUNCTION(vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
-    INIT_INSTANCE_FUNCTION(vkGetPhysicalDeviceSurfaceFormatsKHR)
-    INIT_INSTANCE_FUNCTION(vkGetPhysicalDeviceSurfacePresentModesKHR)
-    INIT_INSTANCE_FUNCTION(vkGetPhysicalDeviceSurfaceSupportKHR)
-
-    //
-    // Get device level functions.
-    //
-    create_device();
-    INIT_DEVICE_FUNCTION(vkAllocateCommandBuffers)
-    INIT_DEVICE_FUNCTION(vkAllocateDescriptorSets)
-    INIT_DEVICE_FUNCTION(vkAllocateMemory)
-    INIT_DEVICE_FUNCTION(vkBeginCommandBuffer)
-    INIT_DEVICE_FUNCTION(vkBindBufferMemory)
-    INIT_DEVICE_FUNCTION(vkBindImageMemory)
-    INIT_DEVICE_FUNCTION(vkCmdBeginRenderPass)
-    INIT_DEVICE_FUNCTION(vkCmdBindDescriptorSets)
-    INIT_DEVICE_FUNCTION(vkCmdBindIndexBuffer)
-    INIT_DEVICE_FUNCTION(vkCmdBindPipeline)
-    INIT_DEVICE_FUNCTION(vkCmdBindVertexBuffers)
-    INIT_DEVICE_FUNCTION(vkCmdBlitImage)
-    INIT_DEVICE_FUNCTION(vkCmdClearAttachments)
-    INIT_DEVICE_FUNCTION(vkCmdCopyBufferToImage)
-    INIT_DEVICE_FUNCTION(vkCmdCopyBuffer)
-    INIT_DEVICE_FUNCTION(vkCmdCopyImage)
-    INIT_DEVICE_FUNCTION(vkCmdDraw)
-    INIT_DEVICE_FUNCTION(vkCmdDrawIndexed)
-    INIT_DEVICE_FUNCTION(vkCmdEndRenderPass)
-    INIT_DEVICE_FUNCTION(vkCmdPipelineBarrier)
-    INIT_DEVICE_FUNCTION(vkCmdPushConstants)
-    INIT_DEVICE_FUNCTION(vkCmdSetDepthBias)
-    INIT_DEVICE_FUNCTION(vkCmdSetScissor)
-    INIT_DEVICE_FUNCTION(vkCmdSetViewport)
-    INIT_DEVICE_FUNCTION(vkCreateBuffer)
-    INIT_DEVICE_FUNCTION(vkCreateCommandPool)
-    INIT_DEVICE_FUNCTION(vkCreateDescriptorPool)
-    INIT_DEVICE_FUNCTION(vkCreateDescriptorSetLayout)
-    INIT_DEVICE_FUNCTION(vkCreateFence)
-    INIT_DEVICE_FUNCTION(vkCreateFramebuffer)
-    INIT_DEVICE_FUNCTION(vkCreateGraphicsPipelines)
-    INIT_DEVICE_FUNCTION(vkCreateImage)
-    INIT_DEVICE_FUNCTION(vkCreateImageView)
-    INIT_DEVICE_FUNCTION(vkCreatePipelineLayout)
-    INIT_DEVICE_FUNCTION(vkCreateRenderPass)
-    INIT_DEVICE_FUNCTION(vkCreateSampler)
-    INIT_DEVICE_FUNCTION(vkCreateSemaphore)
-    INIT_DEVICE_FUNCTION(vkCreateShaderModule)
-    INIT_DEVICE_FUNCTION(vkDestroyBuffer)
-    INIT_DEVICE_FUNCTION(vkDestroyCommandPool)
-    INIT_DEVICE_FUNCTION(vkDestroyDescriptorPool)
-    INIT_DEVICE_FUNCTION(vkDestroyDescriptorSetLayout)
-    INIT_DEVICE_FUNCTION(vkDestroyDevice)
-    INIT_DEVICE_FUNCTION(vkDestroyFence)
-    INIT_DEVICE_FUNCTION(vkDestroyFramebuffer)
-    INIT_DEVICE_FUNCTION(vkDestroyImage)
-    INIT_DEVICE_FUNCTION(vkDestroyImageView)
-    INIT_DEVICE_FUNCTION(vkDestroyPipeline)
-    INIT_DEVICE_FUNCTION(vkDestroyPipelineLayout)
-    INIT_DEVICE_FUNCTION(vkDestroyRenderPass)
-    INIT_DEVICE_FUNCTION(vkDestroySampler)
-    INIT_DEVICE_FUNCTION(vkDestroySemaphore)
-    INIT_DEVICE_FUNCTION(vkDestroyShaderModule)
-    INIT_DEVICE_FUNCTION(vkDeviceWaitIdle)
-    INIT_DEVICE_FUNCTION(vkEndCommandBuffer)
-    INIT_DEVICE_FUNCTION(vkFreeCommandBuffers)
-    INIT_DEVICE_FUNCTION(vkFreeDescriptorSets)
-    INIT_DEVICE_FUNCTION(vkFreeMemory)
-    INIT_DEVICE_FUNCTION(vkGetBufferMemoryRequirements)
-    INIT_DEVICE_FUNCTION(vkGetDeviceQueue)
-    INIT_DEVICE_FUNCTION(vkGetImageMemoryRequirements)
-    INIT_DEVICE_FUNCTION(vkGetImageSubresourceLayout)
-    INIT_DEVICE_FUNCTION(vkMapMemory)
-    INIT_DEVICE_FUNCTION(vkQueueSubmit)
-    INIT_DEVICE_FUNCTION(vkQueueWaitIdle)
-    INIT_DEVICE_FUNCTION(vkResetDescriptorPool)
-    INIT_DEVICE_FUNCTION(vkResetFences)
-    INIT_DEVICE_FUNCTION(vkUnmapMemory)
-    INIT_DEVICE_FUNCTION(vkUpdateDescriptorSets)
-    INIT_DEVICE_FUNCTION(vkWaitForFences)
-    INIT_DEVICE_FUNCTION(vkAcquireNextImageKHR)
-    INIT_DEVICE_FUNCTION(vkCreateSwapchainKHR)
-    INIT_DEVICE_FUNCTION(vkDestroySwapchainKHR)
-    INIT_DEVICE_FUNCTION(vkGetSwapchainImagesKHR)
-    INIT_DEVICE_FUNCTION(vkQueuePresentKHR)
-}
-
-#undef INIT_INSTANCE_FUNCTION
-#undef INIT_DEVICE_FUNCTION
-
-static void deinit_vulkan_library() {
-    vkCreateInstance                            = nullptr;
-    vkEnumerateInstanceExtensionProperties		= nullptr;
-
-    vkCreateDevice								= nullptr;
-    vkDestroyInstance							= nullptr;
-    vkEnumerateDeviceExtensionProperties		= nullptr;
-    vkEnumeratePhysicalDevices					= nullptr;
-    vkGetDeviceProcAddr							= nullptr;
-    vkGetPhysicalDeviceFeatures					= nullptr;
-    vkGetPhysicalDeviceFormatProperties			= nullptr;
-    vkGetPhysicalDeviceMemoryProperties			= nullptr;
-    vkGetPhysicalDeviceProperties				= nullptr;
-    vkGetPhysicalDeviceQueueFamilyProperties	= nullptr;
-    vkCreateWin32SurfaceKHR						= nullptr;
-    vkDestroySurfaceKHR							= nullptr;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR	= nullptr;
-    vkGetPhysicalDeviceSurfaceFormatsKHR		= nullptr;
-    vkGetPhysicalDeviceSurfacePresentModesKHR	= nullptr;
-    vkGetPhysicalDeviceSurfaceSupportKHR		= nullptr;
-
-    vkAllocateCommandBuffers					= nullptr;
-    vkAllocateDescriptorSets					= nullptr;
-    vkAllocateMemory							= nullptr;
-    vkBeginCommandBuffer						= nullptr;
-    vkBindBufferMemory							= nullptr;
-    vkBindImageMemory							= nullptr;
-    vkCmdBeginRenderPass						= nullptr;
-    vkCmdBindDescriptorSets						= nullptr;
-    vkCmdBindIndexBuffer						= nullptr;
-    vkCmdBindPipeline							= nullptr;
-    vkCmdBindVertexBuffers						= nullptr;
-    vkCmdBlitImage								= nullptr;
-    vkCmdClearAttachments						= nullptr;
-    vkCmdCopyBufferToImage						= nullptr;
-    vkCmdCopyImage								= nullptr;
-    vkCmdDraw									= nullptr;
-    vkCmdDrawIndexed							= nullptr;
-    vkCmdEndRenderPass							= nullptr;
-    vkCmdPipelineBarrier						= nullptr;
-    vkCmdPushConstants							= nullptr;
-    vkCmdSetDepthBias							= nullptr;
-    vkCmdSetScissor								= nullptr;
-    vkCmdSetViewport							= nullptr;
-    vkCreateBuffer								= nullptr;
-    vkCreateCommandPool							= nullptr;
-    vkCreateDescriptorPool						= nullptr;
-    vkCreateDescriptorSetLayout					= nullptr;
-    vkCreateFence								= nullptr;
-    vkCreateFramebuffer							= nullptr;
-    vkCreateGraphicsPipelines					= nullptr;
-    vkCreateImage								= nullptr;
-    vkCreateImageView							= nullptr;
-    vkCreatePipelineLayout						= nullptr;
-    vkCreateRenderPass							= nullptr;
-    vkCreateSampler								= nullptr;
-    vkCreateSemaphore							= nullptr;
-    vkCreateShaderModule						= nullptr;
-    vkDestroyBuffer								= nullptr;
-    vkDestroyCommandPool						= nullptr;
-    vkDestroyDescriptorPool						= nullptr;
-    vkDestroyDescriptorSetLayout				= nullptr;
-    vkDestroyDevice								= nullptr;
-    vkDestroyFence								= nullptr;
-    vkDestroyFramebuffer						= nullptr;
-    vkDestroyImage								= nullptr;
-    vkDestroyImageView							= nullptr;
-    vkDestroyPipeline							= nullptr;
-    vkDestroyPipelineLayout						= nullptr;
-    vkDestroyRenderPass							= nullptr;
-    vkDestroySampler							= nullptr;
-    vkDestroySemaphore							= nullptr;
-    vkDestroyShaderModule						= nullptr;
-    vkDeviceWaitIdle							= nullptr;
-    vkEndCommandBuffer							= nullptr;
-    vkFreeCommandBuffers						= nullptr;
-    vkFreeDescriptorSets						= nullptr;
-    vkFreeMemory								= nullptr;
-    vkGetBufferMemoryRequirements				= nullptr;
-    vkGetDeviceQueue							= nullptr;
-    vkGetImageMemoryRequirements				= nullptr;
-    vkGetImageSubresourceLayout					= nullptr;
-    vkMapMemory									= nullptr;
-    vkQueueSubmit								= nullptr;
-    vkQueueWaitIdle								= nullptr;
-    vkResetDescriptorPool						= nullptr;
-    vkResetFences								= nullptr;
-    vkUnmapMemory                               = nullptr;
-    vkUpdateDescriptorSets						= nullptr;
-    vkWaitForFences								= nullptr;
-    vkAcquireNextImageKHR						= nullptr;
-    vkCreateSwapchainKHR						= nullptr;
-    vkDestroySwapchainKHR						= nullptr;
-    vkGetSwapchainImagesKHR						= nullptr;
-    vkQueuePresentKHR							= nullptr;
-}
-
 VkPipeline create_pipeline(const Vk_Pipeline_Def&);
 
 void vk_initialize(const SDL_SysWMinfo& window_info) {
     vk.system_window_info = window_info;
 
-    init_vulkan_library();
+    VK_CHECK(volkInitialize());
+
+    uint32_t instance_version = volkGetInstanceVersion();
+
+    // Check the highest Vulkan instance version supported by the loader.
+    bool loader_supports_version_higher_than_or_equal_to_1_1 =
+        VK_VERSION_MAJOR(instance_version) > 1 || VK_VERSION_MINOR(instance_version) >= 1;
+
+    if (!loader_supports_version_higher_than_or_equal_to_1_1)
+        error("Vulkan loader does not support Vulkan API version 1.1");
+
+    // If Vulkan loader reports it supports Vulkan version that is > X it does not guarantee that X is supported.
+    // Only when we successfully create VkInstance by setting VkApplicationInfo::apiVersion to X
+    // we will know that X is supported.
+    create_instance();
+    volkLoadInstance(vk.instance);
+
+    create_device();
+    volkLoadDevice(vk.device);
 
     vkGetDeviceQueue(vk.device, vk.queue_family_index, 0, &vk.queue);
 
@@ -967,8 +669,6 @@ void vk_shutdown() {
     vkDestroyDevice(vk.device, nullptr);
     vkDestroySurfaceKHR(vk.instance, vk.surface, nullptr);
     vkDestroyInstance(vk.instance, nullptr);
-
-    deinit_vulkan_library();
 }
 
 void vk_record_buffer_memory_barrier(VkCommandBuffer cb, VkBuffer buffer,

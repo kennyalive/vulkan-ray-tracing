@@ -59,7 +59,6 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)third_party\include;$(ProjectDir)third_party\include\glm</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -77,7 +76,6 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)third_party\include;$(ProjectDir)third_party\include\glm</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -98,6 +96,10 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\resource_manager.cpp" />
     <ClCompile Include="src\demo.cpp" />
+    <ClCompile Include="third_party\include\volk.c">
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\common.h" />
@@ -105,7 +107,6 @@
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\resource_manager.h" />
     <ClInclude Include="src\demo.h" />
-    <ClInclude Include="src\vk_definitions.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

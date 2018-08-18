@@ -1,6 +1,7 @@
 #pragma once
 
-#include "vk_definitions.h"
+#include "vk.h"
+
 #include <glm/glm.hpp>
 #include <array>
 #include <vector>

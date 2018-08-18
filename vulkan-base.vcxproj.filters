@@ -13,18 +13,23 @@
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\geometry.cpp" />
     <ClCompile Include="src\common.cpp" />
+    <ClCompile Include="third_party\include\volk.c">
+      <Filter>3rdparty</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\resource_manager.h" />
     <ClInclude Include="src\demo.h" />
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\geometry.h" />
-    <ClInclude Include="src\vk_definitions.h" />
     <ClInclude Include="src\common.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="spirv">
       <UniqueIdentifier>{1f312f12-54b2-48ec-935c-4e39334a8662}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty">
+      <UniqueIdentifier>{e8ccf0b2-0a62-4483-9782-0269fc83579a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
