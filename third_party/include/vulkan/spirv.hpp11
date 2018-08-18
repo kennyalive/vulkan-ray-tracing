@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2017 The Khronos Group Inc.
+// Copyright (c) 2014-2018 The Khronos Group Inc.
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and/or associated documentation files (the "Materials"),
@@ -46,12 +46,12 @@ namespace spv {
 
 typedef unsigned int Id;
 
-#define SPV_VERSION 0x10100
-#define SPV_REVISION 8
+#define SPV_VERSION 0x10200
+#define SPV_REVISION 2
 
 static const unsigned int MagicNumber = 0x07230203;
-static const unsigned int Version = 0x00010100;
-static const unsigned int Revision = 8;
+static const unsigned int Version = 0x00010200;
+static const unsigned int Revision = 2;
 static const unsigned int OpCodeMask = 0xffff;
 static const unsigned int WordCountShift = 16;
 
@@ -126,6 +126,9 @@ enum class ExecutionMode : unsigned {
     Finalizer = 34,
     SubgroupSize = 35,
     SubgroupsPerWorkgroup = 36,
+    SubgroupsPerWorkgroupId = 37,
+    LocalSizeId = 38,
+    LocalSizeHintId = 39,
     PostDepthCoverage = 4446,
     StencilRefReplacingEXT = 5027,
     Max = 0x7fffffff,
@@ -383,11 +386,15 @@ enum class Decoration : unsigned {
     InputAttachmentIndex = 43,
     Alignment = 44,
     MaxByteOffset = 45,
+    AlignmentId = 46,
+    MaxByteOffsetId = 47,
     ExplicitInterpAMD = 4999,
     OverrideCoverageNV = 5248,
     PassthroughNV = 5250,
     ViewportRelativeNV = 5252,
     SecondaryViewportRelativeNV = 5256,
+    HlslCounterBufferGOOGLE = 5634,
+    HlslSemanticGOOGLE = 5635,
     Max = 0x7fffffff,
 };
 
@@ -975,6 +982,8 @@ enum class Op : unsigned {
     OpNamedBarrierInitialize = 328,
     OpMemoryNamedBarrier = 329,
     OpModuleProcessed = 330,
+    OpExecutionModeId = 331,
+    OpDecorateId = 332,
     OpSubgroupBallotKHR = 4421,
     OpSubgroupFirstInvocationKHR = 4422,
     OpSubgroupAllKHR = 4428,
@@ -999,6 +1008,8 @@ enum class Op : unsigned {
     OpSubgroupBlockWriteINTEL = 5576,
     OpSubgroupImageBlockReadINTEL = 5577,
     OpSubgroupImageBlockWriteINTEL = 5578,
+    OpDecorateStringGOOGLE = 5632,
+    OpMemberDecorateStringGOOGLE = 5633,
     Max = 0x7fffffff,
 };
 
