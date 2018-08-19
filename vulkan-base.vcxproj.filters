@@ -4,12 +4,6 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\resource_manager.cpp" />
     <ClCompile Include="src\demo.cpp" />
-    <ClCompile Include="src\shaders\spirv\model_frag.cpp">
-      <Filter>spirv</Filter>
-    </ClCompile>
-    <ClCompile Include="src\shaders\spirv\model_vert.cpp">
-      <Filter>spirv</Filter>
-    </ClCompile>
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\geometry.cpp" />
     <ClCompile Include="src\common.cpp" />
@@ -27,9 +21,6 @@
     <ClInclude Include="src\debug.h" />
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="spirv">
-      <UniqueIdentifier>{1f312f12-54b2-48ec-935c-4e39334a8662}</UniqueIdentifier>
-    </Filter>
     <Filter Include="3rdparty">
       <UniqueIdentifier>{e8ccf0b2-0a62-4483-9782-0269fc83579a}</UniqueIdentifier>
     </Filter>

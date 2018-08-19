@@ -1,3 +1,4 @@
+#include "common.h"
 #include "resource_manager.h"
 #include "vk.h"
 

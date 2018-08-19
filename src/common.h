@@ -2,6 +2,11 @@
 
 #include <chrono>
 #include <cstdint>
+#include <string>
+#include <vector>
+
+void error(const std::string& message);
+std::vector<uint8_t> read_binary_file(const std::string& file_name);
 
 struct Timestamp {
     Timestamp() : t(std::chrono::steady_clock::now()) {}

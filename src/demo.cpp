@@ -1,3 +1,4 @@
+#include "common.h"
 #include "demo.h"
 #include "geometry.h"
 #include "resource_manager.h"
@@ -208,24 +209,21 @@ void Vk_Demo::create_render_passes() {
 }
 
 void Vk_Demo::create_descriptor_sets() {
-    constexpr int buffer_count = 1;
-    constexpr int image_count = 1;
 
     //
     // Descriptor pool.
     //
     {
-        std::array<VkDescriptorPoolSize, 2> pool_sizes;
+        std::array<VkDescriptorPoolSize, 3> pool_sizes;
         pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        pool_sizes[0].descriptorCount = buffer_count;
-        pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        pool_sizes[1].descriptorCount = image_count;
+        pool_sizes[0].descriptorCount = 16;
+        pool_sizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        pool_sizes[1].descriptorCount = 16;
+        pool_sizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+        pool_sizes[2].descriptorCount = 16;
 
-        VkDescriptorPoolCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        desc.pNext = nullptr;
-        desc.flags = 0;
-        desc.maxSets = buffer_count + image_count;
+        VkDescriptorPoolCreateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        desc.maxSets = 32;
         desc.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
         desc.pPoolSizes = pool_sizes.data();
 
@@ -256,19 +254,20 @@ void Vk_Demo::create_descriptor_sets() {
 
     // image set layout
     {
-        VkDescriptorSetLayoutBinding descriptor_binding;
-        descriptor_binding.binding = 0;
-        descriptor_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptor_binding.descriptorCount = 1;
-        descriptor_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        descriptor_binding.pImmutableSamplers = nullptr;
+        VkDescriptorSetLayoutBinding bindings[2] = {};
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayoutCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        desc.pNext = nullptr;
-        desc.flags = 0;
-        desc.bindingCount = 1;
-        desc.pBindings = &descriptor_binding;
+        bindings[1].binding = 1;
+        bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+        bindings[1].descriptorCount = 1;
+        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        desc.bindingCount = 2;
+        desc.pBindings = bindings;
         image_set_layout = get_resource_manager()->create_descriptor_set_layout(desc, "image set layout");
     }
 
@@ -278,9 +277,7 @@ void Vk_Demo::create_descriptor_sets() {
 
     // buffer set
     {
-        VkDescriptorSetAllocateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        desc.pNext = nullptr;
+        VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
         desc.descriptorPool = descriptor_pool;
         desc.descriptorSetCount = 1;
         desc.pSetLayouts = &buffer_set_layout;
@@ -308,41 +305,39 @@ void Vk_Demo::create_descriptor_sets() {
 
     // image sets
     {
-        std::array<VkDescriptorSetLayout, image_count> set_layouts;
-        set_layouts.fill(image_set_layout);
-
-        VkDescriptorSetAllocateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        desc.pNext = nullptr;
+        VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
         desc.descriptorPool = descriptor_pool;
-        desc.descriptorSetCount = image_count;
-        desc.pSetLayouts = set_layouts.data();
+        desc.descriptorSetCount = 1;
+        desc.pSetLayouts = &image_set_layout;
 
-        std::array<VkDescriptorSet, image_count> sets;
-        VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, sets.data()));
+        VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &texture_set));
 
         auto update_set = [](VkDescriptorSet set, VkImageView image_view, VkSampler sampler) {
-            VkDescriptorImageInfo image_info;
-            image_info.sampler = sampler;
-            image_info.imageView = image_view;
-            image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            VkDescriptorImageInfo image_infos[2] = {};
+            image_infos[0].imageView = image_view;
+            image_infos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            image_infos[1].sampler = sampler;
 
-            VkWriteDescriptorSet descriptor_write;
-            descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptor_write.dstSet = set;
-            descriptor_write.dstBinding = 0;
-            descriptor_write.dstArrayElement = 0;
-            descriptor_write.descriptorCount = 1;
-            descriptor_write.pNext = nullptr;
-            descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            descriptor_write.pImageInfo = &image_info;
-            descriptor_write.pBufferInfo = nullptr;
-            descriptor_write.pTexelBufferView = nullptr;
+            VkWriteDescriptorSet descriptor_writes[2] = {};
+            descriptor_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptor_writes[0].dstSet = set;
+            descriptor_writes[0].dstBinding = 0;
+            descriptor_writes[0].dstArrayElement = 0;
+            descriptor_writes[0].descriptorCount = 1;
+            descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+            descriptor_writes[0].pImageInfo = &image_infos[0];
 
-            vkUpdateDescriptorSets(vk.device, 1, &descriptor_write, 0, nullptr);
+            descriptor_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptor_writes[1].dstSet = set;
+            descriptor_writes[1].dstBinding = 1;
+            descriptor_writes[1].dstArrayElement = 0;
+            descriptor_writes[1].descriptorCount = 1;
+            descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+            descriptor_writes[1].pImageInfo = &image_infos[1];
+
+            vkUpdateDescriptorSets(vk.device, 2, descriptor_writes, 0, nullptr);
         };
 
-        texture_set = sets[0];
         update_set(texture_set, texture.view, sampler);
     }
 }
@@ -365,27 +360,23 @@ void Vk_Demo::create_pipeline_layouts() {
 }
 
 void Vk_Demo::create_shader_modules() {
-    auto create_shader_module = [](uint8_t* bytes, long long count, const char* name) {
-        if (count % 4 != 0) {
+    auto create_shader_module = [](const char* file_name, const char* debug_name) {
+        std::vector<uint8_t> bytes = read_binary_file(file_name);
+
+        if (bytes.size() % 4 != 0) {
             error("Vulkan: SPIR-V binary buffer size is not multiple of 4");
         }
         VkShaderModuleCreateInfo desc;
         desc.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         desc.pNext = nullptr;
         desc.flags = 0;
-        desc.codeSize = count;
-        desc.pCode = reinterpret_cast<const uint32_t*>(bytes);
+        desc.codeSize = bytes.size();
+        desc.pCode = reinterpret_cast<const uint32_t*>(bytes.data());
 
-        return get_resource_manager()->create_shader_module(desc, name);
+        return get_resource_manager()->create_shader_module(desc, debug_name);
     };
-
-    extern unsigned char model_vert_spv[];
-    extern long long model_vert_spv_size;
-    model_vs = create_shader_module(model_vert_spv, model_vert_spv_size, "vertex shader");
-
-    extern unsigned char model_frag_spv[];
-    extern long long model_frag_spv_size;
-    model_fs = create_shader_module(model_frag_spv, model_frag_spv_size, "fragment shader");
+    model_vs = create_shader_module("spirv/model.vb", "vertex shader");
+    model_fs = create_shader_module("spirv/model.fb", "fragment shader");
 }
 
 void Vk_Demo::create_pipelines() {

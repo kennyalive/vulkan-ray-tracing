@@ -796,8 +796,8 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     };
 
     std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages_state {
-        get_shader_stage_desc(VK_SHADER_STAGE_VERTEX_BIT, def.vs_module, "main"),
-        get_shader_stage_desc(VK_SHADER_STAGE_FRAGMENT_BIT, def.fs_module, "main")
+        get_shader_stage_desc(VK_SHADER_STAGE_VERTEX_BIT, def.vs_module, "main_vs"),
+        get_shader_stage_desc(VK_SHADER_STAGE_FRAGMENT_BIT, def.fs_module, "main_fs")
     };
 
     //

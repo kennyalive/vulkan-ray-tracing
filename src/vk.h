@@ -23,7 +23,6 @@
 #include <string>
 #include <vector>
 
-void error(const std::string& message);
 void set_window_title(const std::string&);
 
 struct Vk_Pipeline_Def {

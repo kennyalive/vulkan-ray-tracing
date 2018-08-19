@@ -92,8 +92,6 @@
   <ItemGroup>
     <ClCompile Include="src\common.cpp" />
     <ClCompile Include="src\geometry.cpp" />
-    <ClCompile Include="src\shaders\spirv\model_frag.cpp" />
-    <ClCompile Include="src\shaders\spirv\model_vert.cpp" />
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\resource_manager.cpp" />

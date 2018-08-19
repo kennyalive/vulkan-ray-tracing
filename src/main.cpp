@@ -1,3 +1,4 @@
+#include"common.h"
 #include "demo.h"
 
 #define SDL_MAIN_HANDLED
@@ -8,11 +9,6 @@ const int window_width = 720;
 const int window_height = 720;
 
 static SDL_Window* the_window = nullptr;
-
-void error(const std::string& message) {
-    printf("%s\n", message.c_str());
-    throw std::runtime_error(message);
-}
 
 void set_window_title(const std::string& title) {
     SDL_SetWindowTitle(the_window, title.c_str());
