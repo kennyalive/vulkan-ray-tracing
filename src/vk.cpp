@@ -630,24 +630,24 @@ void vk_record_buffer_memory_barrier(VkCommandBuffer cb, VkBuffer buffer,
     vkCmdPipelineBarrier(cb, src_stages, dst_stages, 0, 0, nullptr, 1, &barrier, 0, nullptr);
 }
 
-VkBuffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage) {
+VkBuffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name) {
     VkBufferCreateInfo desc { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     desc.size           = size;
     desc.usage          = usage;
     desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
-    return get_resource_manager()->create_buffer(desc);
+    return get_resource_manager()->create_buffer(desc, false, nullptr, name);
 }
 
-VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr) {
+VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name) {
     VkBufferCreateInfo desc { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     desc.size           = size;
     desc.usage          = usage;
     desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
 
-    return get_resource_manager()->create_buffer(desc, true, buffer_ptr);
+    return get_resource_manager()->create_buffer(desc, true, buffer_ptr, name);
 }
 
-Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_levels, const uint8_t* pixels, int bytes_per_pixel) {
+Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_levels, const uint8_t* pixels, int bytes_per_pixel, const char* name) {
     Vk_Image image;
 
     // create image
@@ -666,7 +666,7 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_level
         desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
         desc.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        image.handle = get_resource_manager()->create_image(desc);
+        image.handle = get_resource_manager()->create_image(desc, name);
     }
 
     // create image view
@@ -681,7 +681,7 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_level
         desc.subresourceRange.baseArrayLayer    = 0;
         desc.subresourceRange.layerCount        = 1;
 
-        image.view = get_resource_manager()->create_image_view(desc);
+        image.view = get_resource_manager()->create_image_view(desc, (name + std::string(" ImageView")).c_str());
     }
 
     // upload image data
@@ -741,7 +741,7 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_level
     return image;
 }
 
-Vk_Image vk_create_render_target(int width, int height, VkFormat format) {
+Vk_Image vk_create_render_target(int width, int height, VkFormat format, const char* name) {
     Vk_Image image;
 
     // create image
@@ -760,7 +760,7 @@ Vk_Image vk_create_render_target(int width, int height, VkFormat format) {
         desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
         desc.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        image.handle = get_resource_manager()->create_image(desc);
+        image.handle = get_resource_manager()->create_image(desc, name);
     }
     // create image view
     {
@@ -774,7 +774,7 @@ Vk_Image vk_create_render_target(int width, int height, VkFormat format) {
         desc.subresourceRange.baseArrayLayer    = 0;
         desc.subresourceRange.layerCount        = 1;
 
-        image.view = get_resource_manager()->create_image_view(desc);
+        image.view = get_resource_manager()->create_image_view(desc, (name + std::string(" ImageView")).c_str());
     }
     return image;
 }

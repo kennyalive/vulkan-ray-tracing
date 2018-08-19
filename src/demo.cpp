@@ -38,7 +38,7 @@ Vk_Demo::Vk_Demo(int window_width, int window_height, const SDL_SysWMinfo& windo
     upload_geometry();
 
     uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer_Object)),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &uniform_buffer_ptr);
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &uniform_buffer_ptr, "uniform buffer to store matrices");
 
     create_render_passes();
     create_descriptor_sets();
@@ -55,7 +55,7 @@ void Vk_Demo::upload_textures() {
         auto rgba_pixels = stbi_load(path.c_str(), &w, &h, &component_count,STBI_rgb_alpha);
         if (rgba_pixels == nullptr)
             error("failed to load image file: " + path);
-        auto texture = vk_create_texture(w, h, VK_FORMAT_R8G8B8A8_UNORM, 1, rgba_pixels, 4);
+        auto texture = vk_create_texture(w, h, VK_FORMAT_R8G8B8A8_UNORM, 1, rgba_pixels, 4, path.c_str());
         stbi_image_free(rgba_pixels);
         return texture;
     };
@@ -82,7 +82,7 @@ void Vk_Demo::upload_textures() {
     desc.maxLod = 0.0f;
     desc.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     desc.unnormalizedCoordinates = VK_FALSE;
-    sampler = get_resource_manager()->create_sampler(desc);
+    sampler = get_resource_manager()->create_sampler(desc, "sampler for diffuse texture");
 }
 
 void Vk_Demo::upload_geometry() {
@@ -91,7 +91,7 @@ void Vk_Demo::upload_geometry() {
 
     {
         const VkDeviceSize size = model.vertices.size() * sizeof(model.vertices[0]);
-        vertex_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        vertex_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, "vertex buffer");
         vk_ensure_staging_buffer_allocation(size);
         memcpy(vk.staging_buffer_ptr, model.vertices.data(), size);
 
@@ -105,7 +105,7 @@ void Vk_Demo::upload_geometry() {
     }
     {
         const VkDeviceSize size = model.indices.size() * sizeof(model.indices[0]);
-        index_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+        index_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, "index buffer");
         vk_ensure_staging_buffer_allocation(size);
         memcpy(vk.staging_buffer_ptr, model.indices.data(), size);
 
@@ -178,7 +178,7 @@ static VkRenderPass create_render_pass() {
     desc.dependencyCount = 0;
     desc.pDependencies = nullptr;
 
-    return get_resource_manager()->create_render_pass(desc);
+    return get_resource_manager()->create_render_pass(desc, "main render pass");
 }
 
 void Vk_Demo::create_render_passes() {
@@ -203,7 +203,7 @@ void Vk_Demo::create_render_passes() {
     swapchain_framebuffers.resize(vk.swapchain_images.size());
     for (size_t i = 0; i < vk.swapchain_images.size(); i++) {
         attachments[0] = vk.swapchain_image_views[i]; // set color attachment
-        swapchain_framebuffers[i] = get_resource_manager()->create_framebuffer(desc);
+        swapchain_framebuffers[i] = get_resource_manager()->create_framebuffer(desc, ("framebuffer for swapchain image " + std::to_string(i)).c_str());
     }
 }
 
@@ -229,7 +229,7 @@ void Vk_Demo::create_descriptor_sets() {
         desc.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
         desc.pPoolSizes = pool_sizes.data();
 
-        descriptor_pool = get_resource_manager()->create_descriptor_pool(desc);
+        descriptor_pool = get_resource_manager()->create_descriptor_pool(desc, "global descriptor pool");
     }
 
     //
@@ -251,7 +251,7 @@ void Vk_Demo::create_descriptor_sets() {
         desc.flags = 0;
         desc.bindingCount = 1;
         desc.pBindings = &descriptor_binding;
-        buffer_set_layout = get_resource_manager()->create_descriptor_set_layout(desc);
+        buffer_set_layout = get_resource_manager()->create_descriptor_set_layout(desc, "buffer set layout");
     }
 
     // image set layout
@@ -269,7 +269,7 @@ void Vk_Demo::create_descriptor_sets() {
         desc.flags = 0;
         desc.bindingCount = 1;
         desc.pBindings = &descriptor_binding;
-        image_set_layout = get_resource_manager()->create_descriptor_set_layout(desc);
+        image_set_layout = get_resource_manager()->create_descriptor_set_layout(desc, "image set layout");
     }
 
     //
@@ -360,12 +360,12 @@ void Vk_Demo::create_pipeline_layouts() {
         std::array<VkDescriptorSetLayout, 2> set_layouts {buffer_set_layout, image_set_layout};
         desc.setLayoutCount = static_cast<uint32_t>(set_layouts.size());
         desc.pSetLayouts = set_layouts.data();
-        pipeline_layout = get_resource_manager()->create_pipeline_layout(desc);
+        pipeline_layout = get_resource_manager()->create_pipeline_layout(desc, "the only pipeline layout");
     }
 }
 
 void Vk_Demo::create_shader_modules() {
-    auto create_shader_module = [](uint8_t* bytes, long long count) {
+    auto create_shader_module = [](uint8_t* bytes, long long count, const char* name) {
         if (count % 4 != 0) {
             error("Vulkan: SPIR-V binary buffer size is not multiple of 4");
         }
@@ -376,16 +376,16 @@ void Vk_Demo::create_shader_modules() {
         desc.codeSize = count;
         desc.pCode = reinterpret_cast<const uint32_t*>(bytes);
 
-        return get_resource_manager()->create_shader_module(desc);
+        return get_resource_manager()->create_shader_module(desc, name);
     };
 
     extern unsigned char model_vert_spv[];
     extern long long model_vert_spv_size;
-    model_vs = create_shader_module(model_vert_spv, model_vert_spv_size);
+    model_vs = create_shader_module(model_vert_spv, model_vert_spv_size, "vertex shader");
 
     extern unsigned char model_frag_spv[];
     extern long long model_frag_spv_size;
-    model_fs = create_shader_module(model_frag_spv, model_frag_spv_size);
+    model_fs = create_shader_module(model_frag_spv, model_frag_spv_size, "fragment shader");
 }
 
 void Vk_Demo::create_pipelines() {

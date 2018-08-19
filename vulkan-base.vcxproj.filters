@@ -24,6 +24,7 @@
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\geometry.h" />
     <ClInclude Include="src\common.h" />
+    <ClInclude Include="src\debug.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="spirv">

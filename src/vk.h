@@ -11,18 +11,20 @@
 #define SDL_MAIN_HANDLED
 #include "sdl/SDL_syswm.h"
 
+#define VK_CHECK(function_call) { \
+    VkResult result = function_call; \
+    if (result < 0) \
+        error("Vulkan: error code " + std::to_string(result) + " returned by " + #function_call); \
+}
+
+#include "debug.h"
+
 #include <functional>
 #include <string>
 #include <vector>
 
 void error(const std::string& message);
 void set_window_title(const std::string&);
-
-#define VK_CHECK(function_call) { \
-    VkResult result = function_call; \
-    if (result < 0) \
-        error("Vulkan: error code " + std::to_string(result) + " returned by " + #function_call); \
-}
 
 struct Vk_Pipeline_Def {
     VkShaderModule vs_module = VK_NULL_HANDLE;
@@ -59,10 +61,10 @@ void vk_shutdown();
 // Resources allocation.
 //
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size);
-VkBuffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage);
-VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr);
-Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_levels, const uint8_t* pixels, int bytes_per_pixel);
-Vk_Image vk_create_render_target(int width, int height, VkFormat format);
+VkBuffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name);
+VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name);
+Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_levels, const uint8_t* pixels, int bytes_per_pixel, const char*  name);
+Vk_Image vk_create_render_target(int width, int height, VkFormat format, const char* name);
 VkPipeline vk_find_pipeline(const Vk_Pipeline_Def& def);
 
 //
