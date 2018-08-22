@@ -382,7 +382,6 @@ void Vk_Demo::create_pipelines() {
 
 void Vk_Demo::update_uniform_buffer() {
     static auto start_time = std::chrono::high_resolution_clock::now();
-
     auto current_time = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count() / 1000.f;
 
@@ -406,11 +405,6 @@ void Vk_Demo::update_uniform_buffer() {
 void Vk_Demo::run_frame() {
     update_uniform_buffer();
     vk_begin_frame();
-
-    // Ensure that vertex shader has access to updated data.
-    vk_record_buffer_memory_barrier(vk.command_buffer, uniform_buffer,
-        VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-        VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_UNIFORM_READ_BIT);
 
     // Prepare render pass instance.
     VkClearValue clear_values[2];
