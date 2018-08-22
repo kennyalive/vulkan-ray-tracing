@@ -1,8 +1,6 @@
 [[vk::binding(0, 0)]]
 cbuffer Constants {
-    float4x4 model;
-    float4x4 view;
-    float4x4 proj;
+    float4x4 mvp;
 };
 
 [[vk::binding(0, 1)]]
@@ -22,7 +20,7 @@ VS2PS main_vs(
     float3 normal : NORMAL)
 {
     VS2PS data;
-    data.position = mul(mul(proj, mul(view, model)), position);
+    data.position = mul(mvp, position);
     data.uv = uv;
     return data;
 }

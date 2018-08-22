@@ -62,7 +62,7 @@ void vk_shutdown();
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size);
 VkBuffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name);
 VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name);
-Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_levels, const uint8_t* pixels, int bytes_per_pixel, const char*  name);
+Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate_mipmaps, const uint8_t* pixels, int bytes_per_pixel, const char*  name);
 Vk_Image vk_create_render_target(int width, int height, VkFormat format, const char* name);
 VkPipeline vk_find_pipeline(const Vk_Pipeline_Def& def);
 

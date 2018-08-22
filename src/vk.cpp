@@ -126,12 +126,13 @@ void vk_record_and_run_commands(VkCommandPool command_pool, VkQueue queue, std::
     vkFreeCommandBuffers(vk.device, command_pool, 1, &command_buffer);
 }
 
-static void record_image_layout_transition(VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags,
-    VkAccessFlags src_access_flags, VkImageLayout old_layout, VkAccessFlags dst_access_flags, VkImageLayout new_layout) {
+static void record_image_layout_transition(
+    VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags,
+    VkAccessFlags src_access_flags, VkImageLayout old_layout,
+    VkAccessFlags dst_access_flags, VkImageLayout new_layout,
+    uint32_t mip_level = VK_REMAINING_MIP_LEVELS) {
 
-    VkImageMemoryBarrier barrier;
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.pNext = nullptr;
+    VkImageMemoryBarrier barrier { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     barrier.srcAccessMask = src_access_flags;
     barrier.dstAccessMask = dst_access_flags;
     barrier.oldLayout = old_layout;
@@ -140,10 +141,16 @@ static void record_image_layout_transition(VkCommandBuffer command_buffer, VkIma
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image;
     barrier.subresourceRange.aspectMask = image_aspect_flags;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+    if (mip_level == VK_REMAINING_MIP_LEVELS) {
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+    } else {
+        barrier.subresourceRange.baseMipLevel = mip_level;
+        barrier.subresourceRange.levelCount = 1;
+    }
 
     vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
         0, nullptr, 0, nullptr, 1, &barrier);
@@ -647,8 +654,15 @@ VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usa
     return get_resource_manager()->create_buffer(desc, true, buffer_ptr, name);
 }
 
-Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_levels, const uint8_t* pixels, int bytes_per_pixel, const char* name) {
+Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate_mipmaps, const uint8_t* pixels, int bytes_per_pixel, const char* name) {
     Vk_Image image;
+
+    uint32_t mip_levels = 1;
+    if (generate_mipmaps) {
+        mip_levels = 0;
+        for (int k = std::max(width, height); k > 0; k >>= 1)
+            mip_levels++;
+    }
 
     // create image
     {
@@ -662,7 +676,7 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_level
         desc.arrayLayers    = 1;
         desc.samples        = VK_SAMPLE_COUNT_1_BIT;
         desc.tiling         = VK_IMAGE_TILING_OPTIMAL;
-        desc.usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        desc.usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | (generate_mipmaps ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0);
         desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
         desc.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -686,55 +700,87 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, int mip_level
 
     // upload image data
     {
-        VkBufferImageCopy regions[16];
-        int num_regions = 0;
-
-        int buffer_size = 0;
-
-        while (true) {
-            VkBufferImageCopy region;
-            region.bufferOffset = buffer_size;
-            region.bufferRowLength = 0;
-            region.bufferImageHeight = 0;
-            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            region.imageSubresource.mipLevel = num_regions;
-            region.imageSubresource.baseArrayLayer = 0;
-            region.imageSubresource.layerCount = 1;
-            region.imageOffset = VkOffset3D{ 0, 0, 0 };
-            region.imageExtent = VkExtent3D{ (uint32_t)width, (uint32_t)height, 1 };
-
-            regions[num_regions] = region;
-            num_regions++;
-
-            buffer_size += width * height * bytes_per_pixel;
-
-            if (mip_levels == 1 || (width == 1 && height == 1))
-                break;
-
-            width >>= 1;
-            if (width < 1) width = 1;
-
-            height >>= 1;
-            if (height < 1) height = 1;
-        }
-
+        int buffer_size = width * height * bytes_per_pixel;
         vk_ensure_staging_buffer_allocation(buffer_size);
         memcpy(vk.staging_buffer_ptr, pixels, buffer_size);
 
+        VkBufferImageCopy region;
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = VkOffset3D{ 0, 0, 0 };
+        region.imageExtent = VkExtent3D{ (uint32_t)width, (uint32_t)height, 1 };
+
         vk_record_and_run_commands(vk.command_pool, vk.queue,
-            [&image, &num_regions, &regions](VkCommandBuffer command_buffer) {
-
-            vk_record_buffer_memory_barrier(command_buffer, vk.staging_buffer,
-                VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT);
+            [&image, &region, generate_mipmaps, width, height, mip_levels](VkCommandBuffer command_buffer) {
 
             record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
-                0, VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                0, VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                0 /* first mip level */);
 
-            vkCmdCopyBufferToImage(command_buffer, vk.staging_buffer, image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions);
+            vkCmdCopyBufferToImage(command_buffer, vk.staging_buffer, image.handle,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-            record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
-                VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            if (!generate_mipmaps) {
+                record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
+                    VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    0 /* first mip level */);
+            }
+
+            VkImageBlit blit{};
+            blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.srcSubresource.baseArrayLayer = 0;
+            blit.srcSubresource.layerCount = 1;
+            blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.dstSubresource.baseArrayLayer = 0;
+            blit.dstSubresource.layerCount = 1;
+
+            int32_t w = (int32_t)width;
+            int32_t h = (int32_t)height;
+
+            for (uint32_t i = 1; i < mip_levels; i++) {
+                blit.srcSubresource.mipLevel = i - 1;
+                blit.srcOffsets[1] = VkOffset3D { w, h, 1 };
+
+                w = std::max(w >> 1, 1);
+                h = std::max(h >> 1, 1);
+
+                blit.dstSubresource.mipLevel = i;
+                blit.dstOffsets[1] = VkOffset3D { w, h, 1 };
+
+                record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
+                    VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    i-1);
+
+                record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
+                    0, VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    i);
+
+                vkCmdBlitImage(command_buffer,
+                    image.handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    1, &blit, VK_FILTER_LINEAR);
+
+                record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
+                    VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    i-1);
+            }
+
+            if (generate_mipmaps) {
+                 record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
+                        VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                        mip_levels - 1);
+            }
         });
     }
 

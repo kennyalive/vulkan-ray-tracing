@@ -15,10 +15,8 @@
 const std::string model_path = "../../data/model.obj";
 const std::string texture_path = "../../data/model.jpg";
 
-struct Uniform_Buffer_Object {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 proj;
+struct Uniform_Buffer {
+    glm::mat4 mvp;
 };
 
 Vk_Demo::Vk_Demo(int window_width, int window_height, const SDL_SysWMinfo& window_sys_info) {
@@ -38,7 +36,7 @@ Vk_Demo::Vk_Demo(int window_width, int window_height, const SDL_SysWMinfo& windo
     upload_textures();
     upload_geometry();
 
-    uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer_Object)),
+    uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &uniform_buffer_ptr, "uniform buffer to store matrices");
 
     create_render_passes();
@@ -56,7 +54,7 @@ void Vk_Demo::upload_textures() {
         auto rgba_pixels = stbi_load(path.c_str(), &w, &h, &component_count,STBI_rgb_alpha);
         if (rgba_pixels == nullptr)
             error("failed to load image file: " + path);
-        auto texture = vk_create_texture(w, h, VK_FORMAT_R8G8B8A8_UNORM, 1, rgba_pixels, 4, path.c_str());
+        Vk_Image texture = vk_create_texture(w, h, VK_FORMAT_R8G8B8A8_UNORM, true, rgba_pixels, 4, path.c_str());
         stbi_image_free(rgba_pixels);
         return texture;
     };
@@ -64,25 +62,19 @@ void Vk_Demo::upload_textures() {
     texture = load_texture(texture_path);
 
     // create sampler
-    VkSamplerCreateInfo desc;
-    desc.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    desc.pNext = nullptr;
-    desc.flags = 0;
-    desc.magFilter = VK_FILTER_LINEAR;
-    desc.minFilter = VK_FILTER_LINEAR;
-    desc.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    desc.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    desc.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    desc.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    desc.mipLodBias = 0.0f;
-    desc.anisotropyEnable = VK_FALSE;
-    desc.maxAnisotropy = 1;
-    desc.compareEnable = VK_FALSE;
-    desc.compareOp = VK_COMPARE_OP_ALWAYS;
-    desc.minLod = 0.0f;
-    desc.maxLod = 0.0f;
-    desc.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    desc.unnormalizedCoordinates = VK_FALSE;
+    VkSamplerCreateInfo desc { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+    desc.magFilter           = VK_FILTER_LINEAR;
+    desc.minFilter           = VK_FILTER_LINEAR;
+    desc.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    desc.addressModeU        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    desc.addressModeV        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    desc.addressModeW        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    desc.mipLodBias          = 0.0f;
+    desc.anisotropyEnable    = VK_FALSE;
+    desc.maxAnisotropy       = 1;
+    desc.minLod              = 0.0f;
+    desc.maxLod              = 12.0f;
+
     sampler = get_resource_manager()->create_sampler(desc, "sampler for diffuse texture");
 }
 
@@ -286,7 +278,7 @@ void Vk_Demo::create_descriptor_sets() {
         VkDescriptorBufferInfo buffer_info;
         buffer_info.buffer = uniform_buffer;
         buffer_info.offset = 0;
-        buffer_info.range = sizeof(Uniform_Buffer_Object);
+        buffer_info.range = sizeof(Uniform_Buffer);
 
         VkWriteDescriptorSet descriptor_write;
         descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -394,9 +386,9 @@ void Vk_Demo::update_uniform_buffer() {
     auto current_time = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count() / 1000.f;
 
-    Uniform_Buffer_Object ubo;
-    ubo.model = glm::rotate(glm::mat4(), time * glm::radians(30.0f), glm::vec3(0, 1, 0));
-    ubo.view = glm::lookAt(glm::vec3(0, 0.5, 3.0), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    Uniform_Buffer ubo;
+    glm::mat4x4 model = glm::rotate(glm::mat4(), time * glm::radians(30.0f), glm::vec3(0, 1, 0));
+    glm::mat4x4 view = glm::lookAt(glm::vec3(0, 0.5, 3.0), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
     // Vulkan clip space has inverted Y and half Z.
     const glm::mat4 clip(
@@ -405,7 +397,9 @@ void Vk_Demo::update_uniform_buffer() {
         0.0f, 0.0f, 0.5f, 0.0f,
         0.0f, 0.0f, 0.5f, 1.0f);
 
-    ubo.proj = clip * glm::perspective(glm::radians(45.0f), vk.surface_width / (float)vk.surface_height, 0.1f, 50.0f);
+    glm::mat4x4 proj = clip * glm::perspective(glm::radians(45.0f), vk.surface_width / (float)vk.surface_height, 0.1f, 50.0f);
+
+    ubo.mvp = proj * view * model;
     memcpy(uniform_buffer_ptr, &ubo, sizeof(ubo));
 }
 
