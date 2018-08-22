@@ -448,23 +448,19 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
         VK_CHECK(vkGetSwapchainImagesKHR(vk.device, vk.swapchain, &image_count, vk.swapchain_images.data()));
 
         vk.swapchain_image_views.resize(image_count);
+
         for (uint32_t i = 0; i < image_count; i++) {
-            VkImageViewCreateInfo desc;
-            desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            desc.pNext = nullptr;
-            desc.flags = 0;
-            desc.image = vk.swapchain_images[i];
-            desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            desc.format = vk.surface_format.format;
-            desc.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-            desc.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-            desc.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-            desc.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-            desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            desc.subresourceRange.baseMipLevel = 0;
-            desc.subresourceRange.levelCount = 1;
+            VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+            desc.image          = vk.swapchain_images[i];
+            desc.viewType       = VK_IMAGE_VIEW_TYPE_2D;
+            desc.format         = vk.surface_format.format;
+
+            desc.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+            desc.subresourceRange.baseMipLevel   = 0;
+            desc.subresourceRange.levelCount     = 1;
             desc.subresourceRange.baseArrayLayer = 0;
-            desc.subresourceRange.layerCount = 1;
+            desc.subresourceRange.layerCount     = 1;
+
             VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.swapchain_image_views[i]));
         }
     }
@@ -473,17 +469,11 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
     // Sync primitives.
     //
     {
-        VkSemaphoreCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        desc.pNext = nullptr;
-        desc.flags = 0;
-
+        VkSemaphoreCreateInfo desc { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
         VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.image_acquired));
         VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.rendering_finished));
 
-        VkFenceCreateInfo fence_desc;
-        fence_desc.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        fence_desc.pNext = nullptr;
+        VkFenceCreateInfo fence_desc { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         fence_desc.flags = VK_FENCE_CREATE_SIGNALED_BIT;
         VK_CHECK(vkCreateFence(vk.device, &fence_desc, nullptr, &vk.rendering_finished_fence));
     }
@@ -492,12 +482,9 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
     // Command pool.
     //
     {
-        VkCommandPoolCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        desc.pNext = nullptr;
+        VkCommandPoolCreateInfo desc { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
         desc.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         desc.queueFamilyIndex = vk.queue_family_index;
-
         VK_CHECK(vkCreateCommandPool(vk.device, &desc, nullptr, &vk.command_pool));
     }
 
@@ -505,11 +492,9 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
     // Command buffer.
     //
     {
-        VkCommandBufferAllocateInfo alloc_info;
-        alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        alloc_info.pNext = nullptr;
-        alloc_info.commandPool = vk.command_pool;
-        alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        VkCommandBufferAllocateInfo alloc_info { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        alloc_info.commandPool        = vk.command_pool;
+        alloc_info.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         alloc_info.commandBufferCount = 1;
         VK_CHECK(vkAllocateCommandBuffers(vk.device, &alloc_info, &vk.command_buffer));
     }
@@ -619,24 +604,6 @@ void vk_shutdown() {
     vkDestroyInstance(vk.instance, nullptr);
 }
 
-void vk_record_buffer_memory_barrier(VkCommandBuffer cb, VkBuffer buffer,
-        VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages,
-        VkAccessFlags src_access, VkAccessFlags dst_access) {
-
-    VkBufferMemoryBarrier barrier;
-    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;;
-    barrier.pNext = nullptr;
-    barrier.srcAccessMask = src_access;
-    barrier.dstAccessMask = dst_access;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.buffer = buffer;
-    barrier.offset = 0;
-    barrier.size = VK_WHOLE_SIZE;
-
-    vkCmdPipelineBarrier(cb, src_stages, dst_stages, 0, 0, nullptr, 1, &barrier, 0, nullptr);
-}
-
 VkBuffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name) {
     VkBufferCreateInfo desc { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     desc.size           = size;
@@ -650,7 +617,6 @@ VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usa
     desc.size           = size;
     desc.usage          = usage;
     desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
-
     return get_resource_manager()->create_buffer(desc, true, buffer_ptr, name);
 }
 
@@ -830,14 +796,10 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     // Shader stages.
     //
     auto get_shader_stage_desc = [](VkShaderStageFlagBits stage, VkShaderModule shader_module, const char* entry) {
-        VkPipelineShaderStageCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        desc.pNext = nullptr;
-        desc.flags = 0;
-        desc.stage = stage;
+        VkPipelineShaderStageCreateInfo desc { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+        desc.stage  = stage;
         desc.module = shader_module;
-        desc.pName = entry;
-        desc.pSpecializationInfo = nullptr;
+        desc.pName  = entry;
         return desc;
     };
 
@@ -852,22 +814,16 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     auto bindings = Vertex::get_bindings();
     auto attribs = Vertex::get_attributes();
 
-    VkPipelineVertexInputStateCreateInfo vertex_input_state;
-    vertex_input_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertex_input_state.pNext = nullptr;
-    vertex_input_state.flags = 0;
-    vertex_input_state.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
-    vertex_input_state.pVertexBindingDescriptions = bindings.data();
-    vertex_input_state.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribs.size());
-    vertex_input_state.pVertexAttributeDescriptions = attribs.data();
+    VkPipelineVertexInputStateCreateInfo vertex_input_state { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+    vertex_input_state.vertexBindingDescriptionCount    = static_cast<uint32_t>(bindings.size());
+    vertex_input_state.pVertexBindingDescriptions       = bindings.data();
+    vertex_input_state.vertexAttributeDescriptionCount  = static_cast<uint32_t>(attribs.size());
+    vertex_input_state.pVertexAttributeDescriptions     = attribs.data();
 
     //
     // Primitive assembly.
     //
-    VkPipelineInputAssemblyStateCreateInfo input_assembly_state;
-    input_assembly_state.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    input_assembly_state.pNext = nullptr;
-    input_assembly_state.flags = 0;
+    VkPipelineInputAssemblyStateCreateInfo input_assembly_state { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
     input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     input_assembly_state.primitiveRestartEnable = VK_FALSE;
 
@@ -887,63 +843,47 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     scissor.extent.width = static_cast<uint32_t>(vk.surface_width);
     scissor.extent.height = static_cast<uint32_t>(vk.surface_height);
 
-    VkPipelineViewportStateCreateInfo viewport_state;
-    viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewport_state.pNext = nullptr;
-    viewport_state.flags = 0;
-    viewport_state.viewportCount = 1;
-    viewport_state.pViewports = &viewport;
-    viewport_state.scissorCount = 1;
-    viewport_state.pScissors = &scissor;
+    VkPipelineViewportStateCreateInfo viewport_state { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+    viewport_state.viewportCount    = 1;
+    viewport_state.pViewports       = &viewport;
+    viewport_state.scissorCount     = 1;
+    viewport_state.pScissors        = &scissor;
 
     //
     // Rasterization.
     //
-    VkPipelineRasterizationStateCreateInfo rasterization_state;
-    rasterization_state.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterization_state.pNext = nullptr;
-    rasterization_state.flags = 0;
-    rasterization_state.depthClampEnable = VK_FALSE;
+    VkPipelineRasterizationStateCreateInfo rasterization_state { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+    rasterization_state.depthClampEnable        = VK_FALSE;
     rasterization_state.rasterizerDiscardEnable = VK_FALSE;
-    rasterization_state.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterization_state.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterization_state.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterization_state.depthBiasEnable = VK_FALSE;
+    rasterization_state.polygonMode             = VK_POLYGON_MODE_FILL;
+    rasterization_state.cullMode                = VK_CULL_MODE_BACK_BIT;
+    rasterization_state.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterization_state.depthBiasEnable         = VK_FALSE;
     rasterization_state.depthBiasConstantFactor = 0.0f;
-    rasterization_state.depthBiasClamp = 0.0f;
-    rasterization_state.depthBiasSlopeFactor = 0.0f;
-    rasterization_state.lineWidth = 1.0f;
+    rasterization_state.depthBiasClamp          = 0.0f;
+    rasterization_state.depthBiasSlopeFactor    = 0.0f;
+    rasterization_state.lineWidth               = 1.0f;
 
     //
     // Multisampling.
     //
-    VkPipelineMultisampleStateCreateInfo multisample_state;
-    multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisample_state.pNext = nullptr;
-    multisample_state.flags = 0;
-    multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisample_state.sampleShadingEnable = VK_FALSE;
-    multisample_state.minSampleShading = 1.0f;
-    multisample_state.pSampleMask = nullptr;
+    VkPipelineMultisampleStateCreateInfo multisample_state { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+    multisample_state.rasterizationSamples  = VK_SAMPLE_COUNT_1_BIT;
+    multisample_state.sampleShadingEnable   = VK_FALSE;
+    multisample_state.minSampleShading      = 1.0f;
+    multisample_state.pSampleMask           = nullptr;
     multisample_state.alphaToCoverageEnable = VK_FALSE;
-    multisample_state.alphaToOneEnable = VK_FALSE;
+    multisample_state.alphaToOneEnable      = VK_FALSE;
 
     //
     // Depth/stencil.
     //
-    VkPipelineDepthStencilStateCreateInfo depth_stencil_state;
-    depth_stencil_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depth_stencil_state.pNext = nullptr;
-    depth_stencil_state.flags = 0;
-    depth_stencil_state.depthTestEnable = VK_TRUE;
-    depth_stencil_state.depthWriteEnable = VK_TRUE;
-    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS;
-    depth_stencil_state.depthBoundsTestEnable = VK_FALSE;
-    depth_stencil_state.stencilTestEnable = VK_FALSE;
-    depth_stencil_state.minDepthBounds = 0.0;
-    depth_stencil_state.maxDepthBounds = 0.0;
-    depth_stencil_state.front = {};
-    depth_stencil_state.back = {};
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_state { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+    depth_stencil_state.depthTestEnable         = VK_TRUE;
+    depth_stencil_state.depthWriteEnable        = VK_TRUE;
+    depth_stencil_state.depthCompareOp          = VK_COMPARE_OP_LESS;
+    depth_stencil_state.depthBoundsTestEnable   = VK_FALSE;
+    depth_stencil_state.stencilTestEnable       = VK_FALSE;
 
     //
     // Blending.
@@ -954,42 +894,30 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
-    VkPipelineColorBlendStateCreateInfo blend_state;
-    blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    blend_state.pNext = nullptr;
-    blend_state.flags = 0;
-    blend_state.logicOpEnable = VK_FALSE;
-    blend_state.logicOp = VK_LOGIC_OP_COPY;
+    VkPipelineColorBlendStateCreateInfo blend_state { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
+    blend_state.logicOpEnable   = VK_FALSE;
+    blend_state.logicOp         = VK_LOGIC_OP_COPY;
     blend_state.attachmentCount = 1;
-    blend_state.pAttachments = &attachment_blend_state;
-    blend_state.blendConstants[0] = 0.0f;
-    blend_state.blendConstants[1] = 0.0f;
-    blend_state.blendConstants[2] = 0.0f;
-    blend_state.blendConstants[3] = 0.0f;
+    blend_state.pAttachments    = &attachment_blend_state;
 
     //
     // Finally create graphics pipeline.
     //
-    VkGraphicsPipelineCreateInfo desc;
-    desc.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    desc.pNext = nullptr;
-    desc.flags = 0;
-    desc.stageCount = static_cast<uint32_t>(shader_stages_state.size());
-    desc.pStages = shader_stages_state.data();
-    desc.pVertexInputState = &vertex_input_state;
-    desc.pInputAssemblyState = &input_assembly_state;
-    desc.pTessellationState = nullptr;
-    desc.pViewportState = &viewport_state;
-    desc.pRasterizationState = &rasterization_state;
-    desc.pMultisampleState = &multisample_state;
-    desc.pDepthStencilState = &depth_stencil_state;
-    desc.pColorBlendState = &blend_state;
-    desc.pDynamicState = nullptr;
-    desc.layout = def.pipeline_layout;
-    desc.renderPass = def.render_pass;
-    desc.subpass = 0;
-    desc.basePipelineHandle = VK_NULL_HANDLE;
-    desc.basePipelineIndex = -1;
+    VkGraphicsPipelineCreateInfo desc { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+    desc.stageCount             = static_cast<uint32_t>(shader_stages_state.size());
+    desc.pStages                = shader_stages_state.data();
+    desc.pVertexInputState      = &vertex_input_state;
+    desc.pInputAssemblyState    = &input_assembly_state;
+    desc.pTessellationState     = nullptr;
+    desc.pViewportState         = &viewport_state;
+    desc.pRasterizationState    = &rasterization_state;
+    desc.pMultisampleState      = &multisample_state;
+    desc.pDepthStencilState     = &depth_stencil_state;
+    desc.pColorBlendState       = &blend_state;
+    desc.pDynamicState          = nullptr;
+    desc.layout                 = def.pipeline_layout;
+    desc.renderPass             = def.render_pass;
+    desc.subpass                = 0;
 
     VkPipeline pipeline;
     VK_CHECK(vkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &desc, nullptr, &pipeline));
@@ -1016,43 +944,37 @@ void vk_begin_frame() {
     VK_CHECK(vkWaitForFences(vk.device, 1, &vk.rendering_finished_fence, VK_FALSE, std::numeric_limits<uint64_t>::max()));
     VK_CHECK(vkResetFences(vk.device, 1, &vk.rendering_finished_fence));
 
-    VkCommandBufferBeginInfo begin_info;
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin_info.pNext = nullptr;
+    VkCommandBufferBeginInfo begin_info { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    begin_info.pInheritanceInfo = nullptr;
-
     VK_CHECK(vkBeginCommandBuffer(vk.command_buffer, &begin_info));
 }
 
 void vk_end_frame() {
     VK_CHECK(vkEndCommandBuffer(vk.command_buffer));
 
-    VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo submit_info;
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.pNext = nullptr;
-    submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = &vk.image_acquired;
-    submit_info.pWaitDstStageMask = &wait_dst_stage_mask;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &vk.command_buffer;
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &vk.rendering_finished;
-	START_TIMER
-    VK_CHECK(vkQueueSubmit(vk.queue, 1, &submit_info, vk.rendering_finished_fence));
-	STOP_TIMER("vkQueueSubmit")
+    const VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-    VkPresentInfoKHR present_info;
-    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present_info.pNext = nullptr;
+    VkSubmitInfo submit_info { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    submit_info.waitSemaphoreCount   = 1;
+    submit_info.pWaitSemaphores      = &vk.image_acquired;
+    submit_info.pWaitDstStageMask    = &wait_dst_stage_mask;
+    submit_info.commandBufferCount   = 1;
+    submit_info.pCommandBuffers      = &vk.command_buffer;
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores    = &vk.rendering_finished;
+
+    START_TIMER
+    VK_CHECK(vkQueueSubmit(vk.queue, 1, &submit_info, vk.rendering_finished_fence));
+    STOP_TIMER("vkQueueSubmit")
+
+    VkPresentInfoKHR present_info { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &vk.rendering_finished;
-    present_info.swapchainCount = 1;
-    present_info.pSwapchains = &vk.swapchain;
-    present_info.pImageIndices = &vk.swapchain_image_index;
-    present_info.pResults = nullptr;
-	START_TIMER
+    present_info.pWaitSemaphores    = &vk.rendering_finished;
+    present_info.swapchainCount     = 1;
+    present_info.pSwapchains        = &vk.swapchain;
+    present_info.pImageIndices      = &vk.swapchain_image_index;
+
+    START_TIMER
     VK_CHECK(vkQueuePresentKHR(vk.queue, &present_info));
-	STOP_TIMER("vkQueuePresentKHR")
+    STOP_TIMER("vkQueuePresentKHR")
 }

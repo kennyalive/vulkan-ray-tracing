@@ -74,10 +74,6 @@ void vk_end_frame();
 
 void vk_record_and_run_commands(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder);
 
-void vk_record_buffer_memory_barrier(VkCommandBuffer cb, VkBuffer buffer,
-                                     VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages,
-                                     VkAccessFlags src_access, VkAccessFlags dst_access);
-
 // Vk_Instance contains vulkan resources that do not depend on applicaton logic.
 // This structure is initialized/deinitialized by vk_initialize/vk_shutdown functions correspondingly.
 struct Vk_Instance {
