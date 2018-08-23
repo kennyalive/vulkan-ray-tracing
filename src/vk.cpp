@@ -6,7 +6,6 @@
 #include <array>
 #include <algorithm>
 #include <cassert>
-#include <chrono>
 #include <functional>
 #include <iostream>
 #include <vector>
@@ -17,19 +16,17 @@ static VkSwapchainKHR create_swapchain(VkPhysicalDevice physical_device, VkDevic
     VkSurfaceCapabilitiesKHR surface_caps;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_caps));
 
-    VkExtent2D image_extent = surface_caps.currentExtent;
-    if (image_extent.width == 0xffffffff && image_extent.height == 0xffffffff) {
-        image_extent.width = std::min(surface_caps.maxImageExtent.width, std::max(surface_caps.minImageExtent.width, 640u));
-        image_extent.height = std::min(surface_caps.maxImageExtent.height, std::max(surface_caps.minImageExtent.height, 480u));
-    }
+    const VkExtent2D image_extent = surface_caps.currentExtent;
+
+    // don't expect special value described in spec on Win32
+    assert(image_extent.width != 0xffffffff && image_extent.height != 0xffffffff);
+
+    // we should not try to create a swapchain when window is minimized
+    assert(image_extent.width != 0 && image_extent.height != 0);
 
     // VK_IMAGE_USAGE_TRANSFER_DST_BIT is required by image clear operations.
     if ((surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
         error("create_swapchain: VK_IMAGE_USAGE_TRANSFER_DST_BIT is not supported by the swapchain");
-
-    // VK_IMAGE_USAGE_TRANSFER_SRC_BIT is required in order to take screenshots.
-    if ((surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0)
-        error("create_swapchain: VK_IMAGE_USAGE_TRANSFER_SRC_BIT is not supported by the swapchain");
 
     // determine present mode and swapchain image count
     uint32_t present_mode_count;
@@ -63,25 +60,19 @@ static VkSwapchainKHR create_swapchain(VkPhysicalDevice physical_device, VkDevic
     }
 
     // create swap chain
-    VkSwapchainCreateInfoKHR desc;
-    desc.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    desc.pNext = nullptr;
-    desc.flags = 0;
-    desc.surface = surface;
-    desc.minImageCount = image_count;
-    desc.imageFormat = surface_format.format;
-    desc.imageColorSpace = surface_format.colorSpace;
-    desc.imageExtent = image_extent;
-    desc.imageArrayLayers = 1;
-    desc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    desc.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    desc.queueFamilyIndexCount = 0;
-    desc.pQueueFamilyIndices = nullptr;
-    desc.preTransform = surface_caps.currentTransform;
-    desc.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    desc.presentMode = present_mode;
-    desc.clipped = VK_TRUE;
-    desc.oldSwapchain = VK_NULL_HANDLE;
+    VkSwapchainCreateInfoKHR desc { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
+    desc.surface            = surface;
+    desc.minImageCount      = image_count;
+    desc.imageFormat        = surface_format.format;
+    desc.imageColorSpace    = surface_format.colorSpace;
+    desc.imageExtent        = image_extent;
+    desc.imageArrayLayers   = 1;
+    desc.imageUsage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    desc.imageSharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+    desc.preTransform       = surface_caps.currentTransform;
+    desc.compositeAlpha     = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    desc.presentMode        = present_mode;
+    desc.clipped            = VK_TRUE;
 
     VkSwapchainKHR swapchain;
     VK_CHECK(vkCreateSwapchainKHR(device, &desc, nullptr, &swapchain));
@@ -283,13 +274,9 @@ static void create_device() {
         std::vector<VkSurfaceFormatKHR> candidates(format_count);
         VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physical_device, vk.surface, &format_count, candidates.data()));
 
-        
-        if (candidates.size() == 1 && candidates[0].format == VK_FORMAT_UNDEFINED) { // special case that means we can choose any format
-            vk.surface_format.format = VK_FORMAT_R8G8B8A8_UNORM;
-            vk.surface_format.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-        } else {
-            vk.surface_format = candidates[0];
-        }
+        // don't support special case described in the spec
+        assert(!(candidates.size() == 1 && candidates[0].format == VK_FORMAT_UNDEFINED));
+        vk.surface_format = candidates[0];
     }
 
     // select queue family
