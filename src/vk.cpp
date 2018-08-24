@@ -276,7 +276,26 @@ static void create_device() {
 
         // don't support special case described in the spec
         assert(!(candidates.size() == 1 && candidates[0].format == VK_FORMAT_UNDEFINED));
-        vk.surface_format = candidates[0];
+
+        VkFormat supported_srgb_formats[] = {
+            VK_FORMAT_B8G8R8A8_SRGB,
+            VK_FORMAT_R8G8B8A8_SRGB,
+            VK_FORMAT_A8B8G8R8_SRGB_PACK32
+        };
+
+        [&candidates, &supported_srgb_formats]() {
+            for (VkFormat srgb_format : supported_srgb_formats) {
+                for (VkSurfaceFormatKHR surface_format : candidates) {
+                    if (surface_format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                        continue;
+                    if (surface_format.format == srgb_format) {
+                        vk.surface_format = surface_format;
+                        return;
+                    }
+                }
+            }
+            error("Failed to find supported surface format");
+        } ();
     }
 
     // select queue family

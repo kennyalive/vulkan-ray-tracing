@@ -54,7 +54,7 @@ void Vk_Demo::upload_textures() {
         auto rgba_pixels = stbi_load(path.c_str(), &w, &h, &component_count,STBI_rgb_alpha);
         if (rgba_pixels == nullptr)
             error("failed to load image file: " + path);
-        Vk_Image texture = vk_create_texture(w, h, VK_FORMAT_R8G8B8A8_UNORM, true, rgba_pixels, 4, path.c_str());
+        Vk_Image texture = vk_create_texture(w, h, VK_FORMAT_R8G8B8A8_SRGB, true, rgba_pixels, 4, path.c_str());
         stbi_image_free(rgba_pixels);
         return texture;
     };
@@ -408,7 +408,7 @@ void Vk_Demo::run_frame() {
 
     // Prepare render pass instance.
     VkClearValue clear_values[2];
-    clear_values[0].color = {0.6f, 0.6f, 0.66f, 0.0f};
+    clear_values[0].color = {0.32f, 0.32f, 0.4f, 0.0f};
     clear_values[1].depthStencil.depth = 1.0;
     clear_values[1].depthStencil.stencil = 0;
 
