@@ -1,4 +1,5 @@
 #include "common.h"
+#include "debug.h"
 #include "resource_manager.h"
 #include "vk.h"
 

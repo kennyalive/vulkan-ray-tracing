@@ -91,6 +91,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\common.cpp" />
+    <ClCompile Include="src\debug.cpp" />
     <ClCompile Include="src\geometry.cpp" />
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\main.cpp" />

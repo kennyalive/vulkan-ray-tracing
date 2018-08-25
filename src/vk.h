@@ -11,13 +11,13 @@
 #define SDL_MAIN_HANDLED
 #include "sdl/SDL_syswm.h"
 
+#include "common.h"
+
 #define VK_CHECK(function_call) { \
     VkResult result = function_call; \
     if (result < 0) \
         error("Vulkan: error code " + std::to_string(result) + " returned by " + #function_call); \
 }
-
-#include "debug.h"
 
 #include <functional>
 #include <string>
@@ -77,48 +77,47 @@ void vk_record_and_run_commands(VkCommandPool command_pool, VkQueue queue, std::
 // Vk_Instance contains vulkan resources that do not depend on applicaton logic.
 // This structure is initialized/deinitialized by vk_initialize/vk_shutdown functions correspondingly.
 struct Vk_Instance {
-    SDL_SysWMinfo system_window_info;
-    HMODULE vulkan_library = NULL;
-    int surface_width = 0;
-    int surface_height = 0;
+    SDL_SysWMinfo           system_window_info;
+    HMODULE                 vulkan_library;
+    int                     surface_width;
+    int                     surface_height;
 
-    VkInstance instance = VK_NULL_HANDLE;
-    VkPhysicalDevice physical_device = VK_NULL_HANDLE;
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
-    VkSurfaceFormatKHR surface_format = {};
+    VkInstance              instance;
+    VkPhysicalDevice        physical_device;
+    uint32_t                queue_family_index;
+    VkDevice                device;
+    VkQueue                 queue;
 
-    uint32_t queue_family_index = 0;
-    VkDevice device = VK_NULL_HANDLE;
-    VkQueue queue = VK_NULL_HANDLE;
+    VmaAllocator            allocator;
 
-    VmaAllocator allocator;
-
-    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-    std::vector<VkImage> swapchain_images;
+    VkSurfaceKHR            surface;
+    VkSurfaceFormatKHR      surface_format;
+    VkSwapchainKHR          swapchain;
+    std::vector<VkImage>    swapchain_images;
     std::vector<VkImageView> swapchain_image_views;
 
-    uint32_t swapchain_image_index = -1; // current swapchain image
+    uint32_t                swapchain_image_index = -1; // current swapchain image
 
-    VkSemaphore image_acquired = VK_NULL_HANDLE;
-    VkSemaphore rendering_finished = VK_NULL_HANDLE;
-    VkFence rendering_finished_fence = VK_NULL_HANDLE;
+    VkCommandPool           command_pool;
+    VkCommandBuffer         command_buffer;
 
-    VkCommandPool command_pool = VK_NULL_HANDLE;
-    VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+    VkSemaphore             image_acquired;
+    VkSemaphore             rendering_finished;
+    VkFence                 rendering_finished_fence;
 
-    VkImage depth_image = VK_NULL_HANDLE;
-    VmaAllocation depth_image_allocation = VK_NULL_HANDLE;
-    VkFormat depth_image_format = VK_FORMAT_UNDEFINED;
-    VkImageView depth_image_view = VK_NULL_HANDLE;
+    VkImage                 depth_image;
+    VmaAllocation           depth_image_allocation;
+    VkFormat                depth_image_format;
+    VkImageView             depth_image_view;
 
     std::vector<Vk_Pipeline_Def> pipeline_defs;
     std::vector<VkPipeline> pipelines;
 
     // Host visible memory used to copy image data to device local memory.
-    VkBuffer staging_buffer = VK_NULL_HANDLE;
-    VmaAllocation staging_buffer_allocation = VK_NULL_HANDLE;
-    VkDeviceSize staging_buffer_size = 0;
-    uint8_t* staging_buffer_ptr = nullptr; // pointer to mapped staging buffer
+    VkBuffer                staging_buffer;
+    VmaAllocation           staging_buffer_allocation;
+    VkDeviceSize            staging_buffer_size;
+    uint8_t*                staging_buffer_ptr; // pointer to mapped staging buffer
 
 #ifndef NDEBUG
     VkDebugUtilsMessengerEXT debug_utils_messenger = nullptr;

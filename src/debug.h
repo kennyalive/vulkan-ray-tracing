@@ -1,9 +1,10 @@
 #pragma once
 
-#ifdef _WIN32
-#define VK_USE_PLATFORM_WIN32_KHR
-#endif
-#include "volk.h"
+#include "vk.h"
+
+void vk_create_debug_utils_messenger();
+void vk_destroy_debug_utils_messenger();
+
 
 template <typename Vk_Object_Type>
 void vk_set_debug_name(Vk_Object_Type object, const char* name) {
