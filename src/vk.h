@@ -23,8 +23,6 @@
 #include <string>
 #include <vector>
 
-void set_window_title(const std::string&);
-
 struct Vk_Pipeline_Def {
     VkShaderModule vs_module = VK_NULL_HANDLE;
     VkShaderModule fs_module = VK_NULL_HANDLE;
