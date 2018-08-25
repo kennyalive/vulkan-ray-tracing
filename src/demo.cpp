@@ -119,26 +119,24 @@ Vk_Demo::~Vk_Demo() {
 }
 
 static VkRenderPass create_render_pass() {
-    VkAttachmentDescription attachments[2];
-    attachments[0].flags = 0;
-    attachments[0].format =  vk.surface_format.format;
-    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    VkAttachmentDescription attachments[2] = {};
+    attachments[0].format           = vk.surface_format.format;
+    attachments[0].samples          = VK_SAMPLE_COUNT_1_BIT;
+    attachments[0].loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[0].storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[0].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[0].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[0].initialLayout    = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[0].finalLayout      = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-    attachments[1].flags = 0;
-    attachments[1].format = vk.depth_image_format;
-    attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    attachments[1].format           = vk.depth_image_format;
+    attachments[1].samples          = VK_SAMPLE_COUNT_1_BIT;
+    attachments[1].loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[1].storeOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[1].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[1].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[1].initialLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    attachments[1].finalLayout      = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference color_attachment_ref;
     color_attachment_ref.attachment = 0;
@@ -148,28 +146,17 @@ static VkRenderPass create_render_pass() {
     depth_attachment_ref.attachment = 1;
     depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-    VkSubpassDescription subpass;
-    subpass.flags = 0;
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.inputAttachmentCount = 0;
-    subpass.pInputAttachments = nullptr;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment_ref;
-    subpass.pResolveAttachments = nullptr;
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount    = 1;
+    subpass.pColorAttachments       = &color_attachment_ref;
     subpass.pDepthStencilAttachment = &depth_attachment_ref;
-    subpass.preserveAttachmentCount = 0;
-    subpass.pPreserveAttachments = nullptr;
 
-    VkRenderPassCreateInfo desc;
-    desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    desc.pNext = nullptr;
-    desc.flags = 0;
+    VkRenderPassCreateInfo desc{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
     desc.attachmentCount = sizeof(attachments) / sizeof(attachments[0]);
-    desc.pAttachments = attachments;
-    desc.subpassCount = 1;
-    desc.pSubpasses = &subpass;
-    desc.dependencyCount = 0;
-    desc.pDependencies = nullptr;
+    desc.pAttachments    = attachments;
+    desc.subpassCount    = 1;
+    desc.pSubpasses      = &subpass;
 
     return get_resource_manager()->create_render_pass(desc, "main render pass");
 }
@@ -180,18 +167,15 @@ void Vk_Demo::create_render_passes() {
     //
     // Create framebuffers to use with the renderpasses.
     //
-    VkFramebufferCreateInfo desc;
-    desc.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    desc.pNext = nullptr;
-    desc.flags = 0;
-    desc.width = vk.surface_width;
+    VkFramebufferCreateInfo desc{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+    desc.width  = vk.surface_width;
     desc.height = vk.surface_height;
     desc.layers = 1;
 
     std::array<VkImageView, 2> attachments {VK_NULL_HANDLE, vk.depth_image_view};
     desc.attachmentCount = static_cast<uint32_t>(attachments.size());
-    desc.pAttachments = attachments.data();
-    desc.renderPass = render_pass;
+    desc.pAttachments    = attachments.data();
+    desc.renderPass      = render_pass;
 
     swapchain_framebuffers.resize(vk.swapchain_images.size());
     for (size_t i = 0; i < vk.swapchain_images.size(); i++) {
@@ -201,7 +185,6 @@ void Vk_Demo::create_render_passes() {
 }
 
 void Vk_Demo::create_descriptor_sets() {
-
     //
     // Descriptor pool.
     //
@@ -229,37 +212,34 @@ void Vk_Demo::create_descriptor_sets() {
     // buffer set layout
     {
         VkDescriptorSetLayoutBinding descriptor_binding;
-        descriptor_binding.binding = 0;
-        descriptor_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptor_binding.descriptorCount = 1;
-        descriptor_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        descriptor_binding.pImmutableSamplers = nullptr;
+        descriptor_binding.binding              = 0;
+        descriptor_binding.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_binding.descriptorCount      = 1;
+        descriptor_binding.stageFlags           = VK_SHADER_STAGE_VERTEX_BIT;
+        descriptor_binding.pImmutableSamplers   = nullptr;
 
-        VkDescriptorSetLayoutCreateInfo desc;
-        desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        desc.pNext = nullptr;
-        desc.flags = 0;
-        desc.bindingCount = 1;
-        desc.pBindings = &descriptor_binding;
+        VkDescriptorSetLayoutCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        desc.bindingCount   = 1;
+        desc.pBindings      = &descriptor_binding;
         buffer_set_layout = get_resource_manager()->create_descriptor_set_layout(desc, "buffer set layout");
     }
 
     // image set layout
     {
         VkDescriptorSetLayoutBinding bindings[2] = {};
-        bindings[0].binding = 0;
-        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        bindings[0].binding         = 0;
+        bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         bindings[0].descriptorCount = 1;
-        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        bindings[0].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        bindings[1].binding = 1;
-        bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+        bindings[1].binding         = 1;
+        bindings[1].descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLER;
         bindings[1].descriptorCount = 1;
-        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        bindings[1].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        desc.bindingCount = 2;
-        desc.pBindings = bindings;
+        desc.bindingCount   = 2;
+        desc.pBindings      = bindings;
         image_set_layout = get_resource_manager()->create_descriptor_set_layout(desc, "image set layout");
     }
 
@@ -270,9 +250,9 @@ void Vk_Demo::create_descriptor_sets() {
     // buffer set
     {
         VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-        desc.descriptorPool = descriptor_pool;
+        desc.descriptorPool     = descriptor_pool;
         desc.descriptorSetCount = 1;
-        desc.pSetLayouts = &buffer_set_layout;
+        desc.pSetLayouts        = &buffer_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &buffer_set));
 
         VkDescriptorBufferInfo buffer_info;
@@ -280,17 +260,13 @@ void Vk_Demo::create_descriptor_sets() {
         buffer_info.offset = 0;
         buffer_info.range = sizeof(Uniform_Buffer);
 
-        VkWriteDescriptorSet descriptor_write;
-        descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_write.pNext = nullptr;
-        descriptor_write.dstSet = buffer_set;
-        descriptor_write.dstBinding = 0;
-        descriptor_write.dstArrayElement = 0;
-        descriptor_write.descriptorCount = 1;
-        descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptor_write.pImageInfo = nullptr;
-        descriptor_write.pBufferInfo = &buffer_info;
-        descriptor_write.pTexelBufferView = nullptr;
+        VkWriteDescriptorSet descriptor_write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+        descriptor_write.dstSet             = buffer_set;
+        descriptor_write.dstBinding         = 0;
+        descriptor_write.dstArrayElement    = 0;
+        descriptor_write.descriptorCount    = 1;
+        descriptor_write.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_write.pBufferInfo        = &buffer_info;
 
         vkUpdateDescriptorSets(vk.device, 1, &descriptor_write, 0, nullptr);
     }
@@ -311,21 +287,21 @@ void Vk_Demo::create_descriptor_sets() {
             image_infos[1].sampler = sampler;
 
             VkWriteDescriptorSet descriptor_writes[2] = {};
-            descriptor_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptor_writes[0].dstSet = set;
-            descriptor_writes[0].dstBinding = 0;
-            descriptor_writes[0].dstArrayElement = 0;
-            descriptor_writes[0].descriptorCount = 1;
-            descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-            descriptor_writes[0].pImageInfo = &image_infos[0];
+            descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptor_writes[0].dstSet             = set;
+            descriptor_writes[0].dstBinding         = 0;
+            descriptor_writes[0].dstArrayElement    = 0;
+            descriptor_writes[0].descriptorCount    = 1;
+            descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+            descriptor_writes[0].pImageInfo         = &image_infos[0];
 
-            descriptor_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptor_writes[1].dstSet = set;
-            descriptor_writes[1].dstBinding = 1;
-            descriptor_writes[1].dstArrayElement = 0;
-            descriptor_writes[1].descriptorCount = 1;
-            descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-            descriptor_writes[1].pImageInfo = &image_infos[1];
+            descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptor_writes[1].dstSet             = set;
+            descriptor_writes[1].dstBinding         = 1;
+            descriptor_writes[1].dstArrayElement    = 0;
+            descriptor_writes[1].descriptorCount    = 1;
+            descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER;
+            descriptor_writes[1].pImageInfo         = &image_infos[1];
 
             vkUpdateDescriptorSets(vk.device, 2, descriptor_writes, 0, nullptr);
         };
@@ -412,33 +388,25 @@ void Vk_Demo::run_frame() {
     clear_values[1].depthStencil.depth = 1.0;
     clear_values[1].depthStencil.stencil = 0;
 
-    VkRenderPassBeginInfo render_pass_begin_info;
-    render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    render_pass_begin_info.pNext = nullptr;
+    VkRenderPassBeginInfo render_pass_begin_info { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+    render_pass_begin_info.renderPass        = render_pass;
+    render_pass_begin_info.framebuffer       = swapchain_framebuffers[vk.swapchain_image_index];
     render_pass_begin_info.renderArea.offset = { 0, 0 };
     render_pass_begin_info.renderArea.extent = { (uint32_t)vk.surface_width, (uint32_t)vk.surface_height };
-    render_pass_begin_info.clearValueCount = 2;
-    render_pass_begin_info.pClearValues = clear_values;
+    render_pass_begin_info.clearValueCount   = 2;
+    render_pass_begin_info.pClearValues      = clear_values;
 
-    // Render scene
-    {
-        render_pass_begin_info.renderPass = render_pass;
-        render_pass_begin_info.framebuffer = swapchain_framebuffers[vk.swapchain_image_index];
-        vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
-        // model
-        {
-            const VkDeviceSize offset = 0;
-            std::array<VkDescriptorSet, 2> sets = {buffer_set, texture_set};
-            vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer, &offset);
-            vkCmdBindIndexBuffer(vk.command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
-            vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, (uint32_t)sets.size(), sets.data(), 0, nullptr);
-            vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
-        }
+    // Draw model.
+    const VkDeviceSize offset = 0;
+    std::array<VkDescriptorSet, 2> sets = {buffer_set, texture_set};
+    vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer, &offset);
+    vkCmdBindIndexBuffer(vk.command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, (uint32_t)sets.size(), sets.data(), 0, nullptr);
+    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
 
-        vkCmdEndRenderPass(vk.command_buffer);
-    }
-
+    vkCmdEndRenderPass(vk.command_buffer);
     vk_end_frame();
 }
