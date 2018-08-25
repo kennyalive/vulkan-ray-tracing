@@ -8,5 +8,3 @@ build/Release/intermediate/
 *.iobj
 src/shaders/tools/bin2hex.obj
 third_party/dxc/
-build/Debug/spirv/
-build/Release/spirv/
