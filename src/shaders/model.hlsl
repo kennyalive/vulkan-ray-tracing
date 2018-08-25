@@ -3,10 +3,10 @@ cbuffer Constants {
     float4x4 mvp;
 };
 
-[[vk::binding(0, 1)]]
+[[vk::binding(1, 0)]]
 Texture2D texture;
 
-[[vk::binding(1, 1)]]
+[[vk::binding(2, 0)]]
 SamplerState texture_sampler;
 
 struct VS2PS {

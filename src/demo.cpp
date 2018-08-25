@@ -190,141 +190,100 @@ void Vk_Demo::create_descriptor_sets() {
     //
     {
         std::array<VkDescriptorPoolSize, 3> pool_sizes;
-        pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        pool_sizes[0].descriptorCount = 16;
-        pool_sizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        pool_sizes[1].descriptorCount = 16;
-        pool_sizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLER;
-        pool_sizes[2].descriptorCount = 16;
+        pool_sizes[0].type              = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        pool_sizes[0].descriptorCount   = 16;
+        pool_sizes[1].type              = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        pool_sizes[1].descriptorCount   = 16;
+        pool_sizes[2].type              = VK_DESCRIPTOR_TYPE_SAMPLER;
+        pool_sizes[2].descriptorCount   = 16;
 
-        VkDescriptorPoolCreateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-        desc.maxSets = 32;
-        desc.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
-        desc.pPoolSizes = pool_sizes.data();
+        VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        desc.maxSets        = 32;
+        desc.poolSizeCount  = static_cast<uint32_t>(pool_sizes.size());
+        desc.pPoolSizes     = pool_sizes.data();
 
         descriptor_pool = get_resource_manager()->create_descriptor_pool(desc, "global descriptor pool");
     }
 
     //
-    // Set layouts.
+    // Descriptor set layouts.
     //
-
-    // buffer set layout
     {
-        VkDescriptorSetLayoutBinding descriptor_binding;
-        descriptor_binding.binding              = 0;
-        descriptor_binding.descriptorType       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptor_binding.descriptorCount      = 1;
-        descriptor_binding.stageFlags           = VK_SHADER_STAGE_VERTEX_BIT;
-        descriptor_binding.pImmutableSamplers   = nullptr;
-
-        VkDescriptorSetLayoutCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        desc.bindingCount   = 1;
-        desc.pBindings      = &descriptor_binding;
-        buffer_set_layout = get_resource_manager()->create_descriptor_set_layout(desc, "buffer set layout");
-    }
-
-    // image set layout
-    {
-        VkDescriptorSetLayoutBinding bindings[2] = {};
+        VkDescriptorSetLayoutBinding bindings[3] = {};
         bindings[0].binding         = 0;
-        bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         bindings[0].descriptorCount = 1;
-        bindings[0].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+        bindings[0].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
 
         bindings[1].binding         = 1;
-        bindings[1].descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLER;
+        bindings[1].descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         bindings[1].descriptorCount = 1;
         bindings[1].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayoutCreateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        desc.bindingCount   = 2;
+        bindings[2].binding         = 2;
+        bindings[2].descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLER;
+        bindings[2].descriptorCount = 1;
+        bindings[2].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        desc.bindingCount   = sizeof(bindings) / sizeof(bindings[0]);
         desc.pBindings      = bindings;
-        image_set_layout = get_resource_manager()->create_descriptor_set_layout(desc, "image set layout");
+        descriptor_set_layout = get_resource_manager()->create_descriptor_set_layout(desc, "Main descriptor set layout");
     }
 
     //
     // Descriptor sets.
     //
-
-    // buffer set
     {
         VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
         desc.descriptorPool     = descriptor_pool;
         desc.descriptorSetCount = 1;
-        desc.pSetLayouts        = &buffer_set_layout;
-        VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &buffer_set));
+        desc.pSetLayouts        = &descriptor_set_layout;
+        VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
 
         VkDescriptorBufferInfo buffer_info;
-        buffer_info.buffer = uniform_buffer;
-        buffer_info.offset = 0;
-        buffer_info.range = sizeof(Uniform_Buffer);
+        buffer_info.buffer  = uniform_buffer;
+        buffer_info.offset  = 0;
+        buffer_info.range   = sizeof(Uniform_Buffer);
 
-        VkWriteDescriptorSet descriptor_write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-        descriptor_write.dstSet             = buffer_set;
-        descriptor_write.dstBinding         = 0;
-        descriptor_write.dstArrayElement    = 0;
-        descriptor_write.descriptorCount    = 1;
-        descriptor_write.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptor_write.pBufferInfo        = &buffer_info;
+        VkDescriptorImageInfo image_info = {};
+        image_info.imageView    = texture.view;
+        image_info.imageLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        vkUpdateDescriptorSets(vk.device, 1, &descriptor_write, 0, nullptr);
-    }
+        VkDescriptorImageInfo sampler_info = {};
+        sampler_info.sampler = sampler;
 
-    // image sets
-    {
-        VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-        desc.descriptorPool = descriptor_pool;
-        desc.descriptorSetCount = 1;
-        desc.pSetLayouts = &image_set_layout;
+        VkWriteDescriptorSet descriptor_writes[3] = {};
+        descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[0].dstSet             = descriptor_set;
+        descriptor_writes[0].dstBinding         = 0;
+        descriptor_writes[0].descriptorCount    = 1;
+        descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_writes[0].pBufferInfo        = &buffer_info;
 
-        VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &texture_set));
+        descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[1].dstSet             = descriptor_set;
+        descriptor_writes[1].dstBinding         = 1;
+        descriptor_writes[1].descriptorCount    = 1;
+        descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        descriptor_writes[1].pImageInfo         = &image_info;
 
-        auto update_set = [](VkDescriptorSet set, VkImageView image_view, VkSampler sampler) {
-            VkDescriptorImageInfo image_infos[2] = {};
-            image_infos[0].imageView = image_view;
-            image_infos[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            image_infos[1].sampler = sampler;
+        descriptor_writes[2].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[2].dstSet             = descriptor_set;
+        descriptor_writes[2].dstBinding         = 2;
+        descriptor_writes[2].descriptorCount    = 1;
+        descriptor_writes[2].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER;
+        descriptor_writes[2].pImageInfo         = &sampler_info;
 
-            VkWriteDescriptorSet descriptor_writes[2] = {};
-            descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptor_writes[0].dstSet             = set;
-            descriptor_writes[0].dstBinding         = 0;
-            descriptor_writes[0].dstArrayElement    = 0;
-            descriptor_writes[0].descriptorCount    = 1;
-            descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-            descriptor_writes[0].pImageInfo         = &image_infos[0];
-
-            descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptor_writes[1].dstSet             = set;
-            descriptor_writes[1].dstBinding         = 1;
-            descriptor_writes[1].dstArrayElement    = 0;
-            descriptor_writes[1].descriptorCount    = 1;
-            descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER;
-            descriptor_writes[1].pImageInfo         = &image_infos[1];
-
-            vkUpdateDescriptorSets(vk.device, 2, descriptor_writes, 0, nullptr);
-        };
-
-        update_set(texture_set, texture.view, sampler);
+        vkUpdateDescriptorSets(vk.device, 3, descriptor_writes, 0, nullptr);
     }
 }
 
 void Vk_Demo::create_pipeline_layouts() {
-    VkPipelineLayoutCreateInfo desc;
-    desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    desc.pNext = nullptr;
-    desc.flags = 0;
+    VkPipelineLayoutCreateInfo desc{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
     desc.setLayoutCount = 1;
-    desc.pushConstantRangeCount = 0;
-    desc.pPushConstantRanges = nullptr;
-
-    {
-        std::array<VkDescriptorSetLayout, 2> set_layouts {buffer_set_layout, image_set_layout};
-        desc.setLayoutCount = static_cast<uint32_t>(set_layouts.size());
-        desc.pSetLayouts = set_layouts.data();
-        pipeline_layout = get_resource_manager()->create_pipeline_layout(desc, "the only pipeline layout");
-    }
+    desc.pSetLayouts = &descriptor_set_layout;
+    pipeline_layout = get_resource_manager()->create_pipeline_layout(desc, "Main pipeline layout");
 }
 
 void Vk_Demo::create_shader_modules() {
@@ -399,11 +358,10 @@ void Vk_Demo::run_frame() {
     vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
     // Draw model.
-    const VkDeviceSize offset = 0;
-    std::array<VkDescriptorSet, 2> sets = {buffer_set, texture_set};
-    vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer, &offset);
+    const VkDeviceSize zero_offset = 0;
+    vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer, &zero_offset);
     vkCmdBindIndexBuffer(vk.command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
-    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, (uint32_t)sets.size(), sets.data(), 0, nullptr);
+    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
     vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
 

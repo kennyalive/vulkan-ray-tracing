@@ -51,12 +51,8 @@ private:
     // Descriptor sets.
     //
     VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
-
-    VkDescriptorSetLayout image_set_layout = VK_NULL_HANDLE;
-    VkDescriptorSetLayout buffer_set_layout = VK_NULL_HANDLE;
-
-    VkDescriptorSet texture_set = VK_NULL_HANDLE;
-    VkDescriptorSet buffer_set = VK_NULL_HANDLE;
+    VkDescriptorSetLayout descriptor_set_layout = VK_NULL_HANDLE;
+    VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
 
     //
     // Pipelines.
