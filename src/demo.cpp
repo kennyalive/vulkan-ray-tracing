@@ -1,5 +1,6 @@
 #include "common.h"
 #include "demo.h"
+#include "debug.h"
 #include "geometry.h"
 #include "resource_manager.h"
 #include "vk.h"
@@ -40,6 +41,7 @@ Vk_Demo::Vk_Demo(int window_width, int window_height, const SDL_SysWMinfo& windo
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &uniform_buffer_ptr, "uniform buffer to store matrices");
 
     create_render_passes();
+    create_framebuffers();
     create_descriptor_sets();
     create_pipeline_layouts();
     create_shader_modules();
@@ -114,11 +116,12 @@ void Vk_Demo::upload_geometry() {
 
 Vk_Demo::~Vk_Demo() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
+    destroy_framebuffers();
     get_resource_manager()->release_resources();
     vk_shutdown();
 }
 
-static VkRenderPass create_render_pass() {
+void Vk_Demo::create_render_passes() {
     VkAttachmentDescription attachments[2] = {};
     attachments[0].format           = vk.surface_format.format;
     attachments[0].samples          = VK_SAMPLE_COUNT_1_BIT;
@@ -140,11 +143,11 @@ static VkRenderPass create_render_pass() {
 
     VkAttachmentReference color_attachment_ref;
     color_attachment_ref.attachment = 0;
-    color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment_ref.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference depth_attachment_ref;
     depth_attachment_ref.attachment = 1;
-    depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depth_attachment_ref.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -158,15 +161,10 @@ static VkRenderPass create_render_pass() {
     desc.subpassCount    = 1;
     desc.pSubpasses      = &subpass;
 
-    return get_resource_manager()->create_render_pass(desc, "main render pass");
+    render_pass = get_resource_manager()->create_render_pass(desc, "Main render pass");
 }
 
-void Vk_Demo::create_render_passes() {
-    render_pass = create_render_pass();
-
-    //
-    // Create framebuffers to use with the renderpasses.
-    //
+void Vk_Demo::create_framebuffers() {
     VkFramebufferCreateInfo desc{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
     desc.width  = vk.surface_width;
     desc.height = vk.surface_height;
@@ -177,11 +175,20 @@ void Vk_Demo::create_render_passes() {
     desc.pAttachments    = attachments.data();
     desc.renderPass      = render_pass;
 
-    swapchain_framebuffers.resize(vk.swapchain_images.size());
-    for (size_t i = 0; i < vk.swapchain_images.size(); i++) {
-        attachments[0] = vk.swapchain_image_views[i]; // set color attachment
-        swapchain_framebuffers[i] = get_resource_manager()->create_framebuffer(desc, ("framebuffer for swapchain image " + std::to_string(i)).c_str());
+    swapchain_framebuffers.resize(vk.swapchain_info.images.size());
+    for (size_t i = 0; i < vk.swapchain_info.images.size(); i++) {
+        attachments[0] = vk.swapchain_info.image_views[i]; // set color attachment
+
+        VK_CHECK(vkCreateFramebuffer(vk.device, &desc, nullptr, &swapchain_framebuffers[i]));
+        vk_set_debug_name(swapchain_framebuffers[i], ("Framebuffer for swapchain image " + std::to_string(i)).c_str());
     }
+}
+
+void Vk_Demo::destroy_framebuffers() {
+    for (VkFramebuffer framebuffer : swapchain_framebuffers) {
+        vkDestroyFramebuffer(vk.device, framebuffer, nullptr);
+    }
+    swapchain_framebuffers.clear();
 }
 
 void Vk_Demo::create_descriptor_sets() {
@@ -315,13 +322,20 @@ void Vk_Demo::create_pipelines() {
     pipeline = vk_find_pipeline(def);
 }
 
-void Vk_Demo::update_uniform_buffer() {
-    static auto start_time = std::chrono::high_resolution_clock::now();
-    auto current_time = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count() / 1000.f;
+using Clock = std::chrono::high_resolution_clock;
+static std::chrono::time_point<Clock> prev_time = Clock::now();
 
+void Vk_Demo::update_uniform_buffer() {
+    // Update time.
+    std::chrono::time_point<Clock> current_time = Clock::now();
+    double time_delta = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - prev_time).count() / 1000.0;
+    prev_time = current_time;
+    static double time = 0.0;
+    time += time_delta;
+
+    // Update mvp matrix.
     Uniform_Buffer ubo;
-    glm::mat4x4 model = glm::rotate(glm::mat4(), time * glm::radians(30.0f), glm::vec3(0, 1, 0));
+    glm::mat4x4 model = glm::rotate(glm::mat4(), (float)time * glm::radians(30.0f), glm::vec3(0, 1, 0));
     glm::mat4x4 view = glm::lookAt(glm::vec3(0, 0.5, 3.0), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
     // Vulkan clip space has inverted Y and half Z.
@@ -367,4 +381,16 @@ void Vk_Demo::run_frame() {
 
     vkCmdEndRenderPass(vk.command_buffer);
     vk_end_frame();
+}
+
+void Vk_Demo::on_minimized() {
+    VK_CHECK(vkDeviceWaitIdle(vk.device));
+    destroy_framebuffers();
+    vk_on_minimized();
+}
+
+void Vk_Demo::on_restored() {
+    vk_on_restored();
+    create_framebuffers();
+    prev_time = Clock::now();
 }

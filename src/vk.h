@@ -11,13 +11,18 @@
 #define SDL_MAIN_HANDLED
 #include "sdl/SDL_syswm.h"
 
+#include "vk_enum_string_helper.h"
+
 #include "common.h"
 
 #define VK_CHECK(function_call) { \
     VkResult result = function_call; \
     if (result < 0) \
-        error("Vulkan: error code " + std::to_string(result) + " returned by " + #function_call); \
+        error(std::string("Vulkan: ") + string_VkResult(result) + " returned by " + #function_call); \
 }
+
+#define VK_CHECK_RESULT(vk_result, error_message) \
+    if (vk_result < 0) error(std::string("Vulkan error ") + string_VkResult(vk_result) + ":  " + error_message);
 
 #include <functional>
 #include <string>
@@ -54,6 +59,9 @@ void vk_initialize(const SDL_SysWMinfo& window_info);
 // Shutdown vulkan subsystem by releasing resources acquired by Vk_Instance.
 void vk_shutdown();
 
+void vk_on_minimized();
+void vk_on_restored();
+
 //
 // Resources allocation.
 //
@@ -71,6 +79,12 @@ void vk_begin_frame();
 void vk_end_frame();
 
 void vk_record_and_run_commands(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder);
+
+struct Swapchain_Info {
+    VkSwapchainKHR           handle;
+    std::vector<VkImage>     images;
+    std::vector<VkImageView> image_views;
+};
 
 // Vk_Instance contains vulkan resources that do not depend on applicaton logic.
 // This structure is initialized/deinitialized by vk_initialize/vk_shutdown functions correspondingly.
@@ -90,9 +104,7 @@ struct Vk_Instance {
 
     VkSurfaceKHR            surface;
     VkSurfaceFormatKHR      surface_format;
-    VkSwapchainKHR          swapchain;
-    std::vector<VkImage>    swapchain_images;
-    std::vector<VkImageView> swapchain_image_views;
+    Swapchain_Info          swapchain_info;
 
     uint32_t                swapchain_image_index = -1; // current swapchain image
 

@@ -13,7 +13,7 @@
 
 Vk_Instance vk;
 
-static VkSwapchainKHR create_swapchain(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surface_format) {
+static Swapchain_Info create_swapchain(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surface_format) {
     VkSurfaceCapabilitiesKHR surface_caps;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_caps));
 
@@ -45,25 +45,25 @@ static VkSwapchainKHR create_swapchain(VkPhysicalDevice physical_device, VkDevic
     }
 
     VkPresentModeKHR present_mode;
-    uint32_t image_count;
+    uint32_t min_image_count;
     if (mailbox_supported) {
         present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
-        image_count = std::max(3u, surface_caps.minImageCount);
+        min_image_count = std::max(3u, surface_caps.minImageCount);
         if (surface_caps.maxImageCount > 0) {
-            image_count = std::min(image_count, surface_caps.maxImageCount);
+            min_image_count = std::min(min_image_count, surface_caps.maxImageCount);
         }
     } else if (immediate_supported) {
         present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-        image_count = surface_caps.minImageCount;
+        min_image_count = surface_caps.minImageCount;
     } else {
         present_mode = VK_PRESENT_MODE_FIFO_KHR;
-        image_count = surface_caps.minImageCount;
+        min_image_count = surface_caps.minImageCount;
     }
 
     // create swap chain
     VkSwapchainCreateInfoKHR desc { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
     desc.surface            = surface;
-    desc.minImageCount      = image_count;
+    desc.minImageCount      = min_image_count;
     desc.imageFormat        = surface_format.format;
     desc.imageColorSpace    = surface_format.colorSpace;
     desc.imageExtent        = image_extent;
@@ -75,9 +75,44 @@ static VkSwapchainKHR create_swapchain(VkPhysicalDevice physical_device, VkDevic
     desc.presentMode        = present_mode;
     desc.clipped            = VK_TRUE;
 
-    VkSwapchainKHR swapchain;
-    VK_CHECK(vkCreateSwapchainKHR(device, &desc, nullptr, &swapchain));
-    return swapchain;
+    Swapchain_Info swapchain_info;
+    VK_CHECK(vkCreateSwapchainKHR(device, &desc, nullptr, &swapchain_info.handle));
+
+    // retrieve swapchain images
+    uint32_t image_count;
+    VK_CHECK(vkGetSwapchainImagesKHR(device, swapchain_info.handle, &image_count, nullptr));
+    swapchain_info.images.resize(image_count);
+    VK_CHECK(vkGetSwapchainImagesKHR(device, swapchain_info.handle, &image_count, swapchain_info.images.data()));
+
+    swapchain_info.image_views.resize(image_count);
+
+    for (uint32_t i = 0; i < image_count; i++) {
+        VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+        desc.image          = swapchain_info.images[i];
+        desc.viewType       = VK_IMAGE_VIEW_TYPE_2D;
+        desc.format         = surface_format.format;
+
+        desc.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        desc.subresourceRange.baseMipLevel   = 0;
+        desc.subresourceRange.levelCount     = 1;
+        desc.subresourceRange.baseArrayLayer = 0;
+        desc.subresourceRange.layerCount     = 1;
+
+        VK_CHECK(vkCreateImageView(device, &desc, nullptr, &swapchain_info.image_views[i]));
+    }
+
+    return swapchain_info;
+}
+
+static void destroy_swapchain(VkDevice device, Swapchain_Info& swapchain_info) {
+    for (auto image_view : swapchain_info.image_views) {
+        vkDestroyImageView(device, image_view, nullptr);
+    }
+    swapchain_info.images.clear();
+    swapchain_info.image_views.clear();
+
+    vkDestroySwapchainKHR(device, swapchain_info.handle, nullptr);
+    swapchain_info.handle = VK_NULL_HANDLE;
 }
 
 static void create_instance() {
@@ -342,31 +377,7 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
     //
     // Swapchain.
     //
-    {
-        vk.swapchain = create_swapchain(vk.physical_device, vk.device, vk.surface, vk.surface_format);
-
-        uint32_t image_count;
-        VK_CHECK(vkGetSwapchainImagesKHR(vk.device, vk.swapchain, &image_count, nullptr));
-        vk.swapchain_images.resize(image_count);
-        VK_CHECK(vkGetSwapchainImagesKHR(vk.device, vk.swapchain, &image_count, vk.swapchain_images.data()));
-
-        vk.swapchain_image_views.resize(image_count);
-
-        for (uint32_t i = 0; i < image_count; i++) {
-            VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-            desc.image          = vk.swapchain_images[i];
-            desc.viewType       = VK_IMAGE_VIEW_TYPE_2D;
-            desc.format         = vk.surface_format.format;
-
-            desc.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-            desc.subresourceRange.baseMipLevel   = 0;
-            desc.subresourceRange.levelCount     = 1;
-            desc.subresourceRange.baseArrayLayer = 0;
-            desc.subresourceRange.layerCount     = 1;
-
-            VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.swapchain_image_views[i]));
-        }
-    }
+    vk.swapchain_info = create_swapchain(vk.physical_device, vk.device, vk.surface, vk.surface_format);
 
     //
     // Sync primitives.
@@ -485,11 +496,7 @@ void vk_shutdown() {
 
     vkDestroyCommandPool(vk.device, vk.command_pool, nullptr);
 
-    for (auto image_view : vk.swapchain_image_views) {
-        vkDestroyImageView(vk.device, image_view, nullptr);
-    }
-    vk.swapchain_images.clear();
-    vkDestroySwapchainKHR(vk.device, vk.swapchain, nullptr);
+    destroy_swapchain(vk.device, vk.swapchain_info);
 
     vkDestroySemaphore(vk.device, vk.image_acquired, nullptr);
     vkDestroySemaphore(vk.device, vk.rendering_finished, nullptr);
@@ -505,6 +512,18 @@ void vk_shutdown() {
 #endif
 
     vkDestroyInstance(vk.instance, nullptr);
+}
+
+void vk_on_minimized() {
+    destroy_swapchain(vk.device, vk.swapchain_info);
+
+}
+
+void vk_on_restored() {
+    assert(vk.swapchain_info.handle == VK_NULL_HANDLE);
+    assert(vk.swapchain_info.images.empty());
+    assert(vk.swapchain_info.image_views.empty());
+    vk.swapchain_info = create_swapchain(vk.physical_device, vk.device, vk.surface, vk.surface_format);
 }
 
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
@@ -865,9 +884,9 @@ VkPipeline vk_find_pipeline(const Vk_Pipeline_Def& def) {
 }
 
 void vk_begin_frame() {
-	START_TIMER
-    VK_CHECK(vkAcquireNextImageKHR(vk.device, vk.swapchain, UINT64_MAX, vk.image_acquired, VK_NULL_HANDLE, &vk.swapchain_image_index));
-	STOP_TIMER("vkAcquireNextImageKHR")
+    START_TIMER
+    VK_CHECK(vkAcquireNextImageKHR(vk.device, vk.swapchain_info.handle, UINT64_MAX, vk.image_acquired, VK_NULL_HANDLE, &vk.swapchain_image_index));
+    STOP_TIMER("vkAcquireNextImageKHR")
 
     VK_CHECK(vkWaitForFences(vk.device, 1, &vk.rendering_finished_fence, VK_FALSE, std::numeric_limits<uint64_t>::max()));
     VK_CHECK(vkResetFences(vk.device, 1, &vk.rendering_finished_fence));
@@ -899,7 +918,7 @@ void vk_end_frame() {
     present_info.waitSemaphoreCount = 1;
     present_info.pWaitSemaphores    = &vk.rendering_finished;
     present_info.swapchainCount     = 1;
-    present_info.pSwapchains        = &vk.swapchain;
+    present_info.pSwapchains        = &vk.swapchain_info.handle;
     present_info.pImageIndices      = &vk.swapchain_image_index;
 
     START_TIMER

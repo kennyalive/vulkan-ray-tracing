@@ -12,11 +12,18 @@ public:
 
     void run_frame();
 
+    void on_minimized();
+    void on_restored();
+
 private:
     void upload_textures();
     void upload_geometry();
 
     void create_render_passes();
+
+    void create_framebuffers();
+    void destroy_framebuffers();
+
     void create_descriptor_sets();
     void create_pipeline_layouts();
     void create_shader_modules();
@@ -25,44 +32,26 @@ private:
     void update_uniform_buffer();
 
 private:
-    //
-    // Textures.
-    //
-    VkSampler               sampler = VK_NULL_HANDLE;
-    Vk_Image                texture;
-   
-    //
-    // Buffers.
-    //
-    VkBuffer                uniform_buffer = VK_NULL_HANDLE;
-    void*                   uniform_buffer_ptr = nullptr;
+    VkSampler                   sampler                 = VK_NULL_HANDLE;
+    Vk_Image                    texture;
 
-    VkBuffer                vertex_buffer = VK_NULL_HANDLE;
-    VkBuffer                index_buffer = VK_NULL_HANDLE;
-    uint32_t                model_index_count = 0;
+    VkBuffer                    uniform_buffer          = VK_NULL_HANDLE;
+    void*                       uniform_buffer_ptr      = nullptr;
 
-    //
-    // Render passes.
-    //
-    VkRenderPass            render_pass = VK_NULL_HANDLE;
-    std::vector<VkFramebuffer> swapchain_framebuffers;
+    VkBuffer                    vertex_buffer           = VK_NULL_HANDLE;
+    VkBuffer                    index_buffer            = VK_NULL_HANDLE;
+    uint32_t                    model_index_count       = 0;
 
-    //
-    // Descriptor sets.
-    //
-    VkDescriptorPool        descriptor_pool = VK_NULL_HANDLE;
-    VkDescriptorSetLayout   descriptor_set_layout = VK_NULL_HANDLE;
-    VkDescriptorSet         descriptor_set = VK_NULL_HANDLE;
+    VkRenderPass                render_pass             = VK_NULL_HANDLE;
+    std::vector<VkFramebuffer>  swapchain_framebuffers;
 
-    //
-    // Pipelines.
-    //
-    VkPipelineLayout        pipeline_layout = VK_NULL_HANDLE;
-    VkPipeline              pipeline = VK_NULL_HANDLE;
+    VkDescriptorPool            descriptor_pool         = VK_NULL_HANDLE;
+    VkDescriptorSetLayout       descriptor_set_layout   = VK_NULL_HANDLE;
+    VkDescriptorSet             descriptor_set          = VK_NULL_HANDLE;
 
-    //
-    // Shader modules.
-    //
-    VkShaderModule          model_vs = VK_NULL_HANDLE;
-    VkShaderModule          model_fs = VK_NULL_HANDLE;
+    VkShaderModule              model_vs                = VK_NULL_HANDLE;
+    VkShaderModule              model_fs                = VK_NULL_HANDLE;
+
+    VkPipelineLayout            pipeline_layout         = VK_NULL_HANDLE;
+    VkPipeline                  pipeline                = VK_NULL_HANDLE;
 };
