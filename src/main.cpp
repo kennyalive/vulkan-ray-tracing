@@ -48,7 +48,10 @@ int main() {
                     minimized = false;
                 }
                 if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
-                    demo.on_resize(event.window.data1, event.window.data2);
+                    demo.release_resolution_dependent_resources();
+                    vk.surface_width = event.window.data1;
+                    vk.surface_height = event.window.data2;
+                    demo.restore_resolution_dependent_resources();
                 }
             }
         }

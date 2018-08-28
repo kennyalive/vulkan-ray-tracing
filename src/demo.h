@@ -14,7 +14,6 @@ public:
 
     void release_resolution_dependent_resources();
     void restore_resolution_dependent_resources();
-    void on_resize(int new_width, int new_height);
 
 private:
     void upload_textures();

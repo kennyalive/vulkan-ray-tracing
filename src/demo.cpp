@@ -411,12 +411,3 @@ void Vk_Demo::restore_resolution_dependent_resources() {
     create_framebuffers();
     prev_time = Clock::now();
 }
-
-void Vk_Demo::on_resize(int new_width, int new_height) {
-    release_resolution_dependent_resources();
-
-    vk.surface_width = new_width;
-    vk.surface_height = new_height;
-
-    restore_resolution_dependent_resources();
-}
