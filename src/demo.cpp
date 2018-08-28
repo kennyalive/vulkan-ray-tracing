@@ -132,7 +132,7 @@ void Vk_Demo::create_render_passes() {
     attachments[0].initialLayout    = VK_IMAGE_LAYOUT_UNDEFINED;
     attachments[0].finalLayout      = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-    attachments[1].format           = vk.depth_image_format;
+    attachments[1].format           = vk.depth_info.format;
     attachments[1].samples          = VK_SAMPLE_COUNT_1_BIT;
     attachments[1].loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachments[1].storeOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -170,7 +170,7 @@ void Vk_Demo::create_framebuffers() {
     desc.height = vk.surface_height;
     desc.layers = 1;
 
-    std::array<VkImageView, 2> attachments {VK_NULL_HANDLE, vk.depth_image_view};
+    std::array<VkImageView, 2> attachments {VK_NULL_HANDLE, vk.depth_info.image_view};
     desc.attachmentCount = static_cast<uint32_t>(attachments.size());
     desc.pAttachments    = attachments.data();
     desc.renderPass      = render_pass;
@@ -355,6 +355,23 @@ void Vk_Demo::run_frame() {
     update_uniform_buffer();
     vk_begin_frame();
 
+    // Set viewport and scisor rect.
+    VkViewport viewport;
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(vk.surface_width);
+    viewport.height = static_cast<float>(vk.surface_height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    VkRect2D scissor;
+    scissor.offset = {0, 0};
+    scissor.extent.width = static_cast<uint32_t>(vk.surface_width);
+    scissor.extent.height = static_cast<uint32_t>(vk.surface_height);
+
+    vkCmdSetViewport(vk.command_buffer, 0, 1, &viewport);
+    vkCmdSetScissor(vk.command_buffer, 0, 1, &scissor);
+
     // Prepare render pass instance.
     VkClearValue clear_values[2];
     clear_values[0].color = {0.32f, 0.32f, 0.4f, 0.0f};
@@ -383,14 +400,23 @@ void Vk_Demo::run_frame() {
     vk_end_frame();
 }
 
-void Vk_Demo::on_minimized() {
+void Vk_Demo::release_resolution_dependent_resources() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
     destroy_framebuffers();
-    vk_on_minimized();
+    vk_release_resolution_dependent_resources();
 }
 
-void Vk_Demo::on_restored() {
-    vk_on_restored();
+void Vk_Demo::restore_resolution_dependent_resources() {
+    vk_restore_resolution_dependent_resources();
     create_framebuffers();
     prev_time = Clock::now();
+}
+
+void Vk_Demo::on_resize(int new_width, int new_height) {
+    release_resolution_dependent_resources();
+
+    vk.surface_width = new_width;
+    vk.surface_height = new_height;
+
+    restore_resolution_dependent_resources();
 }

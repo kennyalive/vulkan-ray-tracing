@@ -59,8 +59,8 @@ void vk_initialize(const SDL_SysWMinfo& window_info);
 // Shutdown vulkan subsystem by releasing resources acquired by Vk_Instance.
 void vk_shutdown();
 
-void vk_on_minimized();
-void vk_on_restored();
+void vk_release_resolution_dependent_resources();
+void vk_restore_resolution_dependent_resources();
 
 //
 // Resources allocation.
@@ -86,51 +86,55 @@ struct Swapchain_Info {
     std::vector<VkImageView> image_views;
 };
 
+struct Depth_Buffer_Info {
+    VkImage                 image;
+    VkImageView             image_view;
+    VmaAllocation           allocation;
+    VkFormat                format;
+};
+
 // Vk_Instance contains vulkan resources that do not depend on applicaton logic.
 // This structure is initialized/deinitialized by vk_initialize/vk_shutdown functions correspondingly.
 struct Vk_Instance {
-    SDL_SysWMinfo           system_window_info;
-    HMODULE                 vulkan_library;
-    int                     surface_width;
-    int                     surface_height;
+    SDL_SysWMinfo                   system_window_info;
+    HMODULE                         vulkan_library;
+    int                             surface_width;
+    int                             surface_height;
 
-    VkInstance              instance;
-    VkPhysicalDevice        physical_device;
-    uint32_t                queue_family_index;
-    VkDevice                device;
-    VkQueue                 queue;
+    VkInstance                      instance;
+    VkPhysicalDevice                physical_device;
+    uint32_t                        queue_family_index;
+    VkDevice                        device;
+    VkQueue                         queue;
 
-    VmaAllocator            allocator;
+    VmaAllocator                    allocator;
 
-    VkSurfaceKHR            surface;
-    VkSurfaceFormatKHR      surface_format;
-    Swapchain_Info          swapchain_info;
+    VkSurfaceKHR                    surface;
+    VkSurfaceFormatKHR              surface_format;
+    Swapchain_Info                  swapchain_info;
 
-    uint32_t                swapchain_image_index = -1; // current swapchain image
+    uint32_t                        swapchain_image_index = -1; // current swapchain image
 
-    VkCommandPool           command_pool;
-    VkCommandBuffer         command_buffer;
+    VkCommandPool                   command_pool;
+    VkCommandBuffer                 command_buffer;
 
-    VkSemaphore             image_acquired;
-    VkSemaphore             rendering_finished;
-    VkFence                 rendering_finished_fence;
-
-    VkImage                 depth_image;
-    VmaAllocation           depth_image_allocation;
-    VkFormat                depth_image_format;
-    VkImageView             depth_image_view;
-
-    std::vector<Vk_Pipeline_Def> pipeline_defs;
-    std::vector<VkPipeline> pipelines;
+    VkSemaphore                     image_acquired;
+    VkSemaphore                     rendering_finished;
+    VkFence                         rendering_finished_fence;
 
     // Host visible memory used to copy image data to device local memory.
-    VkBuffer                staging_buffer;
-    VmaAllocation           staging_buffer_allocation;
-    VkDeviceSize            staging_buffer_size;
-    uint8_t*                staging_buffer_ptr; // pointer to mapped staging buffer
+    VkBuffer                        staging_buffer;
+    VmaAllocation                   staging_buffer_allocation;
+    VkDeviceSize                    staging_buffer_size;
+    uint8_t*                        staging_buffer_ptr; // pointer to mapped staging buffer
+
+    std::vector<Vk_Pipeline_Def>    pipeline_defs;
+    std::vector<VkPipeline>         pipelines;
+
+    Depth_Buffer_Info               depth_info;
 
 #ifndef NDEBUG
-    VkDebugUtilsMessengerEXT debug_utils_messenger = nullptr;
+    VkDebugUtilsMessengerEXT        debug_utils_messenger = nullptr;
 #endif
 };
 

@@ -16,7 +16,10 @@ int main() {
 
     struct On_Exit {~On_Exit() { SDL_Quit(); }} exit_action;
 
-    the_window = SDL_CreateWindow("Vulkan demo", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, SDL_WINDOW_SHOWN);
+    the_window = SDL_CreateWindow("Vulkan demo",
+        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height,
+        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+
     if (the_window == nullptr)
         error("failed to create SDL window");
 
@@ -37,12 +40,15 @@ int main() {
             }
             if (event.type == SDL_WINDOWEVENT && event.window.windowID == the_window_id) {
                 if (event.window.event == SDL_WINDOWEVENT_MINIMIZED) {
-                    demo.on_minimized();
+                    demo.release_resolution_dependent_resources();
                     minimized = true;
                 }
-                if (event.window.event == SDL_WINDOWEVENT_RESTORED) {
-                    demo.on_restored();
+                if ((event.window.event == SDL_WINDOWEVENT_RESTORED || event.window.event == SDL_WINDOWEVENT_MAXIMIZED) && minimized) {
+                    demo.restore_resolution_dependent_resources();
                     minimized = false;
+                }
+                if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+                    demo.on_resize(event.window.data1, event.window.data2);
                 }
             }
         }

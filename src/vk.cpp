@@ -11,11 +11,15 @@
 #include <iostream>
 #include <vector>
 
+//
+// Vk_Instance is a container that stores common Vulkan resources like vulkan instance,
+// device, command pool, swapchain, etc.
+//
 Vk_Instance vk;
 
-static Swapchain_Info create_swapchain(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surface_format) {
+static void create_swapchain() {
     VkSurfaceCapabilitiesKHR surface_caps;
-    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_caps));
+    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.physical_device, vk.surface, &surface_caps));
 
     const VkExtent2D image_extent = surface_caps.currentExtent;
 
@@ -31,9 +35,9 @@ static Swapchain_Info create_swapchain(VkPhysicalDevice physical_device, VkDevic
 
     // determine present mode and swapchain image count
     uint32_t present_mode_count;
-    VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, nullptr));
+    VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physical_device, vk.surface, &present_mode_count, nullptr));
     std::vector<VkPresentModeKHR> present_modes(present_mode_count);
-    VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, present_modes.data()));
+    VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physical_device, vk.surface, &present_mode_count, present_modes.data()));
 
     bool mailbox_supported = false;
     bool immediate_supported = false;
@@ -62,10 +66,10 @@ static Swapchain_Info create_swapchain(VkPhysicalDevice physical_device, VkDevic
 
     // create swap chain
     VkSwapchainCreateInfoKHR desc { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
-    desc.surface            = surface;
+    desc.surface            = vk.surface;
     desc.minImageCount      = min_image_count;
-    desc.imageFormat        = surface_format.format;
-    desc.imageColorSpace    = surface_format.colorSpace;
+    desc.imageFormat        = vk.surface_format.format;
+    desc.imageColorSpace    = vk.surface_format.colorSpace;
     desc.imageExtent        = image_extent;
     desc.imageArrayLayers   = 1;
     desc.imageUsage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -75,22 +79,21 @@ static Swapchain_Info create_swapchain(VkPhysicalDevice physical_device, VkDevic
     desc.presentMode        = present_mode;
     desc.clipped            = VK_TRUE;
 
-    Swapchain_Info swapchain_info;
-    VK_CHECK(vkCreateSwapchainKHR(device, &desc, nullptr, &swapchain_info.handle));
+    VK_CHECK(vkCreateSwapchainKHR(vk.device, &desc, nullptr, &vk.swapchain_info.handle));
 
     // retrieve swapchain images
     uint32_t image_count;
-    VK_CHECK(vkGetSwapchainImagesKHR(device, swapchain_info.handle, &image_count, nullptr));
-    swapchain_info.images.resize(image_count);
-    VK_CHECK(vkGetSwapchainImagesKHR(device, swapchain_info.handle, &image_count, swapchain_info.images.data()));
+    VK_CHECK(vkGetSwapchainImagesKHR(vk.device, vk.swapchain_info.handle, &image_count, nullptr));
+    vk.swapchain_info.images.resize(image_count);
+    VK_CHECK(vkGetSwapchainImagesKHR(vk.device, vk.swapchain_info.handle, &image_count, vk.swapchain_info.images.data()));
 
-    swapchain_info.image_views.resize(image_count);
+    vk.swapchain_info.image_views.resize(image_count);
 
     for (uint32_t i = 0; i < image_count; i++) {
         VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-        desc.image          = swapchain_info.images[i];
+        desc.image          = vk.swapchain_info.images[i];
         desc.viewType       = VK_IMAGE_VIEW_TYPE_2D;
-        desc.format         = surface_format.format;
+        desc.format         = vk.surface_format.format;
 
         desc.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
         desc.subresourceRange.baseMipLevel   = 0;
@@ -98,21 +101,16 @@ static Swapchain_Info create_swapchain(VkPhysicalDevice physical_device, VkDevic
         desc.subresourceRange.baseArrayLayer = 0;
         desc.subresourceRange.layerCount     = 1;
 
-        VK_CHECK(vkCreateImageView(device, &desc, nullptr, &swapchain_info.image_views[i]));
+        VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.swapchain_info.image_views[i]));
     }
-
-    return swapchain_info;
 }
 
-static void destroy_swapchain(VkDevice device, Swapchain_Info& swapchain_info) {
-    for (auto image_view : swapchain_info.image_views) {
-        vkDestroyImageView(device, image_view, nullptr);
+static void destroy_swapchain() {
+    for (auto image_view : vk.swapchain_info.image_views) {
+        vkDestroyImageView(vk.device, image_view, nullptr);
     }
-    swapchain_info.images.clear();
-    swapchain_info.image_views.clear();
-
-    vkDestroySwapchainKHR(device, swapchain_info.handle, nullptr);
-    swapchain_info.handle = VK_NULL_HANDLE;
+    vkDestroySwapchainKHR(vk.device, vk.swapchain_info.handle, nullptr);
+    vk.swapchain_info = Swapchain_Info{};
 }
 
 static void create_instance() {
@@ -285,6 +283,74 @@ static void record_image_layout_transition(
         0, nullptr, 0, nullptr, 1, &barrier);
 }
 
+static void create_depth_buffer() {
+    // choose depth image format
+    {
+        std::array<VkFormat, 2> candidates = { VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT };
+        for (auto format : candidates) {
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties(vk.physical_device, format, &props);
+            if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
+                vk.depth_info.format = format;
+                break;
+            }
+        }
+        if (vk.depth_info.format == VK_FORMAT_UNDEFINED)
+            error("failed to choose depth attachment format");
+    }
+
+    // create depth image
+    {
+        VkImageCreateInfo create_info { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+        create_info.imageType       = VK_IMAGE_TYPE_2D;
+        create_info.format          = vk.depth_info.format;
+        create_info.extent.width    = vk.surface_width;
+        create_info.extent.height   = vk.surface_height;
+        create_info.extent.depth    = 1;
+        create_info.mipLevels       = 1;
+        create_info.arrayLayers     = 1;
+        create_info.samples         = VK_SAMPLE_COUNT_1_BIT;
+        create_info.tiling          = VK_IMAGE_TILING_OPTIMAL;
+        create_info.usage           = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        create_info.sharingMode     = VK_SHARING_MODE_EXCLUSIVE;
+        create_info.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        VmaAllocationCreateInfo alloc_create_info{};
+        alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+        VK_CHECK(vmaCreateImage(vk.allocator, &create_info, &alloc_create_info, &vk.depth_info.image, &vk.depth_info.allocation, nullptr));
+    }
+
+    // create depth image view
+    {
+        VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+        desc.image      = vk.depth_info.image;
+        desc.viewType   = VK_IMAGE_VIEW_TYPE_2D;
+        desc.format     = vk.depth_info.format;
+
+        desc.subresourceRange.aspectMask        = VK_IMAGE_ASPECT_DEPTH_BIT;
+        desc.subresourceRange.baseMipLevel      = 0;
+        desc.subresourceRange.levelCount        = 1;
+        desc.subresourceRange.baseArrayLayer    = 0;
+        desc.subresourceRange.layerCount        = 1;
+
+        VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.depth_info.image_view));
+    }
+
+    VkImageAspectFlags image_aspect_flags = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+
+    vk_record_and_run_commands(vk.command_pool, vk.queue, [&image_aspect_flags](VkCommandBuffer command_buffer) {
+        record_image_layout_transition(command_buffer, vk.depth_info.image, image_aspect_flags, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    });
+}
+
+static void destroy_depth_buffer() {
+    vmaDestroyImage(vk.allocator, vk.depth_info.image, vk.depth_info.allocation);
+    vkDestroyImageView(vk.device, vk.depth_info.image_view, nullptr);
+    vk.depth_info = Depth_Buffer_Info{};
+}
+
 void vk_initialize(const SDL_SysWMinfo& window_info) {
     vk.system_window_info = window_info;
 
@@ -340,46 +406,6 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
     VK_CHECK(vmaCreateAllocator(&allocator_info, &vk.allocator));
 
     //
-    // Select surface format.
-    //
-    {
-        uint32_t format_count;
-        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physical_device, vk.surface, &format_count, nullptr));
-        assert(format_count > 0);
-
-        std::vector<VkSurfaceFormatKHR> candidates(format_count);
-        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physical_device, vk.surface, &format_count, candidates.data()));
-
-        // don't support special case described in the spec
-        assert(!(candidates.size() == 1 && candidates[0].format == VK_FORMAT_UNDEFINED));
-
-        VkFormat supported_srgb_formats[] = {
-            VK_FORMAT_B8G8R8A8_SRGB,
-            VK_FORMAT_R8G8B8A8_SRGB,
-            VK_FORMAT_A8B8G8R8_SRGB_PACK32
-        };
-
-        [&candidates, &supported_srgb_formats]() {
-            for (VkFormat srgb_format : supported_srgb_formats) {
-                for (VkSurfaceFormatKHR surface_format : candidates) {
-                    if (surface_format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-                        continue;
-                    if (surface_format.format == srgb_format) {
-                        vk.surface_format = surface_format;
-                        return;
-                    }
-                }
-            }
-            error("Failed to find supported surface format");
-        } ();
-    }
-
-    //
-    // Swapchain.
-    //
-    vk.swapchain_info = create_swapchain(vk.physical_device, vk.device, vk.surface, vk.surface_format);
-
-    //
     // Sync primitives.
     //
     {
@@ -414,69 +440,42 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
     }
 
     //
-    // Depth attachment image.
-    // 
+    // Select surface format.
+    //
     {
-        // choose depth image format
-        {
-            std::array<VkFormat, 2> candidates = { VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT };
-            for (auto format : candidates) {
-                VkFormatProperties props;
-                vkGetPhysicalDeviceFormatProperties(vk.physical_device, format, &props);
-                if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
-                    vk.depth_image_format = format;
-                    break;
+        uint32_t format_count;
+        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physical_device, vk.surface, &format_count, nullptr));
+        assert(format_count > 0);
+
+        std::vector<VkSurfaceFormatKHR> candidates(format_count);
+        VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physical_device, vk.surface, &format_count, candidates.data()));
+
+        // don't support special case described in the spec
+        assert(!(candidates.size() == 1 && candidates[0].format == VK_FORMAT_UNDEFINED));
+
+        VkFormat supported_srgb_formats[] = {
+            VK_FORMAT_B8G8R8A8_SRGB,
+            VK_FORMAT_R8G8B8A8_SRGB,
+            VK_FORMAT_A8B8G8R8_SRGB_PACK32
+        };
+
+        [&candidates, &supported_srgb_formats]() {
+            for (VkFormat srgb_format : supported_srgb_formats) {
+                for (VkSurfaceFormatKHR surface_format : candidates) {
+                    if (surface_format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                        continue;
+                    if (surface_format.format == srgb_format) {
+                        vk.surface_format = surface_format;
+                        return;
+                    }
                 }
             }
-            if (vk.depth_image_format == VK_FORMAT_UNDEFINED)
-                error("failed to choose depth attachment format");
-        }
-
-        // create depth image
-        {
-            VkImageCreateInfo create_info { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-            create_info.imageType       = VK_IMAGE_TYPE_2D;
-            create_info.format          = vk.depth_image_format;
-            create_info.extent.width    = vk.surface_width;
-            create_info.extent.height   = vk.surface_height;
-            create_info.extent.depth    = 1;
-            create_info.mipLevels       = 1;
-            create_info.arrayLayers     = 1;
-            create_info.samples         = VK_SAMPLE_COUNT_1_BIT;
-            create_info.tiling          = VK_IMAGE_TILING_OPTIMAL;
-            create_info.usage           = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-            create_info.sharingMode     = VK_SHARING_MODE_EXCLUSIVE;
-            create_info.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
-
-            VmaAllocationCreateInfo alloc_create_info{};
-            alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-            VK_CHECK(vmaCreateImage(vk.allocator, &create_info, &alloc_create_info, &vk.depth_image, &vk.depth_image_allocation, nullptr));
-        }
-
-        // create depth image view
-        {
-            VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-            desc.image      = vk.depth_image;
-            desc.viewType   = VK_IMAGE_VIEW_TYPE_2D;
-            desc.format     = vk.depth_image_format;
-
-            desc.subresourceRange.aspectMask        = VK_IMAGE_ASPECT_DEPTH_BIT;
-            desc.subresourceRange.baseMipLevel      = 0;
-            desc.subresourceRange.levelCount        = 1;
-            desc.subresourceRange.baseArrayLayer    = 0;
-            desc.subresourceRange.layerCount        = 1;
-
-            VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.depth_image_view));
-        }
-
-        VkImageAspectFlags image_aspect_flags = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-
-        vk_record_and_run_commands(vk.command_pool, vk.queue, [&image_aspect_flags](VkCommandBuffer command_buffer) {
-            record_image_layout_transition(command_buffer, vk.depth_image, image_aspect_flags, 0, VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-        });
+            error("Failed to find supported surface format");
+        } ();
     }
+
+    create_swapchain();
+    create_depth_buffer();
 }
 
 void vk_shutdown() {
@@ -485,22 +484,20 @@ void vk_shutdown() {
     if (vk.staging_buffer != VK_NULL_HANDLE)
         vmaDestroyBuffer(vk.allocator, vk.staging_buffer, vk.staging_buffer_allocation);
 
-    for (auto pipeline : vk.pipelines) {
+    for (auto pipeline : vk.pipelines)
         vkDestroyPipeline(vk.device, pipeline, nullptr);
-    }
+
     vk.pipeline_defs.clear();
     vk.pipelines.clear();
 
-    vmaDestroyImage(vk.allocator, vk.depth_image, vk.depth_image_allocation);
-    vkDestroyImageView(vk.device, vk.depth_image_view, nullptr);
-
     vkDestroyCommandPool(vk.device, vk.command_pool, nullptr);
-
-    destroy_swapchain(vk.device, vk.swapchain_info);
 
     vkDestroySemaphore(vk.device, vk.image_acquired, nullptr);
     vkDestroySemaphore(vk.device, vk.rendering_finished, nullptr);
     vkDestroyFence(vk.device, vk.rendering_finished_fence, nullptr);
+
+    destroy_swapchain();
+    destroy_depth_buffer();
 
     vmaDestroyAllocator(vk.allocator);
     
@@ -514,16 +511,14 @@ void vk_shutdown() {
     vkDestroyInstance(vk.instance, nullptr);
 }
 
-void vk_on_minimized() {
-    destroy_swapchain(vk.device, vk.swapchain_info);
-
+void vk_release_resolution_dependent_resources() {
+    destroy_swapchain();
+    destroy_depth_buffer();
 }
 
-void vk_on_restored() {
-    assert(vk.swapchain_info.handle == VK_NULL_HANDLE);
-    assert(vk.swapchain_info.images.empty());
-    assert(vk.swapchain_info.image_views.empty());
-    vk.swapchain_info = create_swapchain(vk.physical_device, vk.device, vk.surface, vk.surface_format);
+void vk_restore_resolution_dependent_resources() {
+    create_swapchain();
+    create_depth_buffer();
 }
 
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
@@ -777,24 +772,11 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     //
     // Viewport.
     //
-    VkViewport viewport;
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(vk.surface_width);
-    viewport.height = static_cast<float>(vk.surface_height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor;
-    scissor.offset = {0, 0};
-    scissor.extent.width = static_cast<uint32_t>(vk.surface_width);
-    scissor.extent.height = static_cast<uint32_t>(vk.surface_height);
-
     VkPipelineViewportStateCreateInfo viewport_state { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
     viewport_state.viewportCount    = 1;
-    viewport_state.pViewports       = &viewport;
+    viewport_state.pViewports       = nullptr;
     viewport_state.scissorCount     = 1;
-    viewport_state.pScissors        = &scissor;
+    viewport_state.pScissors        = nullptr;
 
     //
     // Rasterization.
@@ -848,6 +830,18 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     blend_state.pAttachments    = &attachment_blend_state;
 
     //
+    // Dynamic state.
+    //
+    VkDynamicState dynamic_state[2] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamic_state_info{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
+    dynamic_state_info.dynamicStateCount = 2;
+    dynamic_state_info.pDynamicStates    = dynamic_state;
+
+    //
     // Finally create graphics pipeline.
     //
     VkGraphicsPipelineCreateInfo desc { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
@@ -861,7 +855,7 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     desc.pMultisampleState      = &multisample_state;
     desc.pDepthStencilState     = &depth_stencil_state;
     desc.pColorBlendState       = &blend_state;
-    desc.pDynamicState          = nullptr;
+    desc.pDynamicState          = &dynamic_state_info;
     desc.layout                 = def.pipeline_layout;
     desc.renderPass             = def.render_pass;
     desc.subpass                = 0;
