@@ -17,7 +17,7 @@
 //
 Vk_Instance vk;
 
-static void create_swapchain() {
+static bool create_swapchain() {
     VkSurfaceCapabilitiesKHR surface_caps;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.physical_device, vk.surface, &surface_caps));
 
@@ -26,8 +26,8 @@ static void create_swapchain() {
     // don't expect special value described in spec on Win32
     assert(image_extent.width != 0xffffffff && image_extent.height != 0xffffffff);
 
-    // we should not try to create a swapchain when window is minimized
-    assert(image_extent.width != 0 && image_extent.height != 0);
+    if (image_extent.width == 0 || image_extent.height == 0)
+        return false;
 
     // VK_IMAGE_USAGE_TRANSFER_DST_BIT is required by image clear operations.
     if ((surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
@@ -103,6 +103,7 @@ static void create_swapchain() {
 
         VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.swapchain_info.image_views[i]));
     }
+    return true;
 }
 
 static void destroy_swapchain() {
@@ -516,9 +517,12 @@ void vk_release_resolution_dependent_resources() {
     destroy_depth_buffer();
 }
 
-void vk_restore_resolution_dependent_resources() {
-    create_swapchain();
+bool vk_restore_resolution_dependent_resources() {
+    if (!create_swapchain())
+        return false;
+
     create_depth_buffer();
+    return true;
 }
 
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {

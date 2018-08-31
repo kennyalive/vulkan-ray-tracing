@@ -60,7 +60,7 @@ void vk_initialize(const SDL_SysWMinfo& window_info);
 void vk_shutdown();
 
 void vk_release_resolution_dependent_resources();
-void vk_restore_resolution_dependent_resources();
+bool vk_restore_resolution_dependent_resources();
 
 //
 // Resources allocation.

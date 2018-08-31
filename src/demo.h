@@ -13,7 +13,7 @@ public:
     void run_frame();
 
     void release_resolution_dependent_resources();
-    void restore_resolution_dependent_resources();
+    bool restore_resolution_dependent_resources();
 
 private:
     void upload_textures();

@@ -406,8 +406,11 @@ void Vk_Demo::release_resolution_dependent_resources() {
     vk_release_resolution_dependent_resources();
 }
 
-void Vk_Demo::restore_resolution_dependent_resources() {
-    vk_restore_resolution_dependent_resources();
+bool Vk_Demo::restore_resolution_dependent_resources() {
+    if (!vk_restore_resolution_dependent_resources())
+        return false;
+
     create_framebuffers();
     prev_time = Clock::now();
+    return true;
 }
