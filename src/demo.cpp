@@ -351,7 +351,7 @@ void Vk_Demo::update_uniform_buffer() {
     memcpy(uniform_buffer_ptr, &ubo, sizeof(ubo));
 }
 
-void Vk_Demo::run_frame() {
+void Vk_Demo::run_frame(bool draw_only_background) {
     update_uniform_buffer();
     vk_begin_frame();
 
@@ -389,12 +389,14 @@ void Vk_Demo::run_frame() {
     vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
     // Draw model.
-    const VkDeviceSize zero_offset = 0;
-    vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer, &zero_offset);
-    vkCmdBindIndexBuffer(vk.command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
-    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
-    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-    vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
+    if (!draw_only_background) {
+        const VkDeviceSize zero_offset = 0;
+        vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer, &zero_offset);
+        vkCmdBindIndexBuffer(vk.command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
+        vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
+    }
 
     vkCmdEndRenderPass(vk.command_buffer);
     vk_end_frame();

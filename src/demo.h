@@ -10,7 +10,7 @@ public:
     Vk_Demo(int window_width, int window_height, const SDL_SysWMinfo& window_sys_info);
     ~Vk_Demo();
 
-    void run_frame();
+    void run_frame(bool draw_only_background = false);
 
     void release_resolution_dependent_resources();
     bool restore_resolution_dependent_resources();
