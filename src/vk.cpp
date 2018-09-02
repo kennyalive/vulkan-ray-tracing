@@ -55,15 +55,16 @@ static void create_swapchain() {
     if (mailbox_supported) {
         present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
         min_image_count = std::max(3u, surface_caps.minImageCount);
-        if (surface_caps.maxImageCount > 0) {
-            min_image_count = std::min(min_image_count, surface_caps.maxImageCount);
-        }
     } else if (immediate_supported) {
         present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-        min_image_count = surface_caps.minImageCount;
+        min_image_count = std::max(2u, surface_caps.minImageCount);
     } else {
         present_mode = VK_PRESENT_MODE_FIFO_KHR;
-        min_image_count = surface_caps.minImageCount;
+        min_image_count = std::max(2u, surface_caps.minImageCount);
+    }
+
+    if (surface_caps.maxImageCount > 0) {
+        min_image_count = std::min(min_image_count, surface_caps.maxImageCount);
     }
 
     // create swap chain
