@@ -21,9 +21,6 @@
         error(std::string("Vulkan: ") + string_VkResult(result) + " returned by " + #function_call); \
 }
 
-#define VK_CHECK_RESULT(vk_result, error_message) \
-    if (vk_result < 0) error(std::string("Vulkan error ") + string_VkResult(vk_result) + ":  " + error_message);
-
 #include <functional>
 #include <string>
 #include <vector>
@@ -60,7 +57,7 @@ void vk_initialize(const SDL_SysWMinfo& window_info);
 void vk_shutdown();
 
 void vk_release_resolution_dependent_resources();
-bool vk_restore_resolution_dependent_resources();
+void vk_restore_resolution_dependent_resources();
 
 //
 // Resources allocation.
@@ -97,9 +94,7 @@ struct Depth_Buffer_Info {
 // This structure is initialized/deinitialized by vk_initialize/vk_shutdown functions correspondingly.
 struct Vk_Instance {
     SDL_SysWMinfo                   system_window_info;
-    HMODULE                         vulkan_library;
-    int                             surface_width;
-    int                             surface_height;
+    VkExtent2D                      surface_size;
 
     VkInstance                      instance;
     VkPhysicalDevice                physical_device;

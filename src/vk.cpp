@@ -17,17 +17,19 @@
 //
 Vk_Instance vk;
 
-static bool create_swapchain() {
+static void create_swapchain() {
+    assert(vk.swapchain_info.handle == VK_NULL_HANDLE);
+
     VkSurfaceCapabilitiesKHR surface_caps;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.physical_device, vk.surface, &surface_caps));
 
-    const VkExtent2D image_extent = surface_caps.currentExtent;
+    vk.surface_size = surface_caps.currentExtent;
 
     // don't expect special value described in spec on Win32
-    assert(image_extent.width != 0xffffffff && image_extent.height != 0xffffffff);
+    assert(vk.surface_size.width != 0xffffffff && vk.surface_size.height != 0xffffffff);
 
-    if (image_extent.width == 0 || image_extent.height == 0)
-        return false;
+    // we should not try to create a swapchain when window is minimized
+    assert(vk.surface_size.width != 0 && vk.surface_size.height != 0);
 
     // VK_IMAGE_USAGE_TRANSFER_DST_BIT is required by image clear operations.
     if ((surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
@@ -70,7 +72,7 @@ static bool create_swapchain() {
     desc.minImageCount      = min_image_count;
     desc.imageFormat        = vk.surface_format.format;
     desc.imageColorSpace    = vk.surface_format.colorSpace;
-    desc.imageExtent        = image_extent;
+    desc.imageExtent        = vk.surface_size;
     desc.imageArrayLayers   = 1;
     desc.imageUsage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     desc.imageSharingMode   = VK_SHARING_MODE_EXCLUSIVE;
@@ -103,7 +105,6 @@ static bool create_swapchain() {
 
         VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.swapchain_info.image_views[i]));
     }
-    return true;
 }
 
 static void destroy_swapchain() {
@@ -305,8 +306,8 @@ static void create_depth_buffer() {
         VkImageCreateInfo create_info { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
         create_info.imageType       = VK_IMAGE_TYPE_2D;
         create_info.format          = vk.depth_info.format;
-        create_info.extent.width    = vk.surface_width;
-        create_info.extent.height   = vk.surface_height;
+        create_info.extent.width    = vk.surface_size.width;
+        create_info.extent.height   = vk.surface_size.height;
         create_info.extent.depth    = 1;
         create_info.mipLevels       = 1;
         create_info.arrayLayers     = 1;
@@ -517,12 +518,9 @@ void vk_release_resolution_dependent_resources() {
     destroy_depth_buffer();
 }
 
-bool vk_restore_resolution_dependent_resources() {
-    if (!create_swapchain())
-        return false;
-
+void vk_restore_resolution_dependent_resources() {
+    create_swapchain();
     create_depth_buffer();
-    return true;
 }
 
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {

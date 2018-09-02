@@ -20,9 +20,7 @@ struct Uniform_Buffer {
     glm::mat4 mvp;
 };
 
-Vk_Demo::Vk_Demo(int window_width, int window_height, const SDL_SysWMinfo& window_sys_info) {
-    vk.surface_width = window_width;
-    vk.surface_height = window_height;
+Vk_Demo::Vk_Demo(const SDL_SysWMinfo& window_sys_info) {
     vk_initialize(window_sys_info);
 
     VkPhysicalDeviceProperties props;
@@ -166,8 +164,8 @@ void Vk_Demo::create_render_passes() {
 
 void Vk_Demo::create_framebuffers() {
     VkFramebufferCreateInfo desc{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-    desc.width  = vk.surface_width;
-    desc.height = vk.surface_height;
+    desc.width  = vk.surface_size.width;
+    desc.height = vk.surface_size.height;
     desc.layers = 1;
 
     std::array<VkImageView, 2> attachments {VK_NULL_HANDLE, vk.depth_info.image_view};
@@ -345,7 +343,7 @@ void Vk_Demo::update_uniform_buffer() {
         0.0f, 0.0f, 0.5f, 0.0f,
         0.0f, 0.0f, 0.5f, 1.0f);
 
-    glm::mat4x4 proj = clip * glm::perspective(glm::radians(45.0f), vk.surface_width / (float)vk.surface_height, 0.1f, 50.0f);
+    glm::mat4x4 proj = clip * glm::perspective(glm::radians(45.0f), (float)vk.surface_size.width / (float)vk.surface_size.height, 0.1f, 50.0f);
 
     ubo.mvp = proj * view * model;
     memcpy(uniform_buffer_ptr, &ubo, sizeof(ubo));
@@ -356,18 +354,14 @@ void Vk_Demo::run_frame(bool draw_only_background) {
     vk_begin_frame();
 
     // Set viewport and scisor rect.
-    VkViewport viewport;
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(vk.surface_width);
-    viewport.height = static_cast<float>(vk.surface_height);
+    VkViewport viewport{};
+    viewport.width = static_cast<float>(vk.surface_size.width);
+    viewport.height = static_cast<float>(vk.surface_size.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
-    VkRect2D scissor;
-    scissor.offset = {0, 0};
-    scissor.extent.width = static_cast<uint32_t>(vk.surface_width);
-    scissor.extent.height = static_cast<uint32_t>(vk.surface_height);
+    VkRect2D scissor{};
+    scissor.extent = vk.surface_size;
 
     vkCmdSetViewport(vk.command_buffer, 0, 1, &viewport);
     vkCmdSetScissor(vk.command_buffer, 0, 1, &scissor);
@@ -381,8 +375,7 @@ void Vk_Demo::run_frame(bool draw_only_background) {
     VkRenderPassBeginInfo render_pass_begin_info { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     render_pass_begin_info.renderPass        = render_pass;
     render_pass_begin_info.framebuffer       = swapchain_framebuffers[vk.swapchain_image_index];
-    render_pass_begin_info.renderArea.offset = { 0, 0 };
-    render_pass_begin_info.renderArea.extent = { (uint32_t)vk.surface_width, (uint32_t)vk.surface_height };
+    render_pass_begin_info.renderArea.extent = vk.surface_size;
     render_pass_begin_info.clearValueCount   = 2;
     render_pass_begin_info.pClearValues      = clear_values;
 
@@ -408,11 +401,8 @@ void Vk_Demo::release_resolution_dependent_resources() {
     vk_release_resolution_dependent_resources();
 }
 
-bool Vk_Demo::restore_resolution_dependent_resources() {
-    if (!vk_restore_resolution_dependent_resources())
-        return false;
-
+void Vk_Demo::restore_resolution_dependent_resources() {
+    vk_restore_resolution_dependent_resources();
     create_framebuffers();
     prev_time = Clock::now();
-    return true;
 }
