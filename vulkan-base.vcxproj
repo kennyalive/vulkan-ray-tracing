@@ -98,7 +98,7 @@
     <ClCompile Include="src\resource_manager.cpp" />
     <ClCompile Include="src\demo.cpp" />
     <ClCompile Include="src\vma_impl.cpp" />
-    <ClCompile Include="third_party\include\volk.c">
+    <ClCompile Include="third_party\include\volk\volk.c">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>

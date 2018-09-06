@@ -7,11 +7,11 @@
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\geometry.cpp" />
     <ClCompile Include="src\common.cpp" />
-    <ClCompile Include="third_party\include\volk.c">
-      <Filter>3rdparty</Filter>
-    </ClCompile>
     <ClCompile Include="src\vma_impl.cpp" />
     <ClCompile Include="src\debug.cpp" />
+    <ClCompile Include="third_party\include\volk\volk.c">
+      <Filter>3rdparty</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\resource_manager.h" />
