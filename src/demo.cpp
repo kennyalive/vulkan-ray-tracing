@@ -13,9 +13,6 @@
 #include <array>
 #include <chrono>
 
-const std::string model_path = "../../data/model.obj";
-const std::string texture_path = "../../data/model.jpg";
-
 struct Uniform_Buffer {
     glm::mat4 mvp;
 };
@@ -59,7 +56,7 @@ void Vk_Demo::upload_textures() {
         return texture;
     };
 
-    texture = load_texture(texture_path);
+    texture = load_texture("../../data/model.jpg");
 
     // create sampler
     VkSamplerCreateInfo desc { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
@@ -79,7 +76,7 @@ void Vk_Demo::upload_textures() {
 }
 
 void Vk_Demo::upload_geometry() {
-    Model model = load_obj_model(model_path);
+    Model model = load_obj_model("../../data/model.obj");
     model_index_count = static_cast<uint32_t>(model.indices.size());
 
     {
@@ -307,8 +304,8 @@ void Vk_Demo::create_shader_modules() {
 
         return get_resource_manager()->create_shader_module(desc, debug_name);
     };
-    model_vs = create_shader_module("spirv/model.vb", "vertex shader");
-    model_fs = create_shader_module("spirv/model.fb", "fragment shader");
+    model_vs = create_shader_module("../../data/spirv/model.vb", "vertex shader");
+    model_fs = create_shader_module("../../data/spirv/model.fb", "fragment shader");
 }
 
 void Vk_Demo::create_pipelines() {

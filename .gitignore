@@ -6,5 +6,4 @@ build/Debug/intermediate/
 build/Release/intermediate/
 *.ipdb
 *.iobj
-src/shaders/tools/bin2hex.obj
 third_party/dxc/
