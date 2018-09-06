@@ -395,6 +395,12 @@ void Vk_Demo::run_frame(bool draw_only_background) {
     vk_end_frame();
 }
 
+void Vk_Demo::toggle_vsync() {
+    vsync = !vsync;
+    release_resolution_dependent_resources();
+    restore_resolution_dependent_resources();
+}
+
 void Vk_Demo::release_resolution_dependent_resources() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
     destroy_framebuffers();
@@ -402,7 +408,7 @@ void Vk_Demo::release_resolution_dependent_resources() {
 }
 
 void Vk_Demo::restore_resolution_dependent_resources() {
-    vk_restore_resolution_dependent_resources();
+    vk_restore_resolution_dependent_resources(vsync);
     create_framebuffers();
     prev_time = Clock::now();
 }

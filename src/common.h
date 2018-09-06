@@ -5,6 +5,11 @@
 #include <string>
 #include <vector>
 
+template <typename T, size_t N>
+constexpr uint32_t array_length(T(&)[N]) {
+    return N;
+}
+
 void error(const std::string& message);
 std::vector<uint8_t> read_binary_file(const std::string& file_name);
 

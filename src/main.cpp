@@ -7,6 +7,7 @@
 static SDL_Window* the_window   = nullptr;
 
 static bool toogle_fullscreen   = false;
+static bool toggle_vsync        = false;
 static bool handle_resize       = false;
 
 static bool process_events() {
@@ -23,6 +24,12 @@ static bool process_events() {
             (event.key.keysym.sym == SDLK_F11 || event.key.keysym.sym == SDLK_RETURN && alt_pressed))
         {
             toogle_fullscreen = true;
+        }
+
+        // Vsync.
+        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F10)
+        {
+            toggle_vsync = true;
         }
 
         // Resize event
@@ -66,6 +73,11 @@ int main() {
 
             process_events();
             toogle_fullscreen = false;
+        }
+
+        if (toggle_vsync) {
+            demo.toggle_vsync();
+            toggle_vsync = false;
         }
 
         if (handle_resize) {

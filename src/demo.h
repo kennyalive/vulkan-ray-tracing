@@ -12,6 +12,8 @@ public:
 
     void run_frame(bool draw_only_background = false);
 
+    void toggle_vsync();
+
     void release_resolution_dependent_resources();
     void restore_resolution_dependent_resources();
 
@@ -32,6 +34,8 @@ private:
     void update_uniform_buffer();
 
 private:
+    bool                        vsync                   = true;
+
     VkSampler                   sampler                 = VK_NULL_HANDLE;
     Vk_Image                    texture;
 

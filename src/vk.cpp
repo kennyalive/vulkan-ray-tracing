@@ -17,7 +17,7 @@
 //
 Vk_Instance vk;
 
-static void create_swapchain() {
+static void create_swapchain(bool vsync) {
     assert(vk.swapchain_info.handle == VK_NULL_HANDLE);
 
     VkSurfaceCapabilitiesKHR surface_caps;
@@ -36,33 +36,27 @@ static void create_swapchain() {
         error("create_swapchain: VK_IMAGE_USAGE_TRANSFER_DST_BIT is not supported by the swapchain");
 
     // determine present mode and swapchain image count
-    uint32_t present_mode_count;
-    VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physical_device, vk.surface, &present_mode_count, nullptr));
-    std::vector<VkPresentModeKHR> present_modes(present_mode_count);
-    VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physical_device, vk.surface, &present_mode_count, present_modes.data()));
+    VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    uint32_t min_image_count = std::max(2u, surface_caps.minImageCount);
 
-    bool mailbox_supported = false;
-    bool immediate_supported = false;
-    for (auto pm : present_modes) {
-        if (pm == VK_PRESENT_MODE_MAILBOX_KHR)
-            mailbox_supported = true;
-        else if (pm == VK_PRESENT_MODE_IMMEDIATE_KHR)
-            immediate_supported = true;
+    if (!vsync) {
+        uint32_t present_mode_count;
+        VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physical_device, vk.surface, &present_mode_count, nullptr));
+        std::vector<VkPresentModeKHR> present_modes(present_mode_count);
+        VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(vk.physical_device, vk.surface, &present_mode_count, present_modes.data()));
+
+        for (auto pm : present_modes) {
+            if (pm == VK_PRESENT_MODE_MAILBOX_KHR) {
+                present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
+                min_image_count = std::max(3u, surface_caps.minImageCount);
+                break; // mailbox is preferred mode
+            }
+            if (pm == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+                present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+                min_image_count = std::max(2u, surface_caps.minImageCount);
+            }
+        }
     }
-
-    VkPresentModeKHR present_mode;
-    uint32_t min_image_count;
-    if (mailbox_supported) {
-        present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
-        min_image_count = std::max(3u, surface_caps.minImageCount);
-    } else if (immediate_supported) {
-        present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
-        min_image_count = std::max(2u, surface_caps.minImageCount);
-    } else {
-        present_mode = VK_PRESENT_MODE_FIFO_KHR;
-        min_image_count = std::max(2u, surface_caps.minImageCount);
-    }
-
     if (surface_caps.maxImageCount > 0) {
         min_image_count = std::min(min_image_count, surface_caps.maxImageCount);
     }
@@ -151,9 +145,12 @@ static void create_instance() {
     desc.ppEnabledExtensionNames = instance_extensions;
 
 #ifndef NDEBUG
-    const char* validation_layer_name = "VK_LAYER_LUNARG_standard_validation";
-    desc.enabledLayerCount = 1;
-    desc.ppEnabledLayerNames = &validation_layer_name;
+    const char* layer_names[] = {
+        "VK_LAYER_LUNARG_standard_validation",
+        "VK_LAYER_LUNARG_monitor"
+    };
+    desc.enabledLayerCount = array_length(layer_names);
+    desc.ppEnabledLayerNames = layer_names;
 #endif
 
     VK_CHECK(vkCreateInstance(&desc, nullptr, &vk.instance));
@@ -477,7 +474,7 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
         } ();
     }
 
-    create_swapchain();
+    create_swapchain(true);
     create_depth_buffer();
 }
 
@@ -519,8 +516,8 @@ void vk_release_resolution_dependent_resources() {
     destroy_depth_buffer();
 }
 
-void vk_restore_resolution_dependent_resources() {
-    create_swapchain();
+void vk_restore_resolution_dependent_resources(bool vsync) {
+    create_swapchain(vsync);
     create_depth_buffer();
 }
 

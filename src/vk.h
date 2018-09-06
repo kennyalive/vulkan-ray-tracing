@@ -1,9 +1,12 @@
 #pragma once
 
+#include "common.h"
+
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
 #endif
 #include "volk.h"
+#include "vk_enum_string_helper.h"
 
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #include "vk_mem_alloc.h"
@@ -11,9 +14,9 @@
 #define SDL_MAIN_HANDLED
 #include "sdl/SDL_syswm.h"
 
-#include "vk_enum_string_helper.h"
-
-#include "common.h"
+#include <functional>
+#include <string>
+#include <vector>
 
 #define VK_CHECK(function_call) { \
     VkResult result = function_call; \
@@ -21,28 +24,23 @@
         error(std::string("Vulkan: ") + string_VkResult(result) + " returned by " + #function_call); \
 }
 
-#include <functional>
-#include <string>
-#include <vector>
-
 struct Vk_Pipeline_Def {
-    VkShaderModule vs_module = VK_NULL_HANDLE;
-    VkShaderModule fs_module = VK_NULL_HANDLE;
-    VkRenderPass render_pass = VK_NULL_HANDLE;
-    VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+    VkShaderModule      vs_module;
+    VkShaderModule      fs_module;
+    VkRenderPass        render_pass;
+    VkPipelineLayout    pipeline_layout;
 
     bool operator==(const Vk_Pipeline_Def& other) const {
         return vs_module == other.vs_module &&
                fs_module == other.fs_module &&
                render_pass == other.render_pass &&
                pipeline_layout == other.pipeline_layout;
-
     }
 };
 
 struct Vk_Image {
-    VkImage handle = VK_NULL_HANDLE;
-    VkImageView view = VK_NULL_HANDLE;
+    VkImage handle;
+    VkImageView view;
 };
 
 //
@@ -57,7 +55,7 @@ void vk_initialize(const SDL_SysWMinfo& window_info);
 void vk_shutdown();
 
 void vk_release_resolution_dependent_resources();
-void vk_restore_resolution_dependent_resources();
+void vk_restore_resolution_dependent_resources(bool vsync);
 
 //
 // Resources allocation.
@@ -129,7 +127,7 @@ struct Vk_Instance {
     Depth_Buffer_Info               depth_info;
 
 #ifndef NDEBUG
-    VkDebugUtilsMessengerEXT        debug_utils_messenger = nullptr;
+    VkDebugUtilsMessengerEXT        debug_utils_messenger;
 #endif
 };
 
