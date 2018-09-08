@@ -110,7 +110,7 @@ static void destroy_swapchain() {
     vk.swapchain_info = Swapchain_Info{};
 }
 
-static void create_instance() {
+static void create_instance(bool enable_validation_layers) {
     const char* instance_extensions[] = {
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
@@ -144,14 +144,13 @@ static void create_instance() {
     desc.enabledExtensionCount   = sizeof(instance_extensions)/sizeof(instance_extensions[0]);
     desc.ppEnabledExtensionNames = instance_extensions;
 
-#ifndef NDEBUG
-    const char* layer_names[] = {
-        "VK_LAYER_LUNARG_standard_validation",
-        "VK_LAYER_LUNARG_monitor"
-    };
-    desc.enabledLayerCount = array_length(layer_names);
-    desc.ppEnabledLayerNames = layer_names;
-#endif
+    if (enable_validation_layers) {
+        static const char* layer_names[] = {
+            "VK_LAYER_LUNARG_standard_validation"
+        };
+        desc.enabledLayerCount = array_length(layer_names);
+        desc.ppEnabledLayerNames = layer_names;
+    }    
 
     VK_CHECK(vkCreateInstance(&desc, nullptr, &vk.instance));
 }
@@ -351,7 +350,7 @@ static void destroy_depth_buffer() {
     vk.depth_info = Depth_Buffer_Info{};
 }
 
-void vk_initialize(const SDL_SysWMinfo& window_info) {
+void vk_initialize(const SDL_SysWMinfo& window_info, bool enable_validation_layers) {
     vk.system_window_info = window_info;
 
     VK_CHECK(volkInitialize());
@@ -368,7 +367,7 @@ void vk_initialize(const SDL_SysWMinfo& window_info) {
     // If Vulkan loader reports it supports Vulkan version that is > X it does not guarantee that X is supported.
     // Only when we successfully create VkInstance by setting VkApplicationInfo::apiVersion to X
     // we will know that X is supported.
-    create_instance();
+    create_instance(enable_validation_layers);
     volkLoadInstance(vk.instance);
 
     // Create debug messenger as early as possible (even before VkDevice is created).

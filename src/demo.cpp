@@ -22,9 +22,9 @@ struct Uniform_Buffer {
     glm::mat4 mvp;
 };
 
-Vk_Demo::Vk_Demo(const SDL_SysWMinfo& window_sys_info, SDL_Window* sdl_window) {
+Vk_Demo::Vk_Demo(const SDL_SysWMinfo& window_sys_info, SDL_Window* sdl_window, bool enable_validation_layers) {
     this->sdl_window = sdl_window;
-    vk_initialize(window_sys_info);
+    vk_initialize(window_sys_info, enable_validation_layers);
 
     {
         VkPhysicalDeviceProperties device_info;

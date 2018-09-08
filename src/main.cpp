@@ -36,7 +36,7 @@ static bool process_events() {
     return true;
 }
 
-int main() {
+int main(int argc, char** argv) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
         error("SDL_Init error");
 
@@ -55,7 +55,13 @@ int main() {
     if (SDL_GetWindowWMInfo(the_window, &window_sys_info) == SDL_FALSE)
         error("failed to get platform specific window information");
 
-    Vk_Demo demo(window_sys_info, the_window);
+    bool enable_validation_layers = false;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--validation") == 0)
+            enable_validation_layers = true;
+    }
+
+    Vk_Demo demo(window_sys_info, the_window, enable_validation_layers);
 
     while (process_events()) {
         if (toogle_fullscreen) {

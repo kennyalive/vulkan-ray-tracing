@@ -7,7 +7,7 @@ struct SDL_SysWMinfo;
 
 class Vk_Demo {
 public:
-    Vk_Demo(const SDL_SysWMinfo& window_sys_info, SDL_Window* sdl_window);
+    Vk_Demo(const SDL_SysWMinfo& window_sys_info, SDL_Window* sdl_window, bool enable_validation_layers);
     ~Vk_Demo();
 
     void run_frame(bool draw_only_background = false);
