@@ -22,10 +22,10 @@ struct Uniform_Buffer {
     glm::mat4 mvp;
 };
 
-Vk_Demo::Vk_Demo(const SDL_SysWMinfo& window_sys_info, SDL_Window* sdl_window, bool enable_validation_layers) {
-    this->sdl_window = sdl_window;
-    vk_initialize(window_sys_info, enable_validation_layers);
-
+Vk_Demo::Vk_Demo(const Demo_Create_Info& create_info)
+    : create_info(create_info)
+{
+    vk_initialize(create_info.vk_create_info);
     {
         VkPhysicalDeviceProperties device_info;
         vkGetPhysicalDeviceProperties(vk.physical_device, &device_info);
@@ -331,7 +331,7 @@ void Vk_Demo::create_pipelines() {
 
 void Vk_Demo::setup_imgui() {
     ImGui::CreateContext();
-    ImGui_ImplSDL2_InitForVulkan(sdl_window);
+    ImGui_ImplSDL2_InitForVulkan(create_info.window);
 
     // Setup Vulkan binding
     ImGui_ImplVulkan_InitInfo init_info{};
@@ -361,7 +361,7 @@ void Vk_Demo::do_imgui() {
     ImGuiIO& io = ImGui::GetIO();
 
     ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame(sdl_window);
+    ImGui_ImplSDL2_NewFrame(create_info.window);
     ImGui::NewFrame();
 
     if (!io.WantCaptureKeyboard) {

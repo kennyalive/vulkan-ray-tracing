@@ -1,6 +1,5 @@
 #include "demo.h"
 
-#define SDL_MAIN_HANDLED
 #include "sdl/SDL.h"
 #include "sdl/SDL_syswm.h"
 
@@ -11,6 +10,17 @@ static SDL_Window* the_window   = nullptr;
 
 static bool toogle_fullscreen   = false;
 static bool handle_resize       = false;
+
+static void parse_command_line(int argc, char** argv, Demo_Create_Info& demo_create_info) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--validation-layers") == 0) {
+            demo_create_info.vk_create_info.enable_validation_layers = true;
+        }
+        if (strcmp(argv[i], "--debug-names") == 0) {
+            demo_create_info.vk_create_info.use_debug_names = true;
+        }
+    }
+}
 
 static bool process_events() {
     SDL_Event event;
@@ -42,6 +52,7 @@ int main(int argc, char** argv) {
 
     struct On_Exit {~On_Exit() { SDL_Quit(); }} exit_action;
 
+    // Create window.
     the_window = SDL_CreateWindow("Vulkan demo",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 720, 720,
         SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
@@ -49,20 +60,19 @@ int main(int argc, char** argv) {
     if (the_window == nullptr)
         error("failed to create SDL window");
 
-    SDL_SysWMinfo window_sys_info;
-    SDL_VERSION(&window_sys_info.version)
-
-    if (SDL_GetWindowWMInfo(the_window, &window_sys_info) == SDL_FALSE)
+    SDL_SysWMinfo windowing_system_info;
+    SDL_VERSION(&windowing_system_info.version);
+    if (SDL_GetWindowWMInfo(the_window, &windowing_system_info) == SDL_FALSE)
         error("failed to get platform specific window information");
 
-    bool enable_validation_layers = false;
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--validation") == 0)
-            enable_validation_layers = true;
-    }
+    // Initialize demo.
+    Demo_Create_Info demo_info{};
+    demo_info.vk_create_info.windowing_system_info = windowing_system_info;
+    demo_info.window = the_window;
+    parse_command_line(argc, argv, demo_info);
+    Vk_Demo demo(demo_info);
 
-    Vk_Demo demo(window_sys_info, the_window, enable_validation_layers);
-
+    // Run main loop.
     while (process_events()) {
         if (toogle_fullscreen) {
             demo.run_frame(true); // draw only background during fullscreen toggle to prevent image stretching

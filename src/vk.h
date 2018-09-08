@@ -11,7 +11,6 @@
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #include "vk_mem_alloc.h"
 
-#define SDL_MAIN_HANDLED
 #include "sdl/SDL_syswm.h"
 
 #include <functional>
@@ -43,13 +42,19 @@ struct Vk_Image {
     VkImageView view;
 };
 
+struct Vk_Create_Info {
+    SDL_SysWMinfo   windowing_system_info;
+    bool            enable_validation_layers;
+    bool            use_debug_names;
+};
+
 //
 // Initialization.
 //
 
 // Initializes VK_Instance structure.
 // After calling this function we get fully functional vulkan subsystem.
-void vk_initialize(const SDL_SysWMinfo& window_info, bool enable_validation_layers);
+void vk_initialize(const Vk_Create_Info& create_info);
 
 // Shutdown vulkan subsystem by releasing resources acquired by Vk_Instance.
 void vk_shutdown();
@@ -91,8 +96,7 @@ struct Depth_Buffer_Info {
 // Vk_Instance contains vulkan resources that do not depend on applicaton logic.
 // This structure is initialized/deinitialized by vk_initialize/vk_shutdown functions correspondingly.
 struct Vk_Instance {
-    SDL_SysWMinfo                   system_window_info;
-    VkExtent2D                      surface_size;
+    Vk_Create_Info                  create_info;
 
     VkInstance                      instance;
     VkPhysicalDevice                physical_device;
@@ -104,6 +108,7 @@ struct Vk_Instance {
 
     VkSurfaceKHR                    surface;
     VkSurfaceFormatKHR              surface_format;
+    VkExtent2D                      surface_size;
     Swapchain_Info                  swapchain_info;
 
     uint32_t                        swapchain_image_index = -1; // current swapchain image
@@ -125,10 +130,7 @@ struct Vk_Instance {
     std::vector<VkPipeline>         pipelines;
 
     Depth_Buffer_Info               depth_info;
-
-#ifndef NDEBUG
     VkDebugUtilsMessengerEXT        debug_utils_messenger;
-#endif
 };
 
 extern Vk_Instance vk;

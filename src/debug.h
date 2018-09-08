@@ -8,7 +8,9 @@ void vk_destroy_debug_utils_messenger();
 
 template <typename Vk_Object_Type>
 void vk_set_debug_name(Vk_Object_Type object, const char* name) {
-#ifndef NDEBUG
+    if (!vk.create_info.use_debug_names)
+        return;
+
     VkDebugUtilsObjectNameInfoEXT name_info { VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT };
     /*char buf[128];
     snprintf(buf, sizeof(buf), "%s 0x%llx", name, (uint64_t)object);*/
@@ -51,5 +53,4 @@ void vk_set_debug_name(Vk_Object_Type object, const char* name) {
 #undef IF_TYPE_THEN_ENUM
 
     VK_CHECK(vkSetDebugUtilsObjectNameEXT(vk.device, &name_info));
-#endif // !NDEBUG
 }

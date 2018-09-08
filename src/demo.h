@@ -1,13 +1,17 @@
 #pragma once
 
 #include "vk.h"
+#include "sdl/SDL_syswm.h"
 #include <vector>
 
-struct SDL_SysWMinfo;
+struct Demo_Create_Info {
+    Vk_Create_Info  vk_create_info;
+    SDL_Window*     window;
+};
 
 class Vk_Demo {
 public:
-    Vk_Demo(const SDL_SysWMinfo& window_sys_info, SDL_Window* sdl_window, bool enable_validation_layers);
+    Vk_Demo(const Demo_Create_Info& create_info);
     ~Vk_Demo();
 
     void run_frame(bool draw_only_background = false);
@@ -36,7 +40,7 @@ private:
     void update_uniform_buffer();
 
 private:
-    SDL_Window*                 sdl_window              = nullptr;
+    const Demo_Create_Info      create_info;
     bool                        show_ui                 = true;
     bool                        vsync                   = true;
 

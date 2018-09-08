@@ -109,13 +109,11 @@ static void destroy_swapchain() {
     vk.swapchain_info = Swapchain_Info{};
 }
 
-static void create_instance(bool enable_validation_layers) {
+static void create_instance() {
     const char* instance_extensions[] = {
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-#ifndef NDEBUG
-		VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-#endif
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME
     };
 
     uint32_t count = 0;
@@ -143,7 +141,7 @@ static void create_instance(bool enable_validation_layers) {
     desc.enabledExtensionCount   = sizeof(instance_extensions)/sizeof(instance_extensions[0]);
     desc.ppEnabledExtensionNames = instance_extensions;
 
-    if (enable_validation_layers) {
+    if (vk.create_info.enable_validation_layers) {
         static const char* layer_names[] = {
             "VK_LAYER_LUNARG_standard_validation"
         };
@@ -185,7 +183,7 @@ static void create_device() {
 
     VkWin32SurfaceCreateInfoKHR desc { VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR };
     desc.hinstance  = ::GetModuleHandle(nullptr);
-    desc.hwnd       = vk.system_window_info.info.win.window;
+    desc.hwnd       = vk.create_info.windowing_system_info.info.win.window;
     VK_CHECK(vkCreateWin32SurfaceKHR(vk.instance, &desc, nullptr, &vk.surface));
 
     // select queue family
@@ -349,11 +347,10 @@ static void destroy_depth_buffer() {
     vk.depth_info = Depth_Buffer_Info{};
 }
 
-void vk_initialize(const SDL_SysWMinfo& window_info, bool enable_validation_layers) {
-    vk.system_window_info = window_info;
+void vk_initialize(const Vk_Create_Info& create_info) {
+    vk.create_info = create_info;
 
     VK_CHECK(volkInitialize());
-
     uint32_t instance_version = volkGetInstanceVersion();
 
     // Check the highest Vulkan instance version supported by the loader.
@@ -366,13 +363,11 @@ void vk_initialize(const SDL_SysWMinfo& window_info, bool enable_validation_laye
     // If Vulkan loader reports it supports Vulkan version that is > X it does not guarantee that X is supported.
     // Only when we successfully create VkInstance by setting VkApplicationInfo::apiVersion to X
     // we will know that X is supported.
-    create_instance(enable_validation_layers);
+    create_instance();
     volkLoadInstance(vk.instance);
 
     // Create debug messenger as early as possible (even before VkDevice is created).
-#ifndef NDEBUG
     vk_create_debug_utils_messenger();
-#endif
 
     create_device();
     volkLoadDevice(vk.device);
@@ -479,33 +474,26 @@ void vk_initialize(const SDL_SysWMinfo& window_info, bool enable_validation_laye
 void vk_shutdown() {
     vkDeviceWaitIdle(vk.device);
 
-    if (vk.staging_buffer != VK_NULL_HANDLE)
+    if (vk.staging_buffer != VK_NULL_HANDLE) {
         vmaDestroyBuffer(vk.allocator, vk.staging_buffer, vk.staging_buffer_allocation);
+    }
 
-    for (auto pipeline : vk.pipelines)
+    for (auto pipeline : vk.pipelines) {
         vkDestroyPipeline(vk.device, pipeline, nullptr);
-
+    }
     vk.pipeline_defs.clear();
     vk.pipelines.clear();
 
     vkDestroyCommandPool(vk.device, vk.command_pool, nullptr);
-
     vkDestroySemaphore(vk.device, vk.image_acquired, nullptr);
     vkDestroySemaphore(vk.device, vk.rendering_finished, nullptr);
     vkDestroyFence(vk.device, vk.rendering_finished_fence, nullptr);
-
     destroy_swapchain();
     destroy_depth_buffer();
-
     vmaDestroyAllocator(vk.allocator);
-    
     vkDestroyDevice(vk.device, nullptr);
     vkDestroySurfaceKHR(vk.instance, vk.surface, nullptr);
-
-#ifndef NDEBUG
     vk_destroy_debug_utils_messenger();
-#endif
-
     vkDestroyInstance(vk.instance, nullptr);
 }
 
