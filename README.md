@@ -7,4 +7,5 @@
   - _--validation-layers_ - enables VK_LAYER_LUNARG_standard_validation layer. VulkanSDK should be installed in order to use this option.
   - _--debug-names_ - enables debug naming of vulkan objects.
 
-![vulkan-demo](https://user-images.githubusercontent.com/4964024/28161150-168fe846-67cb-11e7-973f-c844e3c398b3.jpg)
+![vulkan-base](https://user-images.githubusercontent.com/4964024/45258496-f4f74400-b3b8-11e8-89e0-8c65287a7879.png)
+
