@@ -4,7 +4,6 @@
 #include "geometry.h"
 #include "resource_manager.h"
 
-#include <array>
 #include <algorithm>
 #include <cassert>
 #include <functional>
@@ -285,7 +284,7 @@ static void record_image_layout_transition(
 static void create_depth_buffer() {
     // choose depth image format
     {
-        std::array<VkFormat, 2> candidates = { VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT };
+        VkFormat candidates[2] = { VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT };
         for (auto format : candidates) {
             VkFormatProperties props;
             vkGetPhysicalDeviceFormatProperties(vk.physical_device, format, &props);
@@ -744,7 +743,7 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
         return desc;
     };
 
-    std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages_state {
+    VkPipelineShaderStageCreateInfo shader_stages_state[2] {
         get_shader_stage_desc(VK_SHADER_STAGE_VERTEX_BIT, def.vs_module, "main_vs"),
         get_shader_stage_desc(VK_SHADER_STAGE_FRAGMENT_BIT, def.fs_module, "main_fs")
     };
@@ -844,8 +843,8 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     // Finally create graphics pipeline.
     //
     VkGraphicsPipelineCreateInfo desc { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-    desc.stageCount             = static_cast<uint32_t>(shader_stages_state.size());
-    desc.pStages                = shader_stages_state.data();
+    desc.stageCount             = array_length(shader_stages_state);
+    desc.pStages                = shader_stages_state;
     desc.pVertexInputState      = &vertex_input_state;
     desc.pInputAssemblyState    = &input_assembly_state;
     desc.pTessellationState     = nullptr;
