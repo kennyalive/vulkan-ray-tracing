@@ -69,6 +69,9 @@
       <AdditionalLibraryDirectories>$(ProjectDir)third_party\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <Manifest>
+      <AdditionalManifestFiles>DeclareDPIAware.manifest</AdditionalManifestFiles>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -90,6 +93,9 @@
       <AdditionalLibraryDirectories>$(ProjectDir)third_party\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>SDL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <Manifest>
+      <AdditionalManifestFiles>DeclareDPIAware.manifest</AdditionalManifestFiles>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\common.cpp" />
