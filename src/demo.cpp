@@ -26,12 +26,17 @@ Vk_Demo::Vk_Demo(const SDL_SysWMinfo& window_sys_info, SDL_Window* sdl_window) {
     this->sdl_window = sdl_window;
     vk_initialize(window_sys_info);
 
-    VkPhysicalDeviceProperties props;
-    vkGetPhysicalDeviceProperties(vk.physical_device, &props);
-    uint32_t major = VK_VERSION_MAJOR(props.apiVersion);
-    uint32_t minor = VK_VERSION_MINOR(props.apiVersion);
-    uint32_t patch = VK_VERSION_PATCH(props.apiVersion);
-    printf("Vulkan API version: %d.%d.%d\n", major, minor, patch);
+    {
+        VkPhysicalDeviceProperties device_info;
+        vkGetPhysicalDeviceProperties(vk.physical_device, &device_info);
+
+        printf("Device: %s\n", device_info.deviceName);
+        printf("Vulkan API version: %d.%d.%d\n",
+            VK_VERSION_MAJOR(device_info.apiVersion),
+            VK_VERSION_MINOR(device_info.apiVersion),
+            VK_VERSION_PATCH(device_info.apiVersion)
+        );
+    }
 
     get_resource_manager()->initialize(vk.device, vk.allocator);
 
@@ -376,14 +381,18 @@ void Vk_Demo::do_imgui() {
 
         if (corner != -1)
             ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
-        ImGui::SetNextWindowBgAlpha(0.3f);
+        ImGui::SetNextWindowBgAlpha(0.8f);
 
-        if (ImGui::Begin("Example: Simple Overlay", &show_ui, 
+        if (ImGui::Begin("UI", &show_ui, 
             (corner != -1 ? ImGuiWindowFlags_NoMove : 0) | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
         {
+            ImGui::Text("%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
+            ImGui::Separator();
+            ImGui::Spacing();
             ImGui::Checkbox("Vertical sync", &vsync);
+
             if (ImGui::BeginPopupContextWindow()) {
                 if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;
                 if (ImGui::MenuItem("Top-left",     NULL, corner == 0)) corner = 0;
