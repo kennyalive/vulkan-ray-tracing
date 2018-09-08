@@ -7,6 +7,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_utils_messenger_callback(
     void*                                           user_data)
 {
 #ifdef _WIN32
+    printf("%s\n", callback_data->pMessage);
     OutputDebugStringA(callback_data->pMessage);
     OutputDebugStringA("\n");
     DebugBreak();
