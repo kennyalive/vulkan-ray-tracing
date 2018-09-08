@@ -10,6 +10,12 @@
 
 #include "glm/gtc/matrix_transform.hpp"
 
+#include "imgui/imgui.h"
+#include "imgui/impl/imgui_impl_vulkan.h"
+#include "imgui/impl/imgui_impl_sdl.h"
+
+#include "sdl/SDL_scancode.h"
+
 #include <array>
 #include <chrono>
 
@@ -17,7 +23,8 @@ struct Uniform_Buffer {
     glm::mat4 mvp;
 };
 
-Vk_Demo::Vk_Demo(const SDL_SysWMinfo& window_sys_info) {
+Vk_Demo::Vk_Demo(const SDL_SysWMinfo& window_sys_info, SDL_Window* sdl_window) {
+    this->sdl_window = sdl_window;
     vk_initialize(window_sys_info);
 
     VkPhysicalDeviceProperties props;
@@ -41,6 +48,8 @@ Vk_Demo::Vk_Demo(const SDL_SysWMinfo& window_sys_info) {
     create_pipeline_layouts();
     create_shader_modules();
     create_pipelines();
+
+    setup_imgui();
 }
 
 void Vk_Demo::upload_textures() {
@@ -111,6 +120,7 @@ void Vk_Demo::upload_geometry() {
 
 Vk_Demo::~Vk_Demo() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
+    release_imgui();
     destroy_framebuffers();
     get_resource_manager()->release_resources();
     vk_shutdown();
@@ -317,6 +327,83 @@ void Vk_Demo::create_pipelines() {
     pipeline = vk_find_pipeline(def);
 }
 
+void Vk_Demo::setup_imgui() {
+    ImGui::CreateContext();
+    ImGui_ImplSDL2_InitForVulkan(sdl_window);
+
+    // Setup Vulkan binding
+    ImGui_ImplVulkan_InitInfo init_info{};
+    init_info.Instance          = vk.instance;
+    init_info.PhysicalDevice    = vk.physical_device;
+    init_info.Device            = vk.device;
+    init_info.QueueFamily       = vk.queue_family_index;
+    init_info.Queue             = vk.queue;
+    init_info.DescriptorPool    = descriptor_pool;
+
+    ImGui_ImplVulkan_Init(&init_info, render_pass);
+    ImGui::StyleColorsDark();
+
+    vk_record_and_run_commands(vk.command_pool, vk.queue, [](VkCommandBuffer cb) {
+        ImGui_ImplVulkan_CreateFontsTexture(cb);
+    });
+    ImGui_ImplVulkan_InvalidateFontUploadObjects();
+}
+
+void Vk_Demo::release_imgui() {
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+}
+
+void Vk_Demo::do_imgui() {
+    ImGuiIO& io = ImGui::GetIO();
+
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplSDL2_NewFrame(sdl_window);
+    ImGui::NewFrame();
+
+    if (!io.WantCaptureKeyboard) {
+        if (ImGui::IsKeyPressed(SDL_SCANCODE_F10)) {
+            show_ui = !show_ui;
+        }
+    }
+
+    if (show_ui) {
+        const float DISTANCE = 10.0f;
+        static int corner = 0;
+
+        ImVec2 window_pos = ImVec2((corner & 1) ? ImGui::GetIO().DisplaySize.x - DISTANCE : DISTANCE,
+                                   (corner & 2) ? ImGui::GetIO().DisplaySize.y - DISTANCE : DISTANCE);
+
+        ImVec2 window_pos_pivot = ImVec2((corner & 1) ? 1.0f : 0.0f, (corner & 2) ? 1.0f : 0.0f);
+
+        if (corner != -1)
+            ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
+        ImGui::SetNextWindowBgAlpha(0.3f);
+
+        if (ImGui::Begin("Example: Simple Overlay", &show_ui, 
+            (corner != -1 ? ImGuiWindowFlags_NoMove : 0) | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
+        {
+            ImGui::Checkbox("Vertical sync", &vsync);
+            if (ImGui::BeginPopupContextWindow()) {
+                if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;
+                if (ImGui::MenuItem("Top-left",     NULL, corner == 0)) corner = 0;
+                if (ImGui::MenuItem("Top-right",    NULL, corner == 1)) corner = 1;
+                if (ImGui::MenuItem("Bottom-left",  NULL, corner == 2)) corner = 2;
+                if (ImGui::MenuItem("Bottom-right", NULL, corner == 3)) corner = 3;
+                if (ImGui::MenuItem("Close")) show_ui = false;
+                ImGui::EndPopup();
+            }
+        }
+        ImGui::End();
+    }
+
+    ImGui::Render();
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
+}
+
 using Clock = std::chrono::high_resolution_clock;
 static std::chrono::time_point<Clock> prev_time = Clock::now();
 
@@ -388,14 +475,16 @@ void Vk_Demo::run_frame(bool draw_only_background) {
         vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
     }
 
+    bool old_vsync = vsync;
+    do_imgui();
+
     vkCmdEndRenderPass(vk.command_buffer);
     vk_end_frame();
-}
 
-void Vk_Demo::toggle_vsync() {
-    vsync = !vsync;
-    release_resolution_dependent_resources();
-    restore_resolution_dependent_resources();
+    if (vsync != old_vsync) {
+        release_resolution_dependent_resources();
+        restore_resolution_dependent_resources();
+    }
 }
 
 void Vk_Demo::release_resolution_dependent_resources() {

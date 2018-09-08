@@ -4,39 +4,34 @@
 #include "sdl/SDL.h"
 #include "sdl/SDL_syswm.h"
 
+#include "imgui/imgui.h"
+#include "imgui/impl/imgui_impl_sdl.h"
+
 static SDL_Window* the_window   = nullptr;
 
 static bool toogle_fullscreen   = false;
-static bool toggle_vsync        = false;
 static bool handle_resize       = false;
 
 static bool process_events() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        bool alt_pressed = (SDL_GetModState() & KMOD_LALT) != 0;
+        ImGui_ImplSDL2_ProcessEvent(&event);
 
-        // Quit event.
-        if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
+        if (event.type == SDL_QUIT)
             return false;
 
-        // Fullscreen (Alt-Enter or F11).
-        if (event.type == SDL_KEYDOWN &&
-            (event.key.keysym.sym == SDLK_F11 || event.key.keysym.sym == SDLK_RETURN && alt_pressed))
-        {
-            toogle_fullscreen = true;
+        if (event.type == SDL_KEYDOWN) {
+            SDL_Scancode scancode = event.key.keysym.scancode;
+
+            if (scancode == SDL_SCANCODE_ESCAPE)
+                return false;
+
+            if (scancode == SDL_SCANCODE_F11 || scancode == SDL_SCANCODE_RETURN && (SDL_GetModState() & KMOD_LALT) != 0)
+                toogle_fullscreen = true;
         }
 
-        // Vsync.
-        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F10)
-        {
-            toggle_vsync = true;
-        }
-
-        // Resize event
         if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED)
-        {
             handle_resize = true;
-        }
     }
     return true;
 }
@@ -60,7 +55,7 @@ int main() {
     if (SDL_GetWindowWMInfo(the_window, &window_sys_info) == SDL_FALSE)
         error("failed to get platform specific window information");
 
-    Vk_Demo demo(window_sys_info);
+    Vk_Demo demo(window_sys_info, the_window);
 
     while (process_events()) {
         if (toogle_fullscreen) {
@@ -73,11 +68,6 @@ int main() {
 
             process_events();
             toogle_fullscreen = false;
-        }
-
-        if (toggle_vsync) {
-            demo.toggle_vsync();
-            toggle_vsync = false;
         }
 
         if (handle_resize) {

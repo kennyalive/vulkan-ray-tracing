@@ -59,7 +59,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)third_party\include;$(ProjectDir)third_party\include\glm</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)third_party\include;$(ProjectDir)third_party\include\glm;$(ProjectDir)third_party\include\imgui;$(ProjectDir)third_party\include\sdl</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -77,7 +77,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(ProjectDir)third_party\include;$(ProjectDir)third_party\include\glm</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)third_party\include;$(ProjectDir)third_party\include\glm;$(ProjectDir)third_party\include\imgui;$(ProjectDir)third_party\include\sdl</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -98,6 +98,12 @@
     <ClCompile Include="src\resource_manager.cpp" />
     <ClCompile Include="src\demo.cpp" />
     <ClCompile Include="src\vma_impl.cpp" />
+    <ClCompile Include="third_party\include\imgui\imgui.cpp" />
+    <ClCompile Include="third_party\include\imgui\imgui_demo.cpp" />
+    <ClCompile Include="third_party\include\imgui\imgui_draw.cpp" />
+    <ClCompile Include="third_party\include\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="third_party\include\imgui\impl\imgui_impl_sdl.cpp" />
+    <ClCompile Include="third_party\include\imgui\impl\imgui_impl_vulkan.cpp" />
     <ClCompile Include="third_party\include\volk\volk.c">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -110,6 +116,11 @@
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\resource_manager.h" />
     <ClInclude Include="src\demo.h" />
+    <ClInclude Include="third_party\include\imgui\imconfig.h" />
+    <ClInclude Include="third_party\include\imgui\imgui.h" />
+    <ClInclude Include="third_party\include\imgui\imgui_internal.h" />
+    <ClInclude Include="third_party\include\imgui\impl\imgui_impl_sdl.h" />
+    <ClInclude Include="third_party\include\imgui\impl\imgui_impl_vulkan.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -10,7 +10,25 @@
     <ClCompile Include="src\vma_impl.cpp" />
     <ClCompile Include="src\debug.cpp" />
     <ClCompile Include="third_party\include\volk\volk.c">
-      <Filter>3rdparty</Filter>
+      <Filter>3rdparty\volk</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\include\imgui\imgui.cpp">
+      <Filter>3rdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\include\imgui\impl\imgui_impl_sdl.cpp">
+      <Filter>3rdparty\imgui\impl</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\include\imgui\impl\imgui_impl_vulkan.cpp">
+      <Filter>3rdparty\imgui\impl</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\include\imgui\imgui_demo.cpp">
+      <Filter>3rdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\include\imgui\imgui_draw.cpp">
+      <Filter>3rdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\include\imgui\imgui_widgets.cpp">
+      <Filter>3rdparty\imgui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -20,10 +38,34 @@
     <ClInclude Include="src\geometry.h" />
     <ClInclude Include="src\common.h" />
     <ClInclude Include="src\debug.h" />
+    <ClInclude Include="third_party\include\imgui\impl\imgui_impl_sdl.h">
+      <Filter>3rdparty\imgui\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\include\imgui\impl\imgui_impl_vulkan.h">
+      <Filter>3rdparty\imgui\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\include\imgui\imconfig.h">
+      <Filter>3rdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\include\imgui\imgui.h">
+      <Filter>3rdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\include\imgui\imgui_internal.h">
+      <Filter>3rdparty\imgui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="3rdparty">
       <UniqueIdentifier>{e8ccf0b2-0a62-4483-9782-0269fc83579a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\volk">
+      <UniqueIdentifier>{8845d206-25f0-438f-ab89-2ddff8cd9cfb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\imgui">
+      <UniqueIdentifier>{cf91d998-9118-4402-a859-dee7b61ac5a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\imgui\impl">
+      <UniqueIdentifier>{67862dcc-703c-4c08-bae0-104bca677a76}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

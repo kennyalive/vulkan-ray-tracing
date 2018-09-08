@@ -7,3 +7,4 @@ build/Release/intermediate/
 *.ipdb
 *.iobj
 third_party/dxc/
+imgui.ini

@@ -7,12 +7,10 @@ struct SDL_SysWMinfo;
 
 class Vk_Demo {
 public:
-    Vk_Demo(const SDL_SysWMinfo& window_sys_info);
+    Vk_Demo(const SDL_SysWMinfo& window_sys_info, SDL_Window* sdl_window);
     ~Vk_Demo();
 
     void run_frame(bool draw_only_background = false);
-
-    void toggle_vsync();
 
     void release_resolution_dependent_resources();
     void restore_resolution_dependent_resources();
@@ -31,9 +29,15 @@ private:
     void create_shader_modules();
     void create_pipelines();
 
+    void setup_imgui();
+    void release_imgui();
+    void do_imgui();
+
     void update_uniform_buffer();
 
 private:
+    SDL_Window*                 sdl_window              = nullptr;
+    bool                        show_ui                 = true;
     bool                        vsync                   = true;
 
     VkSampler                   sampler                 = VK_NULL_HANDLE;
