@@ -16,7 +16,6 @@
 
 #include "sdl/SDL_scancode.h"
 
-#include <array>
 #include <chrono>
 
 struct Uniform_Buffer {
@@ -175,9 +174,9 @@ void Vk_Demo::create_framebuffers() {
     desc.height = vk.surface_size.height;
     desc.layers = 1;
 
-    std::array<VkImageView, 2> attachments {VK_NULL_HANDLE, vk.depth_info.image_view};
-    desc.attachmentCount = static_cast<uint32_t>(attachments.size());
-    desc.pAttachments    = attachments.data();
+    VkImageView attachments[] = {VK_NULL_HANDLE, vk.depth_info.image_view};
+    desc.attachmentCount = array_length(attachments);
+    desc.pAttachments    = attachments;
     desc.renderPass      = render_pass;
 
     swapchain_framebuffers.resize(vk.swapchain_info.images.size());
@@ -201,18 +200,16 @@ void Vk_Demo::create_descriptor_sets() {
     // Descriptor pool.
     //
     {
-        std::array<VkDescriptorPoolSize, 3> pool_sizes;
-        pool_sizes[0].type              = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        pool_sizes[0].descriptorCount   = 16;
-        pool_sizes[1].type              = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        pool_sizes[1].descriptorCount   = 16;
-        pool_sizes[2].type              = VK_DESCRIPTOR_TYPE_SAMPLER;
-        pool_sizes[2].descriptorCount   = 16;
+        VkDescriptorPoolSize pool_sizes[] = {
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16},
+            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 16},
+            {VK_DESCRIPTOR_TYPE_SAMPLER, 16}
+        };
 
         VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
         desc.maxSets        = 32;
-        desc.poolSizeCount  = static_cast<uint32_t>(pool_sizes.size());
-        desc.pPoolSizes     = pool_sizes.data();
+        desc.poolSizeCount  = array_length(pool_sizes);
+        desc.pPoolSizes     = pool_sizes;
 
         descriptor_pool = get_resource_manager()->create_descriptor_pool(desc, "global descriptor pool");
     }
