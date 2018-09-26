@@ -9,25 +9,25 @@
     <ClCompile Include="src\common.cpp" />
     <ClCompile Include="src\vma_impl.cpp" />
     <ClCompile Include="src\debug.cpp" />
-    <ClCompile Include="third_party\include\volk\volk.c">
+    <ClCompile Include="third_party\volk\volk.c">
       <Filter>3rdparty\volk</Filter>
     </ClCompile>
-    <ClCompile Include="third_party\include\imgui\imgui.cpp">
+    <ClCompile Include="third_party\imgui\imgui.cpp">
       <Filter>3rdparty\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="third_party\include\imgui\impl\imgui_impl_sdl.cpp">
+    <ClCompile Include="third_party\imgui\impl\imgui_impl_sdl.cpp">
       <Filter>3rdparty\imgui\impl</Filter>
     </ClCompile>
-    <ClCompile Include="third_party\include\imgui\impl\imgui_impl_vulkan.cpp">
+    <ClCompile Include="third_party\imgui\impl\imgui_impl_vulkan.cpp">
       <Filter>3rdparty\imgui\impl</Filter>
     </ClCompile>
-    <ClCompile Include="third_party\include\imgui\imgui_demo.cpp">
+    <ClCompile Include="third_party\imgui\imgui_demo.cpp">
       <Filter>3rdparty\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="third_party\include\imgui\imgui_draw.cpp">
+    <ClCompile Include="third_party\imgui\imgui_draw.cpp">
       <Filter>3rdparty\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="third_party\include\imgui\imgui_widgets.cpp">
+    <ClCompile Include="third_party\imgui\imgui_widgets.cpp">
       <Filter>3rdparty\imgui</Filter>
     </ClCompile>
     <ClCompile Include="src\matrix.cpp" />
@@ -39,19 +39,19 @@
     <ClInclude Include="src\geometry.h" />
     <ClInclude Include="src\common.h" />
     <ClInclude Include="src\debug.h" />
-    <ClInclude Include="third_party\include\imgui\impl\imgui_impl_sdl.h">
+    <ClInclude Include="third_party\imgui\impl\imgui_impl_sdl.h">
       <Filter>3rdparty\imgui\impl</Filter>
     </ClInclude>
-    <ClInclude Include="third_party\include\imgui\impl\imgui_impl_vulkan.h">
+    <ClInclude Include="third_party\imgui\impl\imgui_impl_vulkan.h">
       <Filter>3rdparty\imgui\impl</Filter>
     </ClInclude>
-    <ClInclude Include="third_party\include\imgui\imconfig.h">
+    <ClInclude Include="third_party\imgui\imconfig.h">
       <Filter>3rdparty\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="third_party\include\imgui\imgui.h">
+    <ClInclude Include="third_party\imgui\imgui.h">
       <Filter>3rdparty\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="third_party\include\imgui\imgui_internal.h">
+    <ClInclude Include="third_party\imgui\imgui_internal.h">
       <Filter>3rdparty\imgui</Filter>
     </ClInclude>
     <ClInclude Include="src\matrix.h" />
