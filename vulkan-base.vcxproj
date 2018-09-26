@@ -59,7 +59,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)third_party\include;$(ProjectDir)third_party\include\glm;$(ProjectDir)third_party\include\imgui;$(ProjectDir)third_party\include\sdl</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)third_party\include;$(ProjectDir)third_party\include\imgui;$(ProjectDir)third_party\include\sdl</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_DEBUG;SDL_MAIN_HANDLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -81,7 +81,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(ProjectDir)third_party\include;$(ProjectDir)third_party\include\glm;$(ProjectDir)third_party\include\imgui;$(ProjectDir)third_party\include\sdl</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)third_party\include;$(ProjectDir)third_party\include\imgui;$(ProjectDir)third_party\include\sdl</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>NDEBUG;SDL_MAIN_HANDLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -101,6 +101,7 @@
     <ClCompile Include="src\common.cpp" />
     <ClCompile Include="src\debug.cpp" />
     <ClCompile Include="src\geometry.cpp" />
+    <ClCompile Include="src\matrix.cpp" />
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\resource_manager.cpp" />
@@ -121,6 +122,8 @@
     <ClInclude Include="src\common.h" />
     <ClInclude Include="src\debug.h" />
     <ClInclude Include="src\geometry.h" />
+    <ClInclude Include="src\matrix.h" />
+    <ClInclude Include="src\vector.h" />
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\resource_manager.h" />
     <ClInclude Include="src\demo.h" />

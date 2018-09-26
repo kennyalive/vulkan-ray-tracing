@@ -30,6 +30,7 @@
     <ClCompile Include="third_party\include\imgui\imgui_widgets.cpp">
       <Filter>3rdparty\imgui</Filter>
     </ClCompile>
+    <ClCompile Include="src\matrix.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\resource_manager.h" />
@@ -53,6 +54,8 @@
     <ClInclude Include="third_party\include\imgui\imgui_internal.h">
       <Filter>3rdparty\imgui</Filter>
     </ClInclude>
+    <ClInclude Include="src\matrix.h" />
+    <ClInclude Include="src\vector.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="3rdparty">

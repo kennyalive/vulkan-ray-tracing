@@ -1,15 +1,15 @@
 #pragma once
 
+#include "vector.h"
 #include "vk.h"
 
-#include <glm/glm.hpp>
 #include <array>
 #include <vector>
 
 struct Vertex {
-    glm::vec3 pos;
-    glm::vec2 tex_coord;
-    glm::vec3 normal;
+    Vector pos;
+    Vector2 tex_coord;
+    Vector normal;
 
     bool operator==(const Vertex& other) const {
         return pos == other.pos && tex_coord == other.tex_coord;

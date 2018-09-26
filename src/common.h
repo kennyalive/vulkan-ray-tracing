@@ -5,9 +5,21 @@
 #include <string>
 #include <vector>
 
+constexpr float Pi = 3.14159265f;
+
 template <typename T, size_t N>
 constexpr uint32_t array_length(T(&)[N]) {
     return N;
+}
+
+inline float radians(float degrees) {
+    constexpr float deg_2_rad = Pi / 180.f;
+    return degrees * deg_2_rad;
+}
+
+inline float degrees(float radians) {
+    constexpr float rad_2_deg = 180.f / Pi;
+    return radians * rad_2_deg;
 }
 
 void error(const std::string& message);
@@ -22,6 +34,13 @@ int64_t elapsed_milliseconds(Timestamp timestamp);
 int64_t elapsed_nanoseconds(Timestamp timestamp);
 
 double get_base_cpu_frequency_ghz();
+
+// Boost hash combine.
+template <typename T>
+inline void hash_combine(std::size_t& seed, T value) {
+    std::hash<T> hasher;
+    seed ^= hasher(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
 
 #if 0
 #define START_TIMER { Timestamp t;

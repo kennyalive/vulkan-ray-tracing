@@ -1,18 +1,18 @@
 #include "geometry.h"
 
-#include <glm/gtx/hash.hpp>
-
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
 #include <unordered_map>
 
-void error(const std::string& message);
-
 namespace std {
 template<> struct hash<Vertex> {
-    size_t operator()(Vertex const& vertex) const {
-        return hash<glm::vec3>()(vertex.pos) ^ hash<glm::vec2>()(vertex.tex_coord) << 1;
+    size_t operator()(Vertex const& v) const {
+        size_t hash = 0;
+        hash_combine(hash, v.pos);
+        hash_combine(hash, v.tex_coord);
+        //hash_combine(hash, v.normal);
+        return hash;
     }
 };
 }
@@ -26,8 +26,8 @@ Model load_obj_model(const std::string& path) {
     if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, path.c_str()))
         error("failed to load obj model: " + path);
 
-    glm::vec3 model_min(std::numeric_limits<float>::infinity());
-    glm::vec3 model_max(-std::numeric_limits<float>::infinity());
+    Vector model_min(std::numeric_limits<float>::infinity());
+    Vector model_max(-std::numeric_limits<float>::infinity());
 
     Model model;
     std::unordered_map<Vertex, std::size_t> unique_vertices;
@@ -41,7 +41,7 @@ Model load_obj_model(const std::string& path) {
             };
             vertex.tex_coord = {
                 attrib.texcoords[2 * index.texcoord_index + 0],
-                1.0 - attrib.texcoords[2 * index.texcoord_index + 1]
+                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
             };
             /*vertex.normal = {
                 attrib.normals[3 * index.normal_index + 0],
@@ -66,7 +66,7 @@ Model load_obj_model(const std::string& path) {
     }
 
     // center the model
-    glm::vec3 center = (model_min + model_max) * 0.5f;
+    Vector center = (model_min + model_max) * 0.5f;
     for (auto& v : model.vertices) {
         v.pos -= center;
     }
