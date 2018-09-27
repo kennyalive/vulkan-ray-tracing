@@ -68,7 +68,7 @@ void Vk_Demo::upload_textures() {
         return texture;
     };
 
-    texture = load_texture("../../data/model.jpg");
+    texture = load_texture("../../data/iron-man/model.jpg");
 
     // create sampler
     VkSamplerCreateInfo desc { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
@@ -88,7 +88,7 @@ void Vk_Demo::upload_textures() {
 }
 
 void Vk_Demo::upload_geometry() {
-    Model model = load_obj_model("../../data/model.obj");
+    Model model = load_obj_model("../../data/iron-man/model.obj");
     model_index_count = static_cast<uint32_t>(model.indices.size());
 
     {
