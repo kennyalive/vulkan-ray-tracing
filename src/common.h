@@ -23,6 +23,7 @@ inline float degrees(float radians) {
 }
 
 void error(const std::string& message);
+std::string get_resource_path(const std::string& resource_relative_path);
 std::vector<uint8_t> read_binary_file(const std::string& file_name);
 
 struct Timestamp {

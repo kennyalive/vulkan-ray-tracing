@@ -2,9 +2,26 @@
 #include <fstream>
 #include <vector>
 
+// Default data folder path. Can be changed with --data-dir command line option.
+std::string g_data_dir = "./data";
+
 void error(const std::string& message) {
     printf("%s\n", message.c_str());
     throw std::runtime_error(message);
+}
+
+static std::string join_paths(std::string path1, std::string path2) {
+  if (!path1.empty() && (path1.back() == '/' || path1.back() == '\\'))
+    path1 = path1.substr(0, path1.length() - 1);
+
+  if (!path2.empty() && (path2[0] == '/' || path2[0] == '\\'))
+    path2 = path2.substr(1, path2.length() - 1);
+
+  return path1 + '/' + path2;
+}
+
+std::string get_resource_path(const std::string& resource_relative_path) {
+    return join_paths(g_data_dir, resource_relative_path);
 }
 
 std::vector<uint8_t> read_binary_file(const std::string& file_name) {

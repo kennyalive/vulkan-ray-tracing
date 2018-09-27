@@ -68,7 +68,7 @@ void Vk_Demo::upload_textures() {
         return texture;
     };
 
-    texture = load_texture("../../data/iron-man/model.jpg");
+    texture = load_texture(get_resource_path("iron-man/model.jpg"));
 
     // create sampler
     VkSamplerCreateInfo desc { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
@@ -88,7 +88,7 @@ void Vk_Demo::upload_textures() {
 }
 
 void Vk_Demo::upload_geometry() {
-    Model model = load_obj_model("../../data/iron-man/model.obj");
+    Model model = load_obj_model(get_resource_path("iron-man/model.obj"));
     model_index_count = static_cast<uint32_t>(model.indices.size());
 
     {
@@ -300,7 +300,7 @@ void Vk_Demo::create_pipeline_layouts() {
 }
 
 void Vk_Demo::create_shader_modules() {
-    auto create_shader_module = [](const char* file_name, const char* debug_name) {
+    auto create_shader_module = [](const std::string& file_name, const char* debug_name) {
         std::vector<uint8_t> bytes = read_binary_file(file_name);
 
         if (bytes.size() % 4 != 0) {
@@ -315,8 +315,8 @@ void Vk_Demo::create_shader_modules() {
 
         return get_resource_manager()->create_shader_module(desc, debug_name);
     };
-    model_vs = create_shader_module("../../data/spirv/model.vb", "vertex shader");
-    model_fs = create_shader_module("../../data/spirv/model.fb", "fragment shader");
+    model_vs = create_shader_module(get_resource_path("spirv/model.vb"), "vertex shader");
+    model_fs = create_shader_module(get_resource_path("spirv/model.fb"), "fragment shader");
 }
 
 void Vk_Demo::create_pipelines() {
