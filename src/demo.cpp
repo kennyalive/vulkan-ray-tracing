@@ -26,15 +26,25 @@ Vk_Demo::Vk_Demo(const Demo_Create_Info& create_info)
 {
     vk_initialize(create_info.vk_create_info);
     {
-        VkPhysicalDeviceProperties device_info;
-        vkGetPhysicalDeviceProperties(vk.physical_device, &device_info);
+        VkPhysicalDeviceRaytracingPropertiesNVX raytracing_properties { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAYTRACING_PROPERTIES_NVX };
 
-        printf("Device: %s\n", device_info.deviceName);
+        VkPhysicalDeviceProperties2 physical_device_properties { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+        physical_device_properties.pNext = &raytracing_properties;
+
+        vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
+
+        printf("Device: %s\n", physical_device_properties.properties.deviceName);
         printf("Vulkan API version: %d.%d.%d\n",
-            VK_VERSION_MAJOR(device_info.apiVersion),
-            VK_VERSION_MINOR(device_info.apiVersion),
-            VK_VERSION_PATCH(device_info.apiVersion)
+            VK_VERSION_MAJOR(physical_device_properties.properties.apiVersion),
+            VK_VERSION_MINOR(physical_device_properties.properties.apiVersion),
+            VK_VERSION_PATCH(physical_device_properties.properties.apiVersion)
         );
+
+        printf("\n");
+        printf("VkPhysicalDeviceRaytracingPropertiesNVX:\n");
+        printf("  shaderHeaderSize = %u\n", raytracing_properties.shaderHeaderSize);
+        printf("  maxRecursionDepth = %u\n", raytracing_properties.maxRecursionDepth);
+        printf("  maxGeometryCount = %u\n", raytracing_properties.maxGeometryCount);
     }
 
     get_resource_manager()->initialize(vk.device, vk.allocator);
@@ -391,6 +401,7 @@ void Vk_Demo::do_imgui() {
             ImGui::Separator();
             ImGui::Spacing();
             ImGui::Checkbox("Vertical sync", &vsync);
+            ImGui::Checkbox("Animate", &animate);
 
             if (ImGui::BeginPopupContextWindow()) {
                 if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;
@@ -410,15 +421,18 @@ void Vk_Demo::do_imgui() {
 }
 
 using Clock = std::chrono::high_resolution_clock;
-static std::chrono::time_point<Clock> prev_time = Clock::now();
+using Time = std::chrono::time_point<Clock>;
+static Time prev_time = Clock::now();
 
 void Vk_Demo::update_uniform_buffer() {
-    // Update time.
-    std::chrono::time_point<Clock> current_time = Clock::now();
-    double time_delta = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - prev_time).count() / 1000.0;
-    prev_time = current_time;
+    // Update simulation time.
     static double time = 0.0;
-    time += time_delta;
+    Time current_time = Clock::now();        
+    if (animate) {
+        double time_delta = std::chrono::duration_cast<std::chrono::microseconds>(current_time - prev_time).count() / 1e6;
+        time += time_delta;
+    }
+    prev_time = current_time;
 
     // Update mvp matrix.
     Uniform_Buffer ubo;

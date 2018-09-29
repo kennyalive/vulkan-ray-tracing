@@ -10,6 +10,7 @@ static bool toogle_fullscreen   = false;
 static bool handle_resize       = false;
 
 static bool parse_command_line(int argc, char** argv, Demo_Create_Info& demo_create_info) {
+    bool found_unknown_option = false;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--validation-layers") == 0) {
             demo_create_info.vk_create_info.enable_validation_layers = true;
@@ -33,8 +34,11 @@ static bool parse_command_line(int argc, char** argv, Demo_Create_Info& demo_cre
             printf("%-25s Shows this information.\n", "--help");
             return false;
         }
+        else
+            found_unknown_option = true;
     }
-    printf("Use --help to list all options.\n");
+    if (found_unknown_option)
+        printf("Use --help to list all options.\n");
     return true;
 }
 

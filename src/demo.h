@@ -43,6 +43,7 @@ private:
     const Demo_Create_Info      create_info;
     bool                        show_ui                 = true;
     bool                        vsync                   = true;
+    bool                        animate                 = false;
 
     VkSampler                   sampler                 = VK_NULL_HANDLE;
     Vk_Image                    texture;

@@ -212,7 +212,8 @@ static void create_device() {
     // create VkDevice
     {
         const char* device_extensions[] = {
-            VK_KHR_SWAPCHAIN_EXTENSION_NAME
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+            VK_NVX_RAYTRACING_EXTENSION_NAME
         };
 
         uint32_t count = 0;
