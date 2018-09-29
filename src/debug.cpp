@@ -6,6 +6,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_utils_messenger_callback(
     const VkDebugUtilsMessengerCallbackDataEXT*     callback_data,
     void*                                           user_data)
 {
+    if (strstr(callback_data->pMessage, "Device Extension VK_NVX_raytracing is not supported by this layer.") != 0 ||
+        strstr(callback_data->pMessage, "pProperties->pNext chain includes a structure with unknown VkStructureType"))
+        return VK_FALSE;
+
 #ifdef _WIN32
     printf("%s\n", callback_data->pMessage);
     OutputDebugStringA(callback_data->pMessage);

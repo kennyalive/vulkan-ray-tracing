@@ -51,6 +51,7 @@ Vk_Demo::Vk_Demo(const Demo_Create_Info& create_info)
 
     upload_textures();
     upload_geometry();
+    create_acceleration_structure();
 
     uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &uniform_buffer_ptr, "uniform buffer to store matrices");
@@ -99,6 +100,7 @@ void Vk_Demo::upload_textures() {
 
 void Vk_Demo::upload_geometry() {
     Model model = load_obj_model(get_resource_path("iron-man/model.obj"));
+    model_vertex_count = static_cast<uint32_t>(model.vertices.size());
     model_index_count = static_cast<uint32_t>(model.indices.size());
 
     {
@@ -131,10 +133,50 @@ void Vk_Demo::upload_geometry() {
     }
 }
 
+void Vk_Demo::create_acceleration_structure() {
+    VkGeometryTrianglesNVX triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NVX };
+    triangles.vertexData    = vertex_buffer;
+    triangles.vertexOffset  = 0;
+    triangles.vertexCount   = model_vertex_count;
+    triangles.vertexStride  = sizeof(Vertex);
+    triangles.vertexFormat  = VK_FORMAT_R32G32B32_SFLOAT;
+    triangles.indexData     = index_buffer;
+    triangles.indexOffset   = 0;
+    triangles.indexCount    = model_index_count;
+    triangles.indexType     = VK_INDEX_TYPE_UINT32;
+
+    VkGeometryNVX geometry { VK_STRUCTURE_TYPE_GEOMETRY_NVX };
+    geometry.geometryType       = VK_GEOMETRY_TYPE_TRIANGLES_NVX;
+    geometry.geometry.triangles = triangles;
+
+    VkAccelerationStructureCreateInfoNVX create_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NVX };
+    create_info.type            = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX;
+    create_info.geometryCount   = 1;
+    create_info.pGeometries     = &geometry;
+    VK_CHECK(vkCreateAccelerationStructureNVX(vk.device, &create_info, nullptr, &acceleration_structure));
+
+    VkAccelerationStructureMemoryRequirementsInfoNVX memory_requirements_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX };
+    memory_requirements_info.accelerationStructure = acceleration_structure;
+    VkMemoryRequirements2 memory_requirements { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2 };
+    vkGetAccelerationStructureMemoryRequirementsNVX(vk.device, &memory_requirements_info, &memory_requirements);
+    VmaAllocationCreateInfo alloc_create_info{};
+    alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    VmaAllocationInfo alloc_info;
+    VK_CHECK(vmaAllocateMemory(vk.allocator, &memory_requirements.memoryRequirements, &alloc_create_info, &acceleration_structure_allocation, &alloc_info));
+
+    VkBindAccelerationStructureMemoryInfoNVX bind_info { VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NVX };
+    bind_info.accelerationStructure = acceleration_structure;
+    bind_info.memory                = alloc_info.deviceMemory;
+    bind_info.memoryOffset          = alloc_info.offset;
+    VK_CHECK(vkBindAccelerationStructureMemoryNVX(vk.device, 1, &bind_info));
+}
+
 Vk_Demo::~Vk_Demo() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
     release_imgui();
     destroy_framebuffers();
+    vkDestroyAccelerationStructureNVX(vk.device, acceleration_structure, nullptr);
+    vmaFreeMemory(vk.allocator, acceleration_structure_allocation);
     get_resource_manager()->release_resources();
     vk_shutdown();
 }

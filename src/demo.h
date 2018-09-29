@@ -22,6 +22,7 @@ public:
 private:
     void upload_textures();
     void upload_geometry();
+    void create_acceleration_structure();
 
     void create_render_passes();
 
@@ -53,7 +54,11 @@ private:
 
     VkBuffer                    vertex_buffer           = VK_NULL_HANDLE;
     VkBuffer                    index_buffer            = VK_NULL_HANDLE;
+    uint32_t                    model_vertex_count      = 0;
     uint32_t                    model_index_count       = 0;
+
+    VkAccelerationStructureNVX  acceleration_structure  = VK_NULL_HANDLE;
+    VmaAllocation               acceleration_structure_allocation = VK_NULL_HANDLE;
 
     VkRenderPass                render_pass             = VK_NULL_HANDLE;
     std::vector<VkFramebuffer>  swapchain_framebuffers;
