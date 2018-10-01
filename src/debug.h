@@ -49,6 +49,7 @@ void vk_set_debug_name(Vk_Object_Type object, const char* name) {
     else IF_TYPE_THEN_ENUM(VkSurfaceKHR,                VK_OBJECT_TYPE_SURFACE_KHR                  )
     else IF_TYPE_THEN_ENUM(VkSwapchainKHR,              VK_OBJECT_TYPE_SWAPCHAIN_KHR                )
     else IF_TYPE_THEN_ENUM(VkDebugUtilsMessengerEXT,    VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT    )
+    else IF_TYPE_THEN_ENUM(VkAccelerationStructureNVX,  VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NVX   )
     else static_assert(false, "Unknown Vulkan object type");
 #undef IF_TYPE_THEN_ENUM
 

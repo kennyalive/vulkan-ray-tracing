@@ -52,6 +52,12 @@ int64_t elapsed_milliseconds(Timestamp timestamp) {
     return static_cast<int64_t>(milliseconds);
 }
 
+int64_t elapsed_microseconds(Timestamp timestamp) {
+    auto duration = std::chrono::steady_clock::now() - timestamp.t;
+    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+    return static_cast<int64_t>(microseconds);
+}
+
 int64_t elapsed_nanoseconds(Timestamp timestamp) {
     auto duration = std::chrono::steady_clock::now() - timestamp.t;
     auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();

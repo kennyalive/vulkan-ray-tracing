@@ -32,6 +32,7 @@ struct Timestamp {
 };
 
 int64_t elapsed_milliseconds(Timestamp timestamp);
+int64_t elapsed_microseconds(Timestamp timestamp);
 int64_t elapsed_nanoseconds(Timestamp timestamp);
 
 double get_base_cpu_frequency_ghz();

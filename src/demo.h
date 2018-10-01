@@ -22,7 +22,7 @@ public:
 private:
     void upload_textures();
     void upload_geometry();
-    void create_acceleration_structure();
+    void create_acceleration_structures();
 
     void create_render_passes();
 
@@ -57,8 +57,11 @@ private:
     uint32_t                    model_vertex_count      = 0;
     uint32_t                    model_index_count       = 0;
 
-    VkAccelerationStructureNVX  acceleration_structure  = VK_NULL_HANDLE;
-    VmaAllocation               acceleration_structure_allocation = VK_NULL_HANDLE;
+    VkAccelerationStructureNVX  bottom_level_accel = VK_NULL_HANDLE;
+    VmaAllocation               bottom_level_accel_allocation = VK_NULL_HANDLE;
+
+    VkAccelerationStructureNVX  top_level_accel = VK_NULL_HANDLE;
+    VmaAllocation               top_level_accel_allocation = VK_NULL_HANDLE;
 
     VkRenderPass                render_pass             = VK_NULL_HANDLE;
     std::vector<VkFramebuffer>  swapchain_framebuffers;
