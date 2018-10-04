@@ -1,0 +1,10 @@
+#version 460
+#extension GL_NVX_raytracing : require
+
+layout(binding = 0, rgba8) uniform image2D image;
+
+void main() {
+    vec2 pixel_center = vec2(gl_LaunchIDNVX.xy) + vec2(0.5);
+    vec2 uv = pixel_center / vec2(gl_LaunchSizeNVX.xy);
+    imageStore(image, ivec2(gl_LaunchIDNVX.xy), vec4(uv.x, uv.y, 0.0, 0.0));
+}

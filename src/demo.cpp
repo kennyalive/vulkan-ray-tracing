@@ -62,6 +62,7 @@ Vk_Demo::Vk_Demo(const Demo_Create_Info& create_info)
     create_pipeline_layouts();
     create_shader_modules();
     create_pipelines();
+    create_raytracing_pipeline();
 
     setup_imgui();
 }
@@ -323,6 +324,10 @@ Vk_Demo::~Vk_Demo() {
     vkDestroyAccelerationStructureNVX(vk.device, top_level_accel, nullptr);
     vmaFreeMemory(vk.allocator, top_level_accel_allocation);
 
+    vkDestroyDescriptorSetLayout(vk.device, raytracing_descriptor_set_layout, nullptr);
+    vkDestroyPipelineLayout(vk.device, raytracing_pipeline_layout, nullptr);
+    vkDestroyPipeline(vk.device, raytracing_pipeline, nullptr);
+
     get_resource_manager()->release_resources();
     vk_shutdown();
 }
@@ -513,8 +518,24 @@ void Vk_Demo::create_shader_modules() {
 
         return get_resource_manager()->create_shader_module(desc, debug_name);
     };
-    model_vs = create_shader_module(get_resource_path("spirv/model.vb"), "vertex shader");
-    model_fs = create_shader_module(get_resource_path("spirv/model.fb"), "fragment shader");
+    model_vs = create_shader_module("spirv/model.vb", "vertex shader");
+    model_fs = create_shader_module("spirv/model.fb", "fragment shader");
+}
+
+VkShaderModule load_spirv(const std::string& spirv_file) {
+    std::vector<uint8_t> bytes = read_binary_file(spirv_file);
+
+    if (bytes.size() % 4 != 0) {
+        error("Vulkan: SPIR-V binary buffer size is not multiple of 4");
+    }
+
+    VkShaderModuleCreateInfo create_info { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO } ;
+    create_info.codeSize = bytes.size();
+    create_info.pCode = reinterpret_cast<const uint32_t*>(bytes.data());
+
+    VkShaderModule shader_module;
+    VK_CHECK(vkCreateShaderModule(vk.device, &create_info, nullptr, &shader_module));
+    return shader_module;
 }
 
 void Vk_Demo::create_pipelines() {
@@ -524,6 +545,53 @@ void Vk_Demo::create_pipelines() {
     def.render_pass = render_pass;
     def.pipeline_layout = pipeline_layout;
     pipeline = vk_find_pipeline(def);
+}
+
+void Vk_Demo::create_raytracing_pipeline() {
+    // Descriptor set.
+    {
+        VkDescriptorSetLayoutBinding layout_bindings[1] {};
+        layout_bindings[0].binding          = 0;
+        layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layout_bindings[0].descriptorCount  = 1;
+        layout_bindings[0].stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+
+        VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        create_info.bindingCount    = array_length(layout_bindings);
+        create_info.pBindings       = layout_bindings;
+        VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &raytracing_descriptor_set_layout));
+    }
+
+    // Pipeline layout.
+    {
+        VkPipelineLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+        create_info.setLayoutCount  = 1;
+        create_info.pSetLayouts     = &raytracing_descriptor_set_layout;
+        VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &raytracing_pipeline_layout));
+    }
+
+    // Pipeline.
+    {
+        VkShaderModule rgen_shader = load_spirv("spirv/simple.rgenb");
+
+        VkPipelineShaderStageCreateInfo stage_infos[1] {};
+        stage_infos[0].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stage_infos[0].stage    = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+        stage_infos[0].module   = rgen_shader;
+        stage_infos[0].pName    = "main";
+
+        uint32_t group_numbers[1] = { 0 };
+
+        VkRaytracingPipelineCreateInfoNVX create_info { VK_STRUCTURE_TYPE_RAYTRACING_PIPELINE_CREATE_INFO_NVX };
+        create_info.stageCount          = array_length(stage_infos);
+        create_info.pStages             = stage_infos;
+        create_info.pGroupNumbers       = group_numbers;
+        create_info.maxRecursionDepth   = 1;
+        create_info.layout              = raytracing_pipeline_layout;
+        VK_CHECK(vkCreateRaytracingPipelinesNVX(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &raytracing_pipeline));
+
+        vkDestroyShaderModule(vk.device, rgen_shader, nullptr);
+    }
 }
 
 void Vk_Demo::setup_imgui() {

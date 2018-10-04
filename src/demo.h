@@ -33,6 +33,7 @@ private:
     void create_pipeline_layouts();
     void create_shader_modules();
     void create_pipelines();
+    void create_raytracing_pipeline();
 
     void setup_imgui();
     void release_imgui();
@@ -75,4 +76,8 @@ private:
 
     VkPipelineLayout            pipeline_layout         = VK_NULL_HANDLE;
     VkPipeline                  pipeline                = VK_NULL_HANDLE;
+
+    VkDescriptorSetLayout       raytracing_descriptor_set_layout    = VK_NULL_HANDLE;
+    VkPipelineLayout            raytracing_pipeline_layout          = VK_NULL_HANDLE;
+    VkPipeline                  raytracing_pipeline                 = VK_NULL_HANDLE;
 };

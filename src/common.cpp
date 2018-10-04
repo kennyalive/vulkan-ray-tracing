@@ -25,25 +25,26 @@ std::string get_resource_path(const std::string& resource_relative_path) {
 }
 
 std::vector<uint8_t> read_binary_file(const std::string& file_name) {
-      std::ifstream file(file_name, std::ios_base::in | std::ios_base::binary);
-      if (!file)
-        error("failed to open file: " + file_name);
+    std::string abs_path = get_resource_path(file_name);
+    std::ifstream file(abs_path, std::ios_base::in | std::ios_base::binary);
+    if (!file)
+    error("failed to open file: " + abs_path);
 
-      // get file size
-      file.seekg(0, std::ios_base::end);
-      std::streampos file_size = file.tellg();
-      file.seekg(0, std::ios_base::beg);
+    // get file size
+    file.seekg(0, std::ios_base::end);
+    std::streampos file_size = file.tellg();
+    file.seekg(0, std::ios_base::beg);
 
-      if (file_size == std::streampos(-1) || !file)
-        error("failed to read file stats: " + file_name);
+    if (file_size == std::streampos(-1) || !file)
+    error("failed to read file stats: " + abs_path);
 
-      // read file content
-      std::vector<uint8_t> file_content(static_cast<size_t>(file_size));
-      file.read(reinterpret_cast<char*>(file_content.data()), file_size);
-      if (!file)
-        error("failed to read file content: " + file_name);
+    // read file content
+    std::vector<uint8_t> file_content(static_cast<size_t>(file_size));
+    file.read(reinterpret_cast<char*>(file_content.data()), file_size);
+    if (!file)
+    error("failed to read file content: " + abs_path);
 
-      return file_content;
+    return file_content;
 }
 
 int64_t elapsed_milliseconds(Timestamp timestamp) {
