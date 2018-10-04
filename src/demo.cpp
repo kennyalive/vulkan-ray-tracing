@@ -203,16 +203,17 @@ void Vk_Demo::create_acceleration_structures() {
         uint64_t bottom_level_accel_handle;
         VK_CHECK(vkGetAccelerationStructureHandleNVX(vk.device, bottom_level_accel, sizeof(uint64_t), &bottom_level_accel_handle));
 
-        // Supposed format of the sructure to hold instance data. As of Vulkan spec 1.1.86 this structure is
-        // undocumented and the following 64-byte layout at least does not lead to driver crash. Probably 
-        // official documentation will be updated soon and we'll know for sure.
         struct Instance {
-            Matrix3x4 transform;
-            uint64_t  : 64;
-            uint64_t handle;
+            Matrix3x4   transform;
+	        uint32_t    instance_id : 24;
+	        uint32_t    instance_mask : 8;
+	        uint32_t    instance_contribution_to_hit_group_index : 24;
+	        uint32_t    flags : 8;
+	        uint64_t    acceleration_structure_handle;
         } instance;
+
         instance.transform = Matrix3x4::identity;
-        instance.handle = bottom_level_accel_handle;
+        instance.acceleration_structure_handle = bottom_level_accel_handle;
 
         VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
         buffer_create_info.size = sizeof(Instance);
@@ -270,9 +271,8 @@ void Vk_Demo::create_acceleration_structures() {
         vkCreateBuffer(vk.device, &buffer_create_info, nullptr, &scratch_buffer);
 
         // NOTE: do we really need vkGetAccelerationStructureScratchMemoryRequirementsNVX function in the API?
-        // I had a dream where my wife said that it should be possible to use vkGetBufferMemoryRequirements2
-        // without introducing new API function and without modifying standard way to query memory requirements
-        // for the resource.
+        // It should be possible to use vkGetBufferMemoryRequirements2 without introducing new API function
+        // and without modifying standard way to query memory requirements for the resource.
         VK_CHECK(vkBindBufferMemory(vk.device, scratch_buffer, alloc_info.deviceMemory, alloc_info.offset));
     }
 
