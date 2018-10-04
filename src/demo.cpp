@@ -32,6 +32,7 @@ Vk_Demo::Vk_Demo(const Demo_Create_Info& create_info)
         physical_device_properties.pNext = &raytracing_properties;
 
         vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
+        shader_header_size = raytracing_properties.shaderHeaderSize;
 
         printf("Device: %s\n", physical_device_properties.properties.deviceName);
         printf("Vulkan API version: %d.%d.%d\n",
@@ -62,7 +63,9 @@ Vk_Demo::Vk_Demo(const Demo_Create_Info& create_info)
     create_pipeline_layouts();
     create_shader_modules();
     create_pipelines();
+
     create_raytracing_pipeline();
+    create_shader_binding_table();
 
     setup_imgui();
 }
@@ -592,6 +595,15 @@ void Vk_Demo::create_raytracing_pipeline() {
 
         vkDestroyShaderModule(vk.device, rgen_shader, nullptr);
     }
+}
+
+void Vk_Demo::create_shader_binding_table() {
+    constexpr uint32_t group_count = 1;
+    VkDeviceSize sbt_size = group_count * shader_header_size;
+
+    void* mapped_memory;
+    shader_binding_table = vk_create_host_visible_buffer(sbt_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, &mapped_memory, "shader_binding_table");
+    VK_CHECK(vkGetRaytracingShaderHandlesNVX(vk.device, raytracing_pipeline, 0, 1, sbt_size, mapped_memory));
 }
 
 void Vk_Demo::setup_imgui() {

@@ -33,7 +33,9 @@ private:
     void create_pipeline_layouts();
     void create_shader_modules();
     void create_pipelines();
+
     void create_raytracing_pipeline();
+    void create_shader_binding_table();
 
     void setup_imgui();
     void release_imgui();
@@ -58,12 +60,6 @@ private:
     uint32_t                    model_vertex_count      = 0;
     uint32_t                    model_index_count       = 0;
 
-    VkAccelerationStructureNVX  bottom_level_accel = VK_NULL_HANDLE;
-    VmaAllocation               bottom_level_accel_allocation = VK_NULL_HANDLE;
-
-    VkAccelerationStructureNVX  top_level_accel = VK_NULL_HANDLE;
-    VmaAllocation               top_level_accel_allocation = VK_NULL_HANDLE;
-
     VkRenderPass                render_pass             = VK_NULL_HANDLE;
     std::vector<VkFramebuffer>  swapchain_framebuffers;
 
@@ -77,7 +73,20 @@ private:
     VkPipelineLayout            pipeline_layout         = VK_NULL_HANDLE;
     VkPipeline                  pipeline                = VK_NULL_HANDLE;
 
+    //
+    // Raytracing resources.
+    //
+    uint32_t                    shader_header_size                  = 0;
+
+    VkAccelerationStructureNVX  bottom_level_accel                  = VK_NULL_HANDLE;
+    VmaAllocation               bottom_level_accel_allocation       = VK_NULL_HANDLE;
+
+    VkAccelerationStructureNVX  top_level_accel                     = VK_NULL_HANDLE;
+    VmaAllocation               top_level_accel_allocation          = VK_NULL_HANDLE;
+
     VkDescriptorSetLayout       raytracing_descriptor_set_layout    = VK_NULL_HANDLE;
     VkPipelineLayout            raytracing_pipeline_layout          = VK_NULL_HANDLE;
     VkPipeline                  raytracing_pipeline                 = VK_NULL_HANDLE;
+
+    VkBuffer                    shader_binding_table                = VK_NULL_HANDLE;
 };
