@@ -658,7 +658,7 @@ void Vk_Demo::do_imgui() {
 
         if (corner != -1)
             ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
-        ImGui::SetNextWindowBgAlpha(0.8f);
+        ImGui::SetNextWindowBgAlpha(0.3f);
 
         if (ImGui::Begin("UI", &show_ui, 
             (corner != -1 ? ImGuiWindowFlags_NoMove : 0) | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -732,7 +732,7 @@ void Vk_Demo::run_frame(bool draw_only_background) {
 
     // Prepare render pass instance.
     VkClearValue clear_values[2];
-    clear_values[0].color = {0.32f, 0.32f, 0.4f, 0.0f};
+    clear_values[0].color = {srgb_encode(0.32f), srgb_encode(0.32f), srgb_encode(0.4f), 0.0f};
     clear_values[1].depthStencil.depth = 1.0;
     clear_values[1].depthStencil.stencil = 0;
 

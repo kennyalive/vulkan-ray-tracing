@@ -25,7 +25,15 @@ VS2PS main_vs(
     return data;
 }
 
+float srgb_encode(float c) {
+    if (c <= 0.0031308f)
+        return 12.92f * c;
+    else
+        return 1.055f * pow(c, 1.f/2.4f) - 0.055f;
+}
+
 float4 main_fs(VS2PS data) : SV_TARGET
 {
-    return texture.Sample(texture_sampler, data.uv);
+    float4 color = texture.Sample(texture_sampler, data.uv);
+    return float4(srgb_encode(color.r), srgb_encode(color.g), srgb_encode(color.b), color.a);
 }
