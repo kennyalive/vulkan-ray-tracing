@@ -239,11 +239,15 @@ static void create_device() {
         queue_desc.queueCount       = 1;
         queue_desc.pQueuePriorities = &priority;
 
+        VkPhysicalDeviceFeatures features {};
+        features.vertexPipelineStoresAndAtomics = VK_TRUE; // to shut up improper validation warning (image store is in the raygen shader not in the vertex stage)
+
         VkDeviceCreateInfo device_desc { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
         device_desc.queueCreateInfoCount    = 1;
         device_desc.pQueueCreateInfos       = &queue_desc;
         device_desc.enabledExtensionCount   = sizeof(device_extensions)/sizeof(device_extensions[0]);
         device_desc.ppEnabledExtensionNames = device_extensions;
+        device_desc.pEnabledFeatures = &features;
 
         VK_CHECK(vkCreateDevice(vk.physical_device, &device_desc, nullptr, &vk.device));
     }

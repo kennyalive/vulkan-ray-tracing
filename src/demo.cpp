@@ -153,6 +153,7 @@ void Vk_Demo::create_acceleration_structures() {
     VkGeometryNVX geometry { VK_STRUCTURE_TYPE_GEOMETRY_NVX };
     geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NVX;
     geometry.geometry.triangles = triangles;
+    geometry.geometry.aabbs = VkGeometryAABBNVX { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NVX };
 
     // Create acceleration structures and allocate/bind memory.
     {
@@ -274,6 +275,8 @@ void Vk_Demo::create_acceleration_structures() {
         buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         vkCreateBuffer(vk.device, &buffer_create_info, nullptr, &scratch_buffer);
 
+        vkGetBufferMemoryRequirements(vk.device, scratch_buffer, &VkMemoryRequirements()); // shut up validation layers
+
         // NOTE: do we really need vkGetAccelerationStructureScratchMemoryRequirementsNVX function in the API?
         // It should be possible to use vkGetBufferMemoryRequirements2 without introducing new API function
         // and without modifying standard way to query memory requirements for the resource.
@@ -309,7 +312,7 @@ void Vk_Demo::create_acceleration_structures() {
     });
 
     int64_t delta = elapsed_microseconds(t);
-    printf("Acceleration structures build time = %lld microseconds", delta);
+    printf("\nAcceleration structures build time = %lld microseconds", delta);
 
     vmaDestroyBuffer(vk.allocator, instance_buffer, instance_buffer_allocation);
     vkDestroyBuffer(vk.device, scratch_buffer, nullptr);
@@ -445,7 +448,7 @@ void Vk_Demo::create_descriptor_sets() {
         bindings[2].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        desc.bindingCount   = sizeof(bindings) / sizeof(bindings[0]);
+        desc.bindingCount   = array_length(bindings);
         desc.pBindings      = bindings;
         descriptor_set_layout = get_resource_manager()->create_descriptor_set_layout(desc, "Main descriptor set layout");
     }
