@@ -649,6 +649,29 @@ void Vk_Demo::create_raytracing_pipeline() {
 
         vkDestroyShaderModule(vk.device, rgen_shader, nullptr);
     }
+
+    // Descriptor set.
+    {
+        VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+        desc.descriptorPool     = descriptor_pool;
+        desc.descriptorSetCount = 1;
+        desc.pSetLayouts        = &raytracing_descriptor_set_layout;
+        VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &raytracing_descriptor_set));
+
+        VkDescriptorImageInfo image_info = {};
+        image_info.imageView    = output_image.view;
+        image_info.imageLayout  = VK_IMAGE_LAYOUT_GENERAL;
+
+        VkWriteDescriptorSet descriptor_writes[1] = {};
+        descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[0].dstSet             = raytracing_descriptor_set;
+        descriptor_writes[0].dstBinding         = 0;
+        descriptor_writes[0].descriptorCount    = 1;
+        descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        descriptor_writes[0].pImageInfo         = &image_info;
+
+        vkUpdateDescriptorSets(vk.device, array_length(descriptor_writes), descriptor_writes, 0, nullptr);
+    }
 }
 
 void Vk_Demo::create_shader_binding_table() {
@@ -794,9 +817,13 @@ void Vk_Demo::run_frame(bool draw_only_background) {
     bool old_vsync = vsync;
 
     if (raytracing) {
-        vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, raytracing_pipeline_layout, 0, 1, &raytracing_descriptor_set, 0, nullptr);
+        vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, raytracing_pipeline);
+        vkCmdTraceRaysNVX(vk.command_buffer, shader_binding_table, 0, shader_binding_table, 0, 0, shader_binding_table, 0, 0, vk.surface_size.width, vk.surface_size.height);
+
+        /*vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
         do_imgui();
-        vkCmdEndRenderPass(vk.command_buffer);
+        vkCmdEndRenderPass(vk.command_buffer);*/
     } else {
         // Set viewport and scisor rect.
         VkViewport viewport{};
