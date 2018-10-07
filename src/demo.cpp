@@ -18,7 +18,9 @@
 #include <chrono>
 
 struct Uniform_Buffer {
-    Matrix4x4 mvp;
+    Matrix4x4   mvp;
+    uint32_t    viewport_size[2];
+    uint32_t    pad[2];
 };
 
 Vk_Demo::Vk_Demo(const Demo_Create_Info& create_info)
@@ -54,23 +56,27 @@ Vk_Demo::Vk_Demo(const Demo_Create_Info& create_info)
     upload_geometry();
     create_acceleration_structures();
 
+    void* mapped_memory;
     uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &uniform_buffer_ptr, "uniform buffer to store matrices");
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_memory, "uniform buffer to store matrices");
+    mapped_uniform_buffer = static_cast<Uniform_Buffer*>(mapped_memory);
 
     create_render_passes();
-    create_framebuffers();
+    
     create_descriptor_sets();
+    create_global_descriptor_set();
     create_pipeline_layouts();
     create_shader_modules();
     create_pipelines();
 
+    create_output_image();
+
+    create_framebuffers();
+
     create_raytracing_pipeline();
     create_shader_binding_table();
 
-    output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_R16G16B16A16_SFLOAT,
-        VK_IMAGE_USAGE_STORAGE_BIT, "output_image");
-
-    create_copy_to_swapchain_resources();
+    copy_to_swapchain.create_resources(global_descriptor_set_layout, descriptor_pool, output_image);
 
     setup_imgui();
 }
@@ -315,9 +321,7 @@ void Vk_Demo::create_acceleration_structures() {
             VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX, VK_FALSE, top_level_accel, VK_NULL_HANDLE,
             scratch_buffer, 0);
     });
-
-    int64_t delta = elapsed_microseconds(t);
-    printf("\nAcceleration structures build time = %lld microseconds\n", delta);
+    printf("\nAcceleration structures build time = %lld microseconds\n", elapsed_microseconds(t));
 
     vmaDestroyBuffer(vk.allocator, instance_buffer, instance_buffer_allocation);
     vkDestroyBuffer(vk.device, scratch_buffer, nullptr);
@@ -327,7 +331,11 @@ void Vk_Demo::create_acceleration_structures() {
 Vk_Demo::~Vk_Demo() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
     release_imgui();
+
+    output_image.destroy();
     destroy_framebuffers();
+
+    vkDestroyDescriptorSetLayout(vk.device, global_descriptor_set_layout, nullptr);
 
     vkDestroyAccelerationStructureNVX(vk.device, bottom_level_accel, nullptr);
     vmaFreeMemory(vk.allocator, bottom_level_accel_allocation);
@@ -339,9 +347,7 @@ Vk_Demo::~Vk_Demo() {
     vkDestroyPipelineLayout(vk.device, raytracing_pipeline_layout, nullptr);
     vkDestroyPipeline(vk.device, raytracing_pipeline, nullptr);
 
-    vkDestroyDescriptorSetLayout(vk.device, copy_to_swapchain_resources.set_layout, nullptr);
-    vkDestroyPipelineLayout(vk.device, copy_to_swapchain_resources.pipeline_layout, nullptr);
-    vkDestroyPipeline(vk.device, copy_to_swapchain_resources.pipeline, nullptr);
+    copy_to_swapchain.destroy_resources(descriptor_pool);
 
     get_resource_manager()->release_resources();
     vk_shutdown();
@@ -349,14 +355,14 @@ Vk_Demo::~Vk_Demo() {
 
 void Vk_Demo::create_render_passes() {
     VkAttachmentDescription attachments[2] = {};
-    attachments[0].format           = vk.surface_format.format;
+    attachments[0].format           = VK_FORMAT_R16G16B16A16_SFLOAT;
     attachments[0].samples          = VK_SAMPLE_COUNT_1_BIT;
     attachments[0].loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachments[0].storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
     attachments[0].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachments[0].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachments[0].initialLayout    = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[0].finalLayout      = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    attachments[0].finalLayout      = VK_IMAGE_LAYOUT_GENERAL;
 
     attachments[1].format           = vk.depth_info.format;
     attachments[1].samples          = VK_SAMPLE_COUNT_1_BIT;
@@ -391,30 +397,64 @@ void Vk_Demo::create_render_passes() {
 }
 
 void Vk_Demo::create_framebuffers() {
-    VkFramebufferCreateInfo desc{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-    desc.width  = vk.surface_size.width;
-    desc.height = vk.surface_size.height;
-    desc.layers = 1;
-
-    VkImageView attachments[] = {VK_NULL_HANDLE, vk.depth_info.image_view};
-    desc.attachmentCount = array_length(attachments);
-    desc.pAttachments    = attachments;
-    desc.renderPass      = render_pass;
-
-    swapchain_framebuffers.resize(vk.swapchain_info.images.size());
-    for (size_t i = 0; i < vk.swapchain_info.images.size(); i++) {
-        attachments[0] = vk.swapchain_info.image_views[i]; // set color attachment
-
-        VK_CHECK(vkCreateFramebuffer(vk.device, &desc, nullptr, &swapchain_framebuffers[i]));
-        vk_set_debug_name(swapchain_framebuffers[i], ("Framebuffer for swapchain image " + std::to_string(i)).c_str());
-    }
+    VkImageView attachments[] = {output_image.view, vk.depth_info.image_view};
+   
+    VkFramebufferCreateInfo create_info { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+    create_info.renderPass      = render_pass;
+    create_info.attachmentCount = array_length(attachments);
+    create_info.pAttachments    = attachments;
+    create_info.width           = vk.surface_size.width;
+    create_info.height          = vk.surface_size.height;
+    create_info.layers          = 1;
+    VK_CHECK(vkCreateFramebuffer(vk.device, &create_info, nullptr, &framebuffer));
+    vk_set_debug_name(framebuffer, "framebuffer");
 }
 
 void Vk_Demo::destroy_framebuffers() {
-    for (VkFramebuffer framebuffer : swapchain_framebuffers) {
-        vkDestroyFramebuffer(vk.device, framebuffer, nullptr);
+    vkDestroyFramebuffer(vk.device, framebuffer, nullptr);
+    framebuffer = VK_NULL_HANDLE;
+}
+
+void Vk_Demo::create_global_descriptor_set() {
+    // Global descriptor set layout.
+    {
+        VkDescriptorSetLayoutBinding bindings[1] = {};
+        bindings[0].binding         = 0;
+        bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags      = VK_SHADER_STAGE_ALL;
+
+        VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        create_info.bindingCount    = array_length(bindings);
+        create_info.pBindings       = bindings;
+
+        VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &global_descriptor_set_layout));
+        vk_set_debug_name(global_descriptor_set_layout, "global descriptor set layout");
     }
-    swapchain_framebuffers.clear();
+
+    // Global descriptor set.
+    {
+        VkDescriptorSetAllocateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+        create_info.descriptorPool     = descriptor_pool;
+        create_info.descriptorSetCount = 1;
+        create_info.pSetLayouts        = &global_descriptor_set_layout;
+        VK_CHECK(vkAllocateDescriptorSets(vk.device, &create_info, &global_descriptor_set));
+
+        VkDescriptorBufferInfo buffer_info;
+        buffer_info.buffer  = uniform_buffer;
+        buffer_info.offset  = 0;
+        buffer_info.range   = sizeof(Uniform_Buffer);
+
+        VkWriteDescriptorSet descriptor_writes[1] = {};
+        descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[0].dstSet             = global_descriptor_set;
+        descriptor_writes[0].dstBinding         = 0;
+        descriptor_writes[0].descriptorCount    = 1;
+        descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_writes[0].pBufferInfo        = &buffer_info;
+
+        vkUpdateDescriptorSets(vk.device, array_length(descriptor_writes), descriptor_writes, 0, nullptr);
+    }
 }
 
 void Vk_Demo::create_descriptor_sets() {
@@ -430,6 +470,7 @@ void Vk_Demo::create_descriptor_sets() {
         };
 
         VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        desc.flags          = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         desc.maxSets        = 32;
         desc.poolSizeCount  = array_length(pool_sizes);
         desc.pPoolSizes     = pool_sizes;
@@ -619,92 +660,9 @@ void Vk_Demo::create_shader_binding_table() {
     VK_CHECK(vkGetRaytracingShaderHandlesNVX(vk.device, raytracing_pipeline, 0, 1, sbt_size, mapped_memory));
 }
 
-void Vk_Demo::create_copy_to_swapchain_resources() {
-    // Descriptor set layout.
-    {
-        VkDescriptorSetLayoutBinding layout_bindings[2] {};
-        layout_bindings[0].binding          = 0;
-        layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        layout_bindings[0].descriptorCount  = 1;
-        layout_bindings[0].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        layout_bindings[1].binding          = 1;
-        layout_bindings[1].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        layout_bindings[1].descriptorCount  = 1;
-        layout_bindings[1].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        create_info.bindingCount    = array_length(layout_bindings);
-        create_info.pBindings       = layout_bindings;
-        VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &copy_to_swapchain_resources.set_layout));
-    }
-
-    // Pipeline layout.
-    {
-        VkPipelineLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        create_info.setLayoutCount  = 1;
-        create_info.pSetLayouts     = &copy_to_swapchain_resources.set_layout;
-        VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &copy_to_swapchain_resources.pipeline_layout));
-    }
-
-    // Pipeline.
-    {
-        VkShaderModule copy_shader = load_spirv("spirv/copy_to_swapchain.comp.spv");
-
-        VkPipelineShaderStageCreateInfo compute_stage { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-        compute_stage.stage    = VK_SHADER_STAGE_COMPUTE_BIT;
-        compute_stage.module   = copy_shader;
-        compute_stage.pName    = "main";
-
-        VkComputePipelineCreateInfo create_info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-        create_info.stage   = compute_stage;
-        create_info.layout  = copy_to_swapchain_resources.pipeline_layout;
-        VK_CHECK(vkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &copy_to_swapchain_resources.pipeline));
-
-        vkDestroyShaderModule(vk.device, copy_shader, nullptr);
-    }
-
-    // Descriptor sets.
-    {
-        const uint32_t swapchain_image_count = (uint32_t)vk.swapchain_info.images.size();
-        copy_to_swapchain_resources.sets.resize(swapchain_image_count);
-
-        VkDescriptorImageInfo src_image_info{};
-        src_image_info.imageView    = output_image.view;
-        src_image_info.imageLayout  = VK_IMAGE_LAYOUT_GENERAL;
-
-        std::vector<VkDescriptorImageInfo> swapchain_image_infos(swapchain_image_count);
-        for (uint32_t i = 0; i < swapchain_image_count; i++) {
-            VkDescriptorSet& set = copy_to_swapchain_resources.sets[i];
-
-            VkDescriptorSetAllocateInfo alloc_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-            alloc_info.descriptorPool     = descriptor_pool;
-            alloc_info.descriptorSetCount = 1;
-            alloc_info.pSetLayouts        = &copy_to_swapchain_resources.set_layout;
-            VK_CHECK(vkAllocateDescriptorSets(vk.device, &alloc_info, &set));
-
-            VkDescriptorImageInfo swapchain_image_info{};
-            swapchain_image_info.imageView      = vk.swapchain_info.image_views[i];
-            swapchain_image_info.imageLayout    = VK_IMAGE_LAYOUT_GENERAL;
-
-            VkWriteDescriptorSet descriptor_writes[2] = {};
-            descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptor_writes[0].dstSet             = set;
-            descriptor_writes[0].dstBinding         = 0;
-            descriptor_writes[0].descriptorCount    = 1;
-            descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            descriptor_writes[0].pImageInfo         = &src_image_info;
-
-            descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptor_writes[1].dstSet             = set;
-            descriptor_writes[1].dstBinding         = 1;
-            descriptor_writes[1].descriptorCount    = 1;
-            descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            descriptor_writes[1].pImageInfo         = &swapchain_image_info;
-
-            vkUpdateDescriptorSets(vk.device, array_length(descriptor_writes), descriptor_writes, 0, nullptr);
-        }
-    }
+void Vk_Demo::create_output_image() {
+    output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_R16G16B16A16_SFLOAT,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT, "output image");
 }
 
 void Vk_Demo::setup_imgui() {
@@ -795,7 +753,7 @@ using Time = std::chrono::time_point<Clock>;
 static Time prev_time = Clock::now();
 
 void Vk_Demo::update_uniform_buffer() {
-    // Update simulation time.
+    // Update time.
     static double time = 0.0;
     Time current_time = Clock::now();        
     if (animate) {
@@ -804,15 +762,17 @@ void Vk_Demo::update_uniform_buffer() {
     }
     prev_time = current_time;
 
-    // Update mvp matrix.
-    Uniform_Buffer ubo;
+    // Update matrix.
     Matrix3x4 model = rotate_y(Matrix3x4::identity, (float)time * radians(30.0f));
     Matrix3x4 view = look_at_transform(Vector(0, 0.5, 3.0), Vector(0), Vector(0, 1, 0));
     float aspect_ratio = (float)vk.surface_size.width / (float)vk.surface_size.height;
     Matrix4x4 proj = perspective_transform_opengl_z01(radians(45.0f), aspect_ratio, 0.1f, 50.0f);
+    Matrix4x4 mvp = proj * view * model;
 
-    ubo.mvp = proj * view * model;
-    memcpy(uniform_buffer_ptr, &ubo, sizeof(ubo));
+    // Update buffer content.
+    mapped_uniform_buffer->mvp = mvp;
+    mapped_uniform_buffer->viewport_size[0]= vk.surface_size.width;
+    mapped_uniform_buffer->viewport_size[1] = vk.surface_size.height;
 }
 
 void Vk_Demo::run_frame(bool draw_only_background) {
@@ -826,7 +786,7 @@ void Vk_Demo::run_frame(bool draw_only_background) {
 
     VkRenderPassBeginInfo render_pass_begin_info { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     render_pass_begin_info.renderPass        = render_pass;
-    render_pass_begin_info.framebuffer       = swapchain_framebuffers[vk.swapchain_image_index];
+    render_pass_begin_info.framebuffer       = framebuffer;
     render_pass_begin_info.renderArea.extent = vk.surface_size;
     render_pass_begin_info.clearValueCount   = 2;
     render_pass_begin_info.pClearValues      = clear_values;
@@ -867,6 +827,27 @@ void Vk_Demo::run_frame(bool draw_only_background) {
         vkCmdEndRenderPass(vk.command_buffer);
     }
 
+    // Copy output image to swapchain.
+    {
+        const uint32_t group_size_x = 32; // according to shader
+        const uint32_t group_size_y = 32;
+
+        uint32_t group_count_x = (vk.surface_size.width + group_size_x - 1) / group_size_x;
+        uint32_t group_count_y = (vk.surface_size.height + group_size_y - 1) / group_size_y;
+
+        vk_record_image_layout_transition(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index], VK_IMAGE_ASPECT_COLOR_BIT,
+            0, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+        VkDescriptorSet sets[] = { global_descriptor_set, copy_to_swapchain.sets[vk.swapchain_image_index] };
+
+        vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, copy_to_swapchain.pipeline_layout, 0, array_length(sets), sets, 0, nullptr);
+        vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, copy_to_swapchain.pipeline);
+        vkCmdDispatch(vk.command_buffer, group_count_x, group_count_y, 1);
+
+        vk_record_image_layout_transition(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index], VK_IMAGE_ASPECT_COLOR_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    }
+
     vk_end_frame();
 
     if (vsync != old_vsync) {
@@ -877,12 +858,110 @@ void Vk_Demo::run_frame(bool draw_only_background) {
 
 void Vk_Demo::release_resolution_dependent_resources() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
+    output_image.destroy();
+    copy_to_swapchain.destroy_resources(descriptor_pool);
     destroy_framebuffers();
     vk_release_resolution_dependent_resources();
 }
 
 void Vk_Demo::restore_resolution_dependent_resources() {
     vk_restore_resolution_dependent_resources(vsync);
+    create_output_image();
+    copy_to_swapchain.create_resources(global_descriptor_set_layout, descriptor_pool, output_image);
     create_framebuffers();
     prev_time = Clock::now();
+}
+
+void Copy_To_Swapchain::create_resources(VkDescriptorSetLayout global_descriptor_set_layout, VkDescriptorPool descriptor_pool, const Vk_Image& output_image) {
+    // Descriptor set layout.
+    {
+        VkDescriptorSetLayoutBinding layout_bindings[2] {};
+        layout_bindings[0].binding          = 0;
+        layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layout_bindings[0].descriptorCount  = 1;
+        layout_bindings[0].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        layout_bindings[1].binding          = 1;
+        layout_bindings[1].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layout_bindings[1].descriptorCount  = 1;
+        layout_bindings[1].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        create_info.bindingCount = array_length(layout_bindings);
+        create_info.pBindings = layout_bindings;
+        VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &set_layout));
+    }
+
+    // Pipeline layout.
+    {
+        VkDescriptorSetLayout set_layouts[] = { global_descriptor_set_layout, set_layout };
+
+        VkPipelineLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+        create_info.setLayoutCount = array_length(set_layouts);
+        create_info.pSetLayouts = set_layouts;
+        VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
+    }
+
+    // Pipeline.
+    {
+        VkShaderModule copy_shader = load_spirv("spirv/copy_to_swapchain.comp.spv");
+
+        VkPipelineShaderStageCreateInfo compute_stage { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+        compute_stage.stage    = VK_SHADER_STAGE_COMPUTE_BIT;
+        compute_stage.module   = copy_shader;
+        compute_stage.pName    = "main";
+
+        VkComputePipelineCreateInfo create_info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+        create_info.stage = compute_stage;
+        create_info.layout = pipeline_layout;
+        VK_CHECK(vkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
+
+        vkDestroyShaderModule(vk.device, copy_shader, nullptr);
+    }
+
+    // Descriptor sets.
+    {
+        sets.resize(vk.swapchain_info.images.size());
+
+        VkDescriptorImageInfo src_image_info{};
+        src_image_info.imageView    = output_image.view;
+        src_image_info.imageLayout  = VK_IMAGE_LAYOUT_GENERAL;
+
+        for (size_t i = 0; i < vk.swapchain_info.images.size(); i++) {
+            VkDescriptorSetAllocateInfo alloc_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+            alloc_info.descriptorPool     = descriptor_pool;
+            alloc_info.descriptorSetCount = 1;
+            alloc_info.pSetLayouts        = &set_layout;
+            VK_CHECK(vkAllocateDescriptorSets(vk.device, &alloc_info, &sets[i]));
+
+            VkDescriptorImageInfo swapchain_image_info{};
+            swapchain_image_info.imageView      = vk.swapchain_info.image_views[i];
+            swapchain_image_info.imageLayout    = VK_IMAGE_LAYOUT_GENERAL;
+
+            VkWriteDescriptorSet descriptor_writes[2] = {};
+            descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptor_writes[0].dstSet             = sets[i];
+            descriptor_writes[0].dstBinding         = 0;
+            descriptor_writes[0].descriptorCount    = 1;
+            descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            descriptor_writes[0].pImageInfo         = &src_image_info;
+
+            descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptor_writes[1].dstSet             = sets[i];
+            descriptor_writes[1].dstBinding         = 1;
+            descriptor_writes[1].descriptorCount    = 1;
+            descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            descriptor_writes[1].pImageInfo         = &swapchain_image_info;
+
+            vkUpdateDescriptorSets(vk.device, array_length(descriptor_writes), descriptor_writes, 0, nullptr);
+        }
+    }
+}
+
+void Copy_To_Swapchain::destroy_resources(VkDescriptorPool descriptor_pool) {
+    vkDestroyDescriptorSetLayout(vk.device, set_layout, nullptr);
+    vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
+    vkDestroyPipeline(vk.device, pipeline, nullptr);
+    VK_CHECK(vkFreeDescriptorSets(vk.device, descriptor_pool, (uint32_t)sets.size(), sets.data()));
+    sets.clear();
 }

@@ -45,8 +45,11 @@ struct Vk_Create_Info {
 };
 
 struct Vk_Image {
-    VkImage handle;
-    VkImageView view;
+    VkImage         handle;
+    VkImageView     view;
+    VmaAllocation   allocation;
+
+    void destroy();
 };
 
 //
@@ -80,6 +83,13 @@ void vk_begin_frame();
 void vk_end_frame();
 
 void vk_record_and_run_commands(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder);
+
+void vk_record_image_layout_transition(
+    VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags aspect_mask,
+    VkAccessFlags src_access_flags, VkAccessFlags dst_access_flags,
+    VkImageLayout old_layout, VkImageLayout new_layout,
+    uint32_t mip_level = VK_REMAINING_MIP_LEVELS
+);
 
 struct Swapchain_Info {
     VkSwapchainKHR           handle;
