@@ -67,6 +67,11 @@ Vk_Demo::Vk_Demo(const Demo_Create_Info& create_info)
     create_raytracing_pipeline();
     create_shader_binding_table();
 
+    output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_R16G16B16A16_SFLOAT,
+        VK_IMAGE_USAGE_STORAGE_BIT, "output_image");
+
+    create_copy_to_swapchain_resources();
+
     setup_imgui();
 }
 
@@ -312,7 +317,7 @@ void Vk_Demo::create_acceleration_structures() {
     });
 
     int64_t delta = elapsed_microseconds(t);
-    printf("\nAcceleration structures build time = %lld microseconds", delta);
+    printf("\nAcceleration structures build time = %lld microseconds\n", delta);
 
     vmaDestroyBuffer(vk.allocator, instance_buffer, instance_buffer_allocation);
     vkDestroyBuffer(vk.device, scratch_buffer, nullptr);
@@ -333,6 +338,10 @@ Vk_Demo::~Vk_Demo() {
     vkDestroyDescriptorSetLayout(vk.device, raytracing_descriptor_set_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, raytracing_pipeline_layout, nullptr);
     vkDestroyPipeline(vk.device, raytracing_pipeline, nullptr);
+
+    vkDestroyDescriptorSetLayout(vk.device, copy_to_swapchain_resources.set_layout, nullptr);
+    vkDestroyPipelineLayout(vk.device, copy_to_swapchain_resources.pipeline_layout, nullptr);
+    vkDestroyPipeline(vk.device, copy_to_swapchain_resources.pipeline, nullptr);
 
     get_resource_manager()->release_resources();
     vk_shutdown();
@@ -414,9 +423,10 @@ void Vk_Demo::create_descriptor_sets() {
     //
     {
         VkDescriptorPoolSize pool_sizes[] = {
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16},
-            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 16},
-            {VK_DESCRIPTOR_TYPE_SAMPLER, 16}
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16  },
+            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,  16  },
+            {VK_DESCRIPTOR_TYPE_SAMPLER,        16  },
+            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  16  },
         };
 
         VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
@@ -609,6 +619,94 @@ void Vk_Demo::create_shader_binding_table() {
     VK_CHECK(vkGetRaytracingShaderHandlesNVX(vk.device, raytracing_pipeline, 0, 1, sbt_size, mapped_memory));
 }
 
+void Vk_Demo::create_copy_to_swapchain_resources() {
+    // Descriptor set layout.
+    {
+        VkDescriptorSetLayoutBinding layout_bindings[2] {};
+        layout_bindings[0].binding          = 0;
+        layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layout_bindings[0].descriptorCount  = 1;
+        layout_bindings[0].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        layout_bindings[1].binding          = 1;
+        layout_bindings[1].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layout_bindings[1].descriptorCount  = 1;
+        layout_bindings[1].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        create_info.bindingCount    = array_length(layout_bindings);
+        create_info.pBindings       = layout_bindings;
+        VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &copy_to_swapchain_resources.set_layout));
+    }
+
+    // Pipeline layout.
+    {
+        VkPipelineLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+        create_info.setLayoutCount  = 1;
+        create_info.pSetLayouts     = &copy_to_swapchain_resources.set_layout;
+        VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &copy_to_swapchain_resources.pipeline_layout));
+    }
+
+    // Pipeline.
+    {
+        VkShaderModule copy_shader = load_spirv("spirv/copy_to_swapchain.comp.spv");
+
+        VkPipelineShaderStageCreateInfo compute_stage { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+        compute_stage.stage    = VK_SHADER_STAGE_COMPUTE_BIT;
+        compute_stage.module   = copy_shader;
+        compute_stage.pName    = "main";
+
+        VkComputePipelineCreateInfo create_info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+        create_info.stage   = compute_stage;
+        create_info.layout  = copy_to_swapchain_resources.pipeline_layout;
+        VK_CHECK(vkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &copy_to_swapchain_resources.pipeline));
+
+        vkDestroyShaderModule(vk.device, copy_shader, nullptr);
+    }
+
+    // Descriptor sets.
+    {
+        const uint32_t swapchain_image_count = (uint32_t)vk.swapchain_info.images.size();
+        copy_to_swapchain_resources.sets.resize(swapchain_image_count);
+
+        VkDescriptorImageInfo src_image_info{};
+        src_image_info.imageView    = output_image.view;
+        src_image_info.imageLayout  = VK_IMAGE_LAYOUT_GENERAL;
+
+        std::vector<VkDescriptorImageInfo> swapchain_image_infos(swapchain_image_count);
+        for (uint32_t i = 0; i < swapchain_image_count; i++) {
+            VkDescriptorSet& set = copy_to_swapchain_resources.sets[i];
+
+            VkDescriptorSetAllocateInfo alloc_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+            alloc_info.descriptorPool     = descriptor_pool;
+            alloc_info.descriptorSetCount = 1;
+            alloc_info.pSetLayouts        = &copy_to_swapchain_resources.set_layout;
+            VK_CHECK(vkAllocateDescriptorSets(vk.device, &alloc_info, &set));
+
+            VkDescriptorImageInfo swapchain_image_info{};
+            swapchain_image_info.imageView      = vk.swapchain_info.image_views[i];
+            swapchain_image_info.imageLayout    = VK_IMAGE_LAYOUT_GENERAL;
+
+            VkWriteDescriptorSet descriptor_writes[2] = {};
+            descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptor_writes[0].dstSet             = set;
+            descriptor_writes[0].dstBinding         = 0;
+            descriptor_writes[0].descriptorCount    = 1;
+            descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            descriptor_writes[0].pImageInfo         = &src_image_info;
+
+            descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptor_writes[1].dstSet             = set;
+            descriptor_writes[1].dstBinding         = 1;
+            descriptor_writes[1].descriptorCount    = 1;
+            descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            descriptor_writes[1].pImageInfo         = &swapchain_image_info;
+
+            vkUpdateDescriptorSets(vk.device, array_length(descriptor_writes), descriptor_writes, 0, nullptr);
+        }
+    }
+}
+
 void Vk_Demo::setup_imgui() {
     ImGui::CreateContext();
     ImGui_ImplSDL2_InitForVulkan(create_info.window);
@@ -673,6 +771,7 @@ void Vk_Demo::do_imgui() {
             ImGui::Spacing();
             ImGui::Checkbox("Vertical sync", &vsync);
             ImGui::Checkbox("Animate", &animate);
+            ImGui::Checkbox("Raytracing", &raytracing);
 
             if (ImGui::BeginPopupContextWindow()) {
                 if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;
@@ -720,20 +819,6 @@ void Vk_Demo::run_frame(bool draw_only_background) {
     update_uniform_buffer();
     vk_begin_frame();
 
-    // Set viewport and scisor rect.
-    VkViewport viewport{};
-    viewport.width = static_cast<float>(vk.surface_size.width);
-    viewport.height = static_cast<float>(vk.surface_size.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor{};
-    scissor.extent = vk.surface_size;
-
-    vkCmdSetViewport(vk.command_buffer, 0, 1, &viewport);
-    vkCmdSetScissor(vk.command_buffer, 0, 1, &scissor);
-
-    // Prepare render pass instance.
     VkClearValue clear_values[2];
     clear_values[0].color = {srgb_encode(0.32f), srgb_encode(0.32f), srgb_encode(0.4f), 0.0f};
     clear_values[1].depthStencil.depth = 1.0;
@@ -746,22 +831,42 @@ void Vk_Demo::run_frame(bool draw_only_background) {
     render_pass_begin_info.clearValueCount   = 2;
     render_pass_begin_info.pClearValues      = clear_values;
 
-    vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+    bool old_vsync = vsync;
 
-    // Draw model.
-    if (!draw_only_background) {
-        const VkDeviceSize zero_offset = 0;
-        vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer, &zero_offset);
-        vkCmdBindIndexBuffer(vk.command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
-        vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
-        vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-        vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
+    if (raytracing) {
+        vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+        do_imgui();
+        vkCmdEndRenderPass(vk.command_buffer);
+    } else {
+        // Set viewport and scisor rect.
+        VkViewport viewport{};
+        viewport.width = static_cast<float>(vk.surface_size.width);
+        viewport.height = static_cast<float>(vk.surface_size.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+
+        VkRect2D scissor{};
+        scissor.extent = vk.surface_size;
+
+        vkCmdSetViewport(vk.command_buffer, 0, 1, &viewport);
+        vkCmdSetScissor(vk.command_buffer, 0, 1, &scissor);
+
+        vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+
+        // Draw model.
+        if (!draw_only_background) {
+            const VkDeviceSize zero_offset = 0;
+            vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer, &zero_offset);
+            vkCmdBindIndexBuffer(vk.command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
+            vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
+        }
+
+        do_imgui();
+        vkCmdEndRenderPass(vk.command_buffer);
     }
 
-    bool old_vsync = vsync;
-    do_imgui();
-
-    vkCmdEndRenderPass(vk.command_buffer);
     vk_end_frame();
 
     if (vsync != old_vsync) {

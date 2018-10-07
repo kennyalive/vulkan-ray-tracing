@@ -38,15 +38,15 @@ struct Vk_Pipeline_Def {
     }
 };
 
-struct Vk_Image {
-    VkImage handle;
-    VkImageView view;
-};
-
 struct Vk_Create_Info {
     SDL_SysWMinfo   windowing_system_info;
     bool            enable_validation_layers;
     bool            use_debug_names;
+};
+
+struct Vk_Image {
+    VkImage handle;
+    VkImageView view;
 };
 
 //
@@ -70,7 +70,7 @@ void vk_ensure_staging_buffer_allocation(VkDeviceSize size);
 VkBuffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name);
 VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name);
 Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate_mipmaps, const uint8_t* pixels, int bytes_per_pixel, const char*  name);
-Vk_Image vk_create_render_target(int width, int height, VkFormat format, const char* name);
+Vk_Image vk_create_image(int width, int height, VkFormat format, VkImageCreateFlags usage_flags, const char* name);
 VkPipeline vk_find_pipeline(const Vk_Pipeline_Def& def);
 
 //

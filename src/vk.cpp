@@ -68,7 +68,7 @@ static void create_swapchain(bool vsync) {
     desc.imageColorSpace    = vk.surface_format.colorSpace;
     desc.imageExtent        = vk.surface_size;
     desc.imageArrayLayers   = 1;
-    desc.imageUsage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    desc.imageUsage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
     desc.imageSharingMode   = VK_SHARING_MODE_EXCLUSIVE;
     desc.preTransform       = surface_caps.currentTransform;
     desc.compositeAlpha     = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -687,7 +687,7 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
     return image;
 }
 
-Vk_Image vk_create_render_target(int width, int height, VkFormat format, const char* name) {
+Vk_Image vk_create_image(int width, int height, VkFormat format, VkImageCreateFlags usage_flags, const char* name) {
     Vk_Image image;
 
     // create image
@@ -702,7 +702,7 @@ Vk_Image vk_create_render_target(int width, int height, VkFormat format, const c
         desc.arrayLayers    = 1;
         desc.samples        = VK_SAMPLE_COUNT_1_BIT;
         desc.tiling         = VK_IMAGE_TILING_OPTIMAL;
-        desc.usage          = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        desc.usage          = usage_flags;
         desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
         desc.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 

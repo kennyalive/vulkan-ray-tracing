@@ -37,6 +37,8 @@ private:
     void create_raytracing_pipeline();
     void create_shader_binding_table();
 
+    void create_copy_to_swapchain_resources();
+
     void setup_imgui();
     void release_imgui();
     void do_imgui();
@@ -48,6 +50,7 @@ private:
     bool                        show_ui                 = true;
     bool                        vsync                   = true;
     bool                        animate                 = false;
+    bool                        raytracing              = false;
 
     VkSampler                   sampler                 = VK_NULL_HANDLE;
     Vk_Image                    texture;
@@ -87,6 +90,22 @@ private:
     VkDescriptorSetLayout       raytracing_descriptor_set_layout    = VK_NULL_HANDLE;
     VkPipelineLayout            raytracing_pipeline_layout          = VK_NULL_HANDLE;
     VkPipeline                  raytracing_pipeline                 = VK_NULL_HANDLE;
+    VkDescriptorSet             raytracing_descriptor_set           = VK_NULL_HANDLE;
 
     VkBuffer                    shader_binding_table                = VK_NULL_HANDLE;
+
+    //
+    // Output image.
+    //
+    Vk_Image output_image = {};
+
+    struct Copy_To_Swapchain_Resources {
+        VkDescriptorSetLayout           set_layout;
+        VkPipelineLayout                pipeline_layout;
+        VkPipeline                      pipeline;
+
+        std::vector<VkDescriptorSet>    sets; // per swapchain image
+    };
+
+    Copy_To_Swapchain_Resources copy_to_swapchain_resources = {};
 };
