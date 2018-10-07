@@ -524,8 +524,8 @@ void Vk_Demo::create_shader_modules() {
 
         return get_resource_manager()->create_shader_module(desc, debug_name);
     };
-    model_vs = create_shader_module("spirv/model.vb", "vertex shader");
-    model_fs = create_shader_module("spirv/model.fb", "fragment shader");
+    model_vs = create_shader_module("spirv/model.vert.spv", "vertex shader");
+    model_fs = create_shader_module("spirv/model.frag.spv", "fragment shader");
 }
 
 VkShaderModule load_spirv(const std::string& spirv_file) {
@@ -554,7 +554,7 @@ void Vk_Demo::create_pipelines() {
 }
 
 void Vk_Demo::create_raytracing_pipeline() {
-    // Descriptor set.
+    // Descriptor set layout.
     {
         VkDescriptorSetLayoutBinding layout_bindings[1] {};
         layout_bindings[0].binding          = 0;
@@ -578,7 +578,7 @@ void Vk_Demo::create_raytracing_pipeline() {
 
     // Pipeline.
     {
-        VkShaderModule rgen_shader = load_spirv("spirv/simple.rgenb");
+        VkShaderModule rgen_shader = load_spirv("spirv/simple.rgen.spv");
 
         VkPipelineShaderStageCreateInfo stage_infos[1] {};
         stage_infos[0].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

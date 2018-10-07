@@ -729,17 +729,17 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     //
     // Shader stages.
     //
-    auto get_shader_stage_desc = [](VkShaderStageFlagBits stage, VkShaderModule shader_module, const char* entry) {
+    auto get_shader_stage_desc = [](VkShaderStageFlagBits stage, VkShaderModule shader_module) {
         VkPipelineShaderStageCreateInfo desc { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         desc.stage  = stage;
         desc.module = shader_module;
-        desc.pName  = entry;
+        desc.pName  = "main";
         return desc;
     };
 
     VkPipelineShaderStageCreateInfo shader_stages_state[2] {
-        get_shader_stage_desc(VK_SHADER_STAGE_VERTEX_BIT, def.vs_module, "main_vs"),
-        get_shader_stage_desc(VK_SHADER_STAGE_FRAGMENT_BIT, def.fs_module, "main_fs")
+        get_shader_stage_desc(VK_SHADER_STAGE_VERTEX_BIT, def.vs_module),
+        get_shader_stage_desc(VK_SHADER_STAGE_FRAGMENT_BIT, def.fs_module)
     };
 
     //
