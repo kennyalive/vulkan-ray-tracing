@@ -49,6 +49,7 @@ private:
     void create_pipelines();
 
     void create_raytracing_pipeline();
+    void update_raytracing_output_image_descriptor();
     void create_shader_binding_table();
 
     void create_output_image();

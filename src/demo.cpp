@@ -657,21 +657,25 @@ void Vk_Demo::create_raytracing_pipeline() {
         desc.descriptorSetCount = 1;
         desc.pSetLayouts        = &raytracing_descriptor_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &raytracing_descriptor_set));
+        update_raytracing_output_image_descriptor();
 
-        VkDescriptorImageInfo image_info = {};
-        image_info.imageView    = output_image.view;
-        image_info.imageLayout  = VK_IMAGE_LAYOUT_GENERAL;
-
-        VkWriteDescriptorSet descriptor_writes[1] = {};
-        descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[0].dstSet             = raytracing_descriptor_set;
-        descriptor_writes[0].dstBinding         = 0;
-        descriptor_writes[0].descriptorCount    = 1;
-        descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        descriptor_writes[0].pImageInfo         = &image_info;
-
-        vkUpdateDescriptorSets(vk.device, array_length(descriptor_writes), descriptor_writes, 0, nullptr);
     }
+}
+
+void Vk_Demo::update_raytracing_output_image_descriptor() {
+    VkDescriptorImageInfo image_info = {};
+    image_info.imageView    = output_image.view;
+    image_info.imageLayout  = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkWriteDescriptorSet descriptor_writes[1] = {};
+    descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptor_writes[0].dstSet             = raytracing_descriptor_set;
+    descriptor_writes[0].dstBinding         = 0;
+    descriptor_writes[0].descriptorCount    = 1;
+    descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descriptor_writes[0].pImageInfo         = &image_info;
+
+    vkUpdateDescriptorSets(vk.device, array_length(descriptor_writes), descriptor_writes, 0, nullptr);
 }
 
 void Vk_Demo::create_shader_binding_table() {
@@ -894,6 +898,7 @@ void Vk_Demo::release_resolution_dependent_resources() {
 void Vk_Demo::restore_resolution_dependent_resources() {
     vk_restore_resolution_dependent_resources(vsync);
     create_output_image();
+    update_raytracing_output_image_descriptor();
     copy_to_swapchain.create_resources(global_descriptor_set_layout, descriptor_pool, output_image);
     create_framebuffers();
     prev_time = Clock::now();
