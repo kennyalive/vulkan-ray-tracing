@@ -78,8 +78,11 @@ private:
     uint32_t                    model_vertex_count      = 0;
     uint32_t                    model_index_count       = 0;
 
-    VkRenderPass                render_pass             = VK_NULL_HANDLE;
-    VkFramebuffer               framebuffer             = VK_NULL_HANDLE;
+    VkRenderPass                color_depth_render_pass = VK_NULL_HANDLE;
+    VkFramebuffer               color_depth_framebuffer = VK_NULL_HANDLE;
+
+    VkRenderPass                color_render_pass       = VK_NULL_HANDLE;
+    VkFramebuffer               color_framebuffer       = VK_NULL_HANDLE;
 
     VkDescriptorSetLayout       global_descriptor_set_layout = VK_NULL_HANDLE;
     VkDescriptorSet             global_descriptor_set        = VK_NULL_HANDLE;

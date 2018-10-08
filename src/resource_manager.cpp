@@ -50,11 +50,6 @@ void Resource_Manager::release_resources() {
     }
     samplers.clear();
 
-    for (auto render_pass : render_passes) {
-        vkDestroyRenderPass(device, render_pass, nullptr);
-    }
-    render_passes.clear();
-
     for (auto framebuffer : framebuffers) {
         vkDestroyFramebuffer(device, framebuffer, nullptr);
     }
@@ -153,14 +148,6 @@ VkSampler Resource_Manager::create_sampler(const VkSamplerCreateInfo& desc, cons
     vk_set_debug_name(sampler, name);
     samplers.push_back(sampler);
     return sampler;
-}
-
-VkRenderPass Resource_Manager::create_render_pass(const VkRenderPassCreateInfo& desc, const char* name) {
-    VkRenderPass render_pass;
-    VK_CHECK(vkCreateRenderPass(device, &desc, nullptr, &render_pass));
-    vk_set_debug_name(render_pass, name);
-    render_passes.push_back(render_pass);
-    return render_pass;
 }
 
 VkFramebuffer Resource_Manager::create_framebuffer(const VkFramebufferCreateInfo& desc, const char* name) {

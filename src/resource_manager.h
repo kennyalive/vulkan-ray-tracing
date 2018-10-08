@@ -15,7 +15,6 @@ public:
     VkImage                 create_image                (const VkImageCreateInfo& desc, const char* name);
     VkImageView             create_image_view           (const VkImageViewCreateInfo& desc, const char* name);
     VkSampler               create_sampler              (const VkSamplerCreateInfo& desc, const char* name);
-    VkRenderPass            create_render_pass          (const VkRenderPassCreateInfo& desc, const char* name);
     VkFramebuffer           create_framebuffer          (const VkFramebufferCreateInfo& desc, const char* name);
     VkDescriptorSetLayout   create_descriptor_set_layout(const VkDescriptorSetLayoutCreateInfo& desc, const char* name);
     VkPipelineLayout        create_pipeline_layout      (const VkPipelineLayoutCreateInfo& desc, const char* name);
@@ -44,7 +43,6 @@ private:
     std::vector<VkImageView>            image_views;
     std::vector<VkSampler>              samplers;
     std::vector<VkDescriptorSetLayout>  descriptor_set_layouts;
-    std::vector<VkRenderPass>           render_passes;
     std::vector<VkFramebuffer>          framebuffers;
     std::vector<VkPipelineLayout>       pipeline_layouts;
     std::vector<VkPipeline>             graphics_pipelines;
