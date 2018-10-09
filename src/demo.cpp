@@ -226,9 +226,11 @@ void Vk_Demo::create_acceleration_structures() {
 	        uint32_t    instance_contribution_to_hit_group_index : 24;
 	        uint32_t    flags : 8;
 	        uint64_t    acceleration_structure_handle;
-        } instance;
+        } instance{};
 
         instance.transform = Matrix3x4::identity;
+        instance.instance_mask = 0xff;
+        instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NVX;
         instance.acceleration_structure_handle = bottom_level_accel_handle;
 
         VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
@@ -508,10 +510,11 @@ void Vk_Demo::create_descriptor_sets() {
     //
     {
         VkDescriptorPoolSize pool_sizes[] = {
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16  },
-            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,  16  },
-            {VK_DESCRIPTOR_TYPE_SAMPLER,        16  },
-            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  16  },
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             16  },
+            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,              16  },
+            {VK_DESCRIPTOR_TYPE_SAMPLER,                    16  },
+            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,              16  },
+            {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, 16  },
         };
 
         VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
@@ -652,11 +655,16 @@ void Vk_Demo::create_pipelines() {
 void Vk_Demo::create_raytracing_pipeline() {
     // Descriptor set layout.
     {
-        VkDescriptorSetLayoutBinding layout_bindings[1] {};
+        VkDescriptorSetLayoutBinding layout_bindings[2] {};
         layout_bindings[0].binding          = 0;
         layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         layout_bindings[0].descriptorCount  = 1;
         layout_bindings[0].stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+
+        layout_bindings[1].binding          = 1;
+        layout_bindings[1].descriptorType   = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+        layout_bindings[1].descriptorCount  = 1;
+        layout_bindings[1].stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
         VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
         create_info.bindingCount    = array_length(layout_bindings);
@@ -675,14 +683,20 @@ void Vk_Demo::create_raytracing_pipeline() {
     // Pipeline.
     {
         VkShaderModule rgen_shader = load_spirv("spirv/simple.rgen.spv");
+        VkShaderModule miss_shader = load_spirv("spirv/simple.miss.spv");
 
-        VkPipelineShaderStageCreateInfo stage_infos[1] {};
+        VkPipelineShaderStageCreateInfo stage_infos[2] {};
         stage_infos[0].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stage_infos[0].stage    = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
         stage_infos[0].module   = rgen_shader;
         stage_infos[0].pName    = "main";
 
-        uint32_t group_numbers[1] = { 0 };
+        stage_infos[1].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stage_infos[1].stage    = VK_SHADER_STAGE_MISS_BIT_NVX;
+        stage_infos[1].module   = miss_shader;
+        stage_infos[1].pName    = "main";
+
+        uint32_t group_numbers[4] = { 0, 1 }; // [raygen] [miss shader]
 
         VkRaytracingPipelineCreateInfoNVX create_info { VK_STRUCTURE_TYPE_RAYTRACING_PIPELINE_CREATE_INFO_NVX };
         create_info.stageCount          = array_length(stage_infos);
@@ -693,6 +707,7 @@ void Vk_Demo::create_raytracing_pipeline() {
         VK_CHECK(vkCreateRaytracingPipelinesNVX(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &raytracing_pipeline));
 
         vkDestroyShaderModule(vk.device, rgen_shader, nullptr);
+        vkDestroyShaderModule(vk.device, miss_shader, nullptr);
     }
 
     // Descriptor set.
@@ -702,8 +717,23 @@ void Vk_Demo::create_raytracing_pipeline() {
         desc.descriptorSetCount = 1;
         desc.pSetLayouts        = &raytracing_descriptor_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &raytracing_descriptor_set));
+
         update_raytracing_output_image_descriptor();
 
+        // Update acceleration structure slot.
+        VkDescriptorAccelerationStructureInfoNVX accel_info { VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
+        accel_info.accelerationStructureCount = 1;
+        accel_info.pAccelerationStructures = &top_level_accel;
+
+        VkWriteDescriptorSet descriptor_write = {};
+        descriptor_write.sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_write.pNext              = &accel_info;
+        descriptor_write.dstSet             = raytracing_descriptor_set;
+        descriptor_write.dstBinding         = 1;
+        descriptor_write.descriptorCount    = 1;
+        descriptor_write.descriptorType     = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;;
+
+        vkUpdateDescriptorSets(vk.device, 1, &descriptor_write, 0, nullptr);
     }
 }
 
@@ -724,12 +754,12 @@ void Vk_Demo::update_raytracing_output_image_descriptor() {
 }
 
 void Vk_Demo::create_shader_binding_table() {
-    constexpr uint32_t group_count = 1;
+    constexpr uint32_t group_count = 2;
     VkDeviceSize sbt_size = group_count * shader_header_size;
 
     void* mapped_memory;
     shader_binding_table = vk_create_host_visible_buffer(sbt_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, &mapped_memory, "shader_binding_table");
-    VK_CHECK(vkGetRaytracingShaderHandlesNVX(vk.device, raytracing_pipeline, 0, 1, sbt_size, mapped_memory));
+    VK_CHECK(vkGetRaytracingShaderHandlesNVX(vk.device, raytracing_pipeline, 0, group_count, sbt_size, mapped_memory));
 }
 
 void Vk_Demo::create_output_image() {
@@ -862,7 +892,11 @@ void Vk_Demo::run_frame(bool draw_only_background) {
     if (raytracing) {
         vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, raytracing_pipeline_layout, 0, 1, &raytracing_descriptor_set, 0, nullptr);
         vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, raytracing_pipeline);
-        vkCmdTraceRaysNVX(vk.command_buffer, shader_binding_table, 0, shader_binding_table, 0, 0, shader_binding_table, 0, 0, vk.surface_size.width, vk.surface_size.height);
+        vkCmdTraceRaysNVX(vk.command_buffer,
+            shader_binding_table, 0, // raygen shader
+            shader_binding_table, 1 * shader_header_size, shader_header_size, // miss shaders
+            shader_binding_table, 2 * shader_header_size, shader_header_size, // hit groups are not used yet
+            vk.surface_size.width, vk.surface_size.height);
 
         // Draw UI.
         VkRenderPassBeginInfo render_pass_begin_info { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
