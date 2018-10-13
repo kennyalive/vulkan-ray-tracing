@@ -479,12 +479,6 @@ void vk_shutdown() {
         vmaDestroyBuffer(vk.allocator, vk.staging_buffer, vk.staging_buffer_allocation);
     }
 
-    for (auto pipeline : vk.pipelines) {
-        vkDestroyPipeline(vk.device, pipeline, nullptr);
-    }
-    vk.pipeline_defs.clear();
-    vk.pipelines.clear();
-
     vkDestroyCommandPool(vk.device, vk.command_pool, nullptr);
     vkDestroyDescriptorPool(vk.device, vk.descriptor_pool, nullptr);
     vkDestroySemaphore(vk.device, vk.image_acquired, nullptr);
@@ -531,8 +525,6 @@ void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
     vk.staging_buffer_ptr = (uint8_t*)alloc_info.pMappedData;
     vk.staging_buffer_size = size;
 }
-
-VkPipeline create_pipeline(const Vk_Pipeline_Def&);
 
 Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name) {
     VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
@@ -755,55 +747,36 @@ Vk_Image vk_create_image(int width, int height, VkFormat format, VkImageCreateFl
     return image;
 }
 
-static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
-    //
-    // Shader stages.
-    //
-    auto get_shader_stage_desc = [](VkShaderStageFlagBits stage, VkShaderModule shader_module) {
-        VkPipelineShaderStageCreateInfo desc { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-        desc.stage  = stage;
-        desc.module = shader_module;
-        desc.pName  = "main";
-        return desc;
-    };
+Vk_Graphics_Pipeline_State get_default_graphics_pipeline_state() {
+    Vk_Graphics_Pipeline_State state;
 
-    VkPipelineShaderStageCreateInfo shader_stages_state[2] {
-        get_shader_stage_desc(VK_SHADER_STAGE_VERTEX_BIT, def.vs_module),
-        get_shader_stage_desc(VK_SHADER_STAGE_FRAGMENT_BIT, def.fs_module)
-    };
-
-    //
-    // Vertex input.
-    //
+    // VkVertexInputBindingDescription
     auto bindings = Vertex::get_bindings();
+    memcpy(state.vertex_bindings, bindings.data(), bindings.size() * sizeof(VkVertexInputBindingDescription));
+    state.vertex_binding_count = (uint32_t)bindings.size();
+
+    // VkVertexInputAttributeDescription
     auto attribs = Vertex::get_attributes();
+    memcpy(state.vertex_attributes, attribs.data(), attribs.size() * sizeof(VkVertexInputAttributeDescription));
+    state.vertex_attribute_count = (uint32_t)attribs.size();
 
-    VkPipelineVertexInputStateCreateInfo vertex_input_state { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
-    vertex_input_state.vertexBindingDescriptionCount    = static_cast<uint32_t>(bindings.size());
-    vertex_input_state.pVertexBindingDescriptions       = bindings.data();
-    vertex_input_state.vertexAttributeDescriptionCount  = static_cast<uint32_t>(attribs.size());
-    vertex_input_state.pVertexAttributeDescriptions     = attribs.data();
-
-    //
-    // Primitive assembly.
-    //
-    VkPipelineInputAssemblyStateCreateInfo input_assembly_state { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-    input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    // VkPipelineInputAssemblyStateCreateInfo
+    auto& input_assembly_state = state.input_assembly_state;
+    input_assembly_state = VkPipelineInputAssemblyStateCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
+    input_assembly_state.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     input_assembly_state.primitiveRestartEnable = VK_FALSE;
 
-    //
-    // Viewport.
-    //
-    VkPipelineViewportStateCreateInfo viewport_state { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
-    viewport_state.viewportCount    = 1;
-    viewport_state.pViewports       = nullptr;
-    viewport_state.scissorCount     = 1;
-    viewport_state.pScissors        = nullptr;
+    // VkPipelineViewportStateCreateInfo
+    auto& viewport_state = state.viewport_state;
+    viewport_state = VkPipelineViewportStateCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+    viewport_state.viewportCount                = 1;
+    viewport_state.pViewports                   = nullptr;
+    viewport_state.scissorCount                 = 1;
+    viewport_state.pScissors                    = nullptr;
 
-    //
-    // Rasterization.
-    //
-    VkPipelineRasterizationStateCreateInfo rasterization_state { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+    // VkPipelineRasterizationStateCreateInfo
+    auto& rasterization_state = state.rasterization_state;
+    rasterization_state = VkPipelineRasterizationStateCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
     rasterization_state.depthClampEnable        = VK_FALSE;
     rasterization_state.rasterizerDiscardEnable = VK_FALSE;
     rasterization_state.polygonMode             = VK_POLYGON_MODE_FILL;
@@ -815,86 +788,94 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     rasterization_state.depthBiasSlopeFactor    = 0.0f;
     rasterization_state.lineWidth               = 1.0f;
 
-    //
-    // Multisampling.
-    //
-    VkPipelineMultisampleStateCreateInfo multisample_state { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-    multisample_state.rasterizationSamples  = VK_SAMPLE_COUNT_1_BIT;
-    multisample_state.sampleShadingEnable   = VK_FALSE;
-    multisample_state.minSampleShading      = 1.0f;
-    multisample_state.pSampleMask           = nullptr;
-    multisample_state.alphaToCoverageEnable = VK_FALSE;
-    multisample_state.alphaToOneEnable      = VK_FALSE;
+    // VkPipelineMultisampleStateCreateInfo
+    auto& multisample_state = state.multisample_state;
+    multisample_state = VkPipelineMultisampleStateCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+    multisample_state.rasterizationSamples      = VK_SAMPLE_COUNT_1_BIT;
+    multisample_state.sampleShadingEnable       = VK_FALSE;
+    multisample_state.minSampleShading          = 1.0f;
+    multisample_state.pSampleMask               = nullptr;
+    multisample_state.alphaToCoverageEnable     = VK_FALSE;
+    multisample_state.alphaToOneEnable          = VK_FALSE;
 
-    //
-    // Depth/stencil.
-    //
-    VkPipelineDepthStencilStateCreateInfo depth_stencil_state { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+    // VkPipelineDepthStencilStateCreateInfo
+    auto& depth_stencil_state = state.depth_stencil_state;
+    depth_stencil_state = VkPipelineDepthStencilStateCreateInfo{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
     depth_stencil_state.depthTestEnable         = VK_TRUE;
     depth_stencil_state.depthWriteEnable        = VK_TRUE;
     depth_stencil_state.depthCompareOp          = VK_COMPARE_OP_LESS;
     depth_stencil_state.depthBoundsTestEnable   = VK_FALSE;
     depth_stencil_state.stencilTestEnable       = VK_FALSE;
 
-    //
-    // Blending.
-    //
-    VkPipelineColorBlendAttachmentState attachment_blend_state = {};
-    attachment_blend_state.blendEnable = VK_FALSE;
-    attachment_blend_state.colorWriteMask =
-        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    // VkPipelineColorBlendAttachmentState
+    auto& attachment_blend_state = state.attachment_blend_state[0];
+    attachment_blend_state = VkPipelineColorBlendAttachmentState{};
+    attachment_blend_state.blendEnable          = VK_FALSE;
+    attachment_blend_state.colorWriteMask       = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                                  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    state.attachment_blend_state_count          = 1;
 
-    VkPipelineColorBlendStateCreateInfo blend_state { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-    blend_state.logicOpEnable   = VK_FALSE;
-    blend_state.logicOp         = VK_LOGIC_OP_COPY;
-    blend_state.attachmentCount = 1;
-    blend_state.pAttachments    = &attachment_blend_state;
+    // VkPipelineDynamicStateCreateInfo
+    state.dynamic_state[0]                      = VK_DYNAMIC_STATE_VIEWPORT;
+    state.dynamic_state[1]                      = VK_DYNAMIC_STATE_SCISSOR;
+    state.dynamic_state_count                   = 2;
 
-    //
-    // Dynamic state.
-    //
-    VkDynamicState dynamic_state[2] = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
-
-    VkPipelineDynamicStateCreateInfo dynamic_state_info{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
-    dynamic_state_info.dynamicStateCount = 2;
-    dynamic_state_info.pDynamicStates    = dynamic_state;
-
-    //
-    // Finally create graphics pipeline.
-    //
-    VkGraphicsPipelineCreateInfo desc { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-    desc.stageCount             = (uint32_t)std::size(shader_stages_state);
-    desc.pStages                = shader_stages_state;
-    desc.pVertexInputState      = &vertex_input_state;
-    desc.pInputAssemblyState    = &input_assembly_state;
-    desc.pViewportState         = &viewport_state;
-    desc.pRasterizationState    = &rasterization_state;
-    desc.pMultisampleState      = &multisample_state;
-    desc.pDepthStencilState     = &depth_stencil_state;
-    desc.pColorBlendState       = &blend_state;
-    desc.pDynamicState          = &dynamic_state_info;
-    desc.layout                 = def.pipeline_layout;
-    desc.renderPass             = def.render_pass;
-    desc.subpass                = 0;
-
-    VkPipeline pipeline;
-    VK_CHECK(vkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &desc, nullptr, &pipeline));
-    return pipeline;
+    return state;
 }
 
-VkPipeline vk_find_pipeline(const Vk_Pipeline_Def& def) {
-    for (size_t i = 0; i < vk.pipeline_defs.size(); i++) {
-        if (vk.pipeline_defs[i] == def)
-            return vk.pipelines[i];
-    }
+VkPipeline vk_create_graphics_pipeline(
+    const Vk_Graphics_Pipeline_State&   state,
+    VkPipelineLayout                    pipeline_layout,
+    VkRenderPass                        render_pass,
+    VkShaderModule                      vertex_shader,
+    VkShaderModule                      fragment_shader)
+{
+    auto get_shader_stage_create_info = [](VkShaderStageFlagBits stage, VkShaderModule shader_module) {
+        VkPipelineShaderStageCreateInfo create_info{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+        create_info.stage  = stage;
+        create_info.module = shader_module;
+        create_info.pName  = "main";
+        return create_info;
+    };
 
-    VkPipeline pipeline = create_pipeline(def);
-    vk.pipeline_defs.push_back(def);
-    vk.pipelines.push_back(pipeline);
+    VkPipelineShaderStageCreateInfo shader_stages_state[2] {
+        get_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertex_shader),
+        get_shader_stage_create_info(VK_SHADER_STAGE_FRAGMENT_BIT, fragment_shader)
+    };
+
+    VkPipelineVertexInputStateCreateInfo vertex_input_state{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+    vertex_input_state.vertexBindingDescriptionCount    = state.vertex_binding_count;
+    vertex_input_state.pVertexBindingDescriptions       = state.vertex_bindings;
+    vertex_input_state.vertexAttributeDescriptionCount  = state.vertex_attribute_count;
+    vertex_input_state.pVertexAttributeDescriptions     = state.vertex_attributes;
+
+    VkPipelineColorBlendStateCreateInfo blend_state{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
+    blend_state.logicOpEnable                           = VK_FALSE;
+    blend_state.logicOp                                 = VK_LOGIC_OP_COPY;
+    blend_state.attachmentCount                         = state.attachment_blend_state_count;
+    blend_state.pAttachments                            = state.attachment_blend_state;
+
+    VkPipelineDynamicStateCreateInfo dynamic_state_create_info{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
+    dynamic_state_create_info.dynamicStateCount         = state.dynamic_state_count;
+    dynamic_state_create_info.pDynamicStates            = state.dynamic_state;
+
+    VkGraphicsPipelineCreateInfo create_info { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+    create_info.stageCount                              = (uint32_t)std::size(shader_stages_state);
+    create_info.pStages                                 = shader_stages_state;
+    create_info.pVertexInputState                       = &vertex_input_state;
+    create_info.pInputAssemblyState                     = &state.input_assembly_state;
+    create_info.pViewportState                          = &state.viewport_state;
+    create_info.pRasterizationState                     = &state.rasterization_state;
+    create_info.pMultisampleState                       = &state.multisample_state;
+    create_info.pDepthStencilState                      = &state.depth_stencil_state;
+    create_info.pColorBlendState                        = &blend_state;
+    create_info.pDynamicState                           = &dynamic_state_create_info;
+    create_info.layout                                  = pipeline_layout;
+    create_info.renderPass                              = render_pass;
+    create_info.subpass                                 = 0;
+
+    VkPipeline pipeline;
+    VK_CHECK(vkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
     return pipeline;
 }
 

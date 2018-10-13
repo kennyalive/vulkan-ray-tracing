@@ -570,18 +570,14 @@ void Rasterization_Resources::create(VkImageView output_image_view) {
 
     // Pipeline.
     {
-        VkShaderModule model_vs = load_spirv("spirv/model.vert.spv");
-        VkShaderModule model_fs = load_spirv("spirv/model.frag.spv");
+        VkShaderModule vertex_shader = load_spirv("spirv/model.vert.spv");
+        VkShaderModule fragment_shader = load_spirv("spirv/model.frag.spv");
 
-        Vk_Pipeline_Def def;
-        def.vs_module = model_vs;
-        def.fs_module = model_fs;
-        def.render_pass = render_pass;
-        def.pipeline_layout = pipeline_layout;
-        pipeline = vk_find_pipeline(def);
+        pipeline = vk_create_graphics_pipeline(get_default_graphics_pipeline_state(),
+            pipeline_layout, render_pass, vertex_shader, fragment_shader);
 
-        vkDestroyShaderModule(vk.device, model_vs, nullptr);
-        vkDestroyShaderModule(vk.device, model_fs, nullptr);
+        vkDestroyShaderModule(vk.device, vertex_shader, nullptr);
+        vkDestroyShaderModule(vk.device, fragment_shader, nullptr);
     }
 
     //
@@ -637,6 +633,7 @@ void Rasterization_Resources::destroy() {
     uniform_buffer.destroy();
     vkDestroyDescriptorSetLayout(vk.device, descriptor_set_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
+    vkDestroyPipeline(vk.device, pipeline, nullptr);
     vkDestroySampler(vk.device, sampler, nullptr);
     vkDestroyRenderPass(vk.device, render_pass, nullptr);
     vkDestroyFramebuffer(vk.device, framebuffer, nullptr);

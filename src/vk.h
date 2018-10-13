@@ -24,20 +24,6 @@
         error(std::string("Vulkan: ") + string_VkResult(result) + " returned by " + #function_call); \
 }
 
-struct Vk_Pipeline_Def {
-    VkShaderModule      vs_module;
-    VkShaderModule      fs_module;
-    VkRenderPass        render_pass;
-    VkPipelineLayout    pipeline_layout;
-
-    bool operator==(const Vk_Pipeline_Def& other) const {
-        return vs_module == other.vs_module &&
-               fs_module == other.fs_module &&
-               render_pass == other.render_pass &&
-               pipeline_layout == other.pipeline_layout;
-    }
-};
-
 struct Vk_Create_Info {
     SDL_SysWMinfo               windowing_system_info;
 
@@ -53,15 +39,29 @@ struct Vk_Image {
     VkImage         handle;
     VkImageView     view;
     VmaAllocation   allocation;
-
     void destroy();
 };
 
 struct Vk_Buffer {
     VkBuffer        handle;
     VmaAllocation   allocation;
-
     void destroy();
+};
+
+struct Vk_Graphics_Pipeline_State {
+    VkVertexInputBindingDescription         vertex_bindings[8];
+    uint32_t                                vertex_binding_count;
+    VkVertexInputAttributeDescription       vertex_attributes[16];
+    uint32_t                                vertex_attribute_count;
+    VkPipelineInputAssemblyStateCreateInfo  input_assembly_state;
+    VkPipelineViewportStateCreateInfo       viewport_state;
+    VkPipelineRasterizationStateCreateInfo  rasterization_state;
+    VkPipelineMultisampleStateCreateInfo    multisample_state;
+    VkPipelineDepthStencilStateCreateInfo   depth_stencil_state;
+    VkPipelineColorBlendAttachmentState     attachment_blend_state[4];
+    UINT32                                  attachment_blend_state_count;
+    VkDynamicState                          dynamic_state[8];
+    uint32_t                                dynamic_state_count;
 };
 
 //
@@ -86,7 +86,16 @@ Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const ch
 Vk_Buffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name);
 Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate_mipmaps, const uint8_t* pixels, int bytes_per_pixel, const char*  name);
 Vk_Image vk_create_image(int width, int height, VkFormat format, VkImageCreateFlags usage_flags, const char* name);
-VkPipeline vk_find_pipeline(const Vk_Pipeline_Def& def);
+
+Vk_Graphics_Pipeline_State get_default_graphics_pipeline_state();
+
+VkPipeline vk_create_graphics_pipeline(
+    const Vk_Graphics_Pipeline_State&   state,
+    VkPipelineLayout                    pipeline_layout,
+    VkRenderPass                        render_pass,
+    VkShaderModule                      vertex_shader,
+    VkShaderModule                      fragment_shader
+);
 
 //
 // Rendering setup.
@@ -150,9 +159,6 @@ struct Vk_Instance {
     VmaAllocation                   staging_buffer_allocation;
     VkDeviceSize                    staging_buffer_size;
     uint8_t*                        staging_buffer_ptr; // pointer to mapped staging buffer
-
-    std::vector<Vk_Pipeline_Def>    pipeline_defs;
-    std::vector<VkPipeline>         pipelines;
 
     Depth_Buffer_Info               depth_info;
     VkDebugUtilsMessengerEXT        debug_utils_messenger;
