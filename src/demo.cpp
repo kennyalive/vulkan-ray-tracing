@@ -3,7 +3,6 @@
 #include "debug.h"
 #include "geometry.h"
 #include "matrix.h"
-#include "resource_manager.h"
 #include "vk.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -97,8 +96,6 @@ void Vk_Demo::initialize(const Demo_Create_Info& create_info) {
         printf("  maxGeometryCount = %u\n", raytracing_properties.maxGeometryCount);
     }
 
-    get_resource_manager()->initialize(vk.device, vk.allocator);
-
     // Geometry buffers.
     {
         Model model = load_obj_model(get_resource_path("iron-man/model.obj"));
@@ -115,7 +112,7 @@ void Vk_Demo::initialize(const Demo_Create_Info& create_info) {
                 region.srcOffset = 0;
                 region.dstOffset = 0;
                 region.size = size;
-                vkCmdCopyBuffer(command_buffer, vk.staging_buffer, vertex_buffer, 1, &region);
+                vkCmdCopyBuffer(command_buffer, vk.staging_buffer, vertex_buffer.handle, 1, &region);
             });
         }
         {
@@ -129,7 +126,7 @@ void Vk_Demo::initialize(const Demo_Create_Info& create_info) {
                 region.srcOffset = 0;
                 region.dstOffset = 0;
                 region.size = size;
-                vkCmdCopyBuffer(command_buffer, vk.staging_buffer, index_buffer, 1, &region);
+                vkCmdCopyBuffer(command_buffer, vk.staging_buffer, index_buffer.handle, 1, &region);
             });
         }
     }
@@ -169,12 +166,12 @@ void Vk_Demo::initialize(const Demo_Create_Info& create_info) {
     create_ui_framebuffer();
 
     VkGeometryTrianglesNVX model_triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NVX };
-    model_triangles.vertexData    = vertex_buffer;
+    model_triangles.vertexData    = vertex_buffer.handle;
     model_triangles.vertexOffset  = 0;
     model_triangles.vertexCount   = model_vertex_count;
     model_triangles.vertexStride  = sizeof(Vertex);
     model_triangles.vertexFormat  = VK_FORMAT_R32G32B32_SFLOAT;
-    model_triangles.indexData     = index_buffer;
+    model_triangles.indexData     = index_buffer.handle;
     model_triangles.indexOffset   = 0;
     model_triangles.indexCount    = model_index_count;
     model_triangles.indexType     = VK_INDEX_TYPE_UINT32;
@@ -190,6 +187,9 @@ void Vk_Demo::shutdown() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
     release_imgui();
 
+    vertex_buffer.destroy();
+    index_buffer.destroy();
+
     raster.destroy();
     rt.destroy();
     copy_to_swapchain.destroy();;
@@ -200,7 +200,6 @@ void Vk_Demo::shutdown() {
     vkDestroyRenderPass(vk.device, ui_render_pass, nullptr);
     vkDestroyFramebuffer(vk.device, ui_framebuffer, nullptr);
 
-    get_resource_manager()->release_resources();
     vk_shutdown();
 }
 
@@ -339,12 +338,15 @@ void Vk_Demo::run_frame(bool draw_only_background) {
     bool old_raytracing = raytracing;
 
     if (raytracing) {
+        const VkBuffer sbt = rt.shader_binding_table.handle;
+        const uint32_t sbt_slot_size = rt.shader_header_size;
+
         vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, rt.pipeline_layout, 0, 1, &rt.descriptor_set, 0, nullptr);
         vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, rt.pipeline);
         vkCmdTraceRaysNVX(vk.command_buffer,
-            rt.shader_binding_table, 0, // raygen shader
-            rt.shader_binding_table, 1 * rt.shader_header_size, rt.shader_header_size, // miss shaders
-            rt.shader_binding_table, 2 * rt.shader_header_size, rt.shader_header_size, // hit groups are not used yet
+            sbt, 0, // raygen shader
+            sbt, 1 * sbt_slot_size, sbt_slot_size, // miss shaders
+            sbt, 2 * sbt_slot_size, sbt_slot_size, // hit groups are not used yet
             vk.surface_size.width, vk.surface_size.height);
 
         // Draw UI.
@@ -387,8 +389,8 @@ void Vk_Demo::run_frame(bool draw_only_background) {
         // Draw model.
         if (!draw_only_background) {
             const VkDeviceSize zero_offset = 0;
-            vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer, &zero_offset);
-            vkCmdBindIndexBuffer(vk.command_buffer, index_buffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer.handle, &zero_offset);
+            vkCmdBindIndexBuffer(vk.command_buffer, index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
             vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline_layout, 0, 1, &raster.descriptor_set, 0, nullptr);
             vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline);
             vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
@@ -465,20 +467,21 @@ void Rasterization_Resources::create(VkImageView output_image_view) {
 
     texture = load_texture("iron-man/model.jpg");
 
-    VkSamplerCreateInfo desc { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-    desc.magFilter           = VK_FILTER_LINEAR;
-    desc.minFilter           = VK_FILTER_LINEAR;
-    desc.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    desc.addressModeU        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    desc.addressModeV        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    desc.addressModeW        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    desc.mipLodBias          = 0.0f;
-    desc.anisotropyEnable    = VK_FALSE;
-    desc.maxAnisotropy       = 1;
-    desc.minLod              = 0.0f;
-    desc.maxLod              = 12.0f;
+    VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+    create_info.magFilter           = VK_FILTER_LINEAR;
+    create_info.minFilter           = VK_FILTER_LINEAR;
+    create_info.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    create_info.addressModeU        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    create_info.addressModeV        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    create_info.addressModeW        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    create_info.mipLodBias          = 0.0f;
+    create_info.anisotropyEnable    = VK_FALSE;
+    create_info.maxAnisotropy       = 1;
+    create_info.minLod              = 0.0f;
+    create_info.maxLod              = 12.0f;
 
-    sampler = get_resource_manager()->create_sampler(desc, "diffuse_texture_sampler");
+    VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &sampler));
+    vk_set_debug_name(sampler, "diffuse_texture_sampler");
 
     //
     // Descriptor set layouts.
@@ -500,18 +503,22 @@ void Rasterization_Resources::create(VkImageView output_image_view) {
         bindings[2].descriptorCount = 1;
         bindings[2].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayoutCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        desc.bindingCount   = array_length(bindings);
-        desc.pBindings      = bindings;
-        descriptor_set_layout = get_resource_manager()->create_descriptor_set_layout(desc, "raster_descriptor_set_layout");
+        VkDescriptorSetLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        create_info.bindingCount   = array_length(bindings);
+        create_info.pBindings      = bindings;
+
+        VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &descriptor_set_layout));
+        vk_set_debug_name(descriptor_set_layout, "raster_descriptor_set_layout");
     }
 
     // Pipeline layout.
     {
-        VkPipelineLayoutCreateInfo desc{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        desc.setLayoutCount = 1;
-        desc.pSetLayouts = &descriptor_set_layout;
-        pipeline_layout = get_resource_manager()->create_pipeline_layout(desc, "raster_pipeline_layout");
+        VkPipelineLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+        create_info.setLayoutCount = 1;
+        create_info.pSetLayouts = &descriptor_set_layout;
+
+        VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
+        vk_set_debug_name(pipeline_layout, "raster_pipeline_layout");
     }
 
     // Render pass.
@@ -588,7 +595,7 @@ void Rasterization_Resources::create(VkImageView output_image_view) {
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
 
         VkDescriptorBufferInfo buffer_info;
-        buffer_info.buffer  = uniform_buffer;
+        buffer_info.buffer  = uniform_buffer.handle;
         buffer_info.offset  = 0;
         buffer_info.range   = sizeof(Uniform_Buffer);
 
@@ -626,9 +633,13 @@ void Rasterization_Resources::create(VkImageView output_image_view) {
 }
 
 void Rasterization_Resources::destroy() {
+    texture.destroy();
+    uniform_buffer.destroy();
+    vkDestroyDescriptorSetLayout(vk.device, descriptor_set_layout, nullptr);
+    vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
+    vkDestroySampler(vk.device, sampler, nullptr);
     vkDestroyRenderPass(vk.device, render_pass, nullptr);
     vkDestroyFramebuffer(vk.device, framebuffer, nullptr);
-
     *this = Rasterization_Resources{};
 }
 
@@ -927,6 +938,8 @@ void Raytracing_Resources::create(VkImageView output_image_view, const VkGeometr
 }
 
 void Raytracing_Resources::destroy() {
+    shader_binding_table.destroy();
+
     vkDestroyAccelerationStructureNVX(vk.device, bottom_level_accel, nullptr);
     vmaFreeMemory(vk.allocator, bottom_level_accel_allocation);
 

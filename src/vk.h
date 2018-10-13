@@ -57,6 +57,13 @@ struct Vk_Image {
     void destroy();
 };
 
+struct Vk_Buffer {
+    VkBuffer        handle;
+    VmaAllocation   allocation;
+
+    void destroy();
+};
+
 //
 // Initialization.
 //
@@ -75,8 +82,8 @@ void vk_restore_resolution_dependent_resources(bool vsync);
 // Resources allocation.
 //
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size);
-VkBuffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name);
-VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name);
+Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name);
+Vk_Buffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name);
 Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate_mipmaps, const uint8_t* pixels, int bytes_per_pixel, const char*  name);
 Vk_Image vk_create_image(int width, int height, VkFormat format, VkImageCreateFlags usage_flags, const char* name);
 VkPipeline vk_find_pipeline(const Vk_Pipeline_Def& def);

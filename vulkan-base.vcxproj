@@ -102,7 +102,6 @@
     <ClCompile Include="src\matrix.cpp" />
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\resource_manager.cpp" />
     <ClCompile Include="src\demo.cpp" />
     <ClCompile Include="src\vma_impl.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp" />
@@ -123,7 +122,6 @@
     <ClInclude Include="src\matrix.h" />
     <ClInclude Include="src\vector.h" />
     <ClInclude Include="src\vk.h" />
-    <ClInclude Include="src\resource_manager.h" />
     <ClInclude Include="src\demo.h" />
     <ClInclude Include="third_party\imgui\imconfig.h" />
     <ClInclude Include="third_party\imgui\imgui.h" />

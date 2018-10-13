@@ -1,8 +1,7 @@
-#include "vk.h"
 #include "common.h"
 #include "debug.h"
 #include "geometry.h"
-#include "resource_manager.h"
+#include "vk.h"
 
 #include <algorithm>
 #include <cassert>
@@ -326,6 +325,13 @@ void Vk_Image::destroy() {
     vkDestroyImage(vk.device, handle, nullptr);
     vkDestroyImageView(vk.device, view, nullptr);
     vmaFreeMemory(vk.allocator, allocation);
+    *this = Vk_Image{};
+}
+
+void Vk_Buffer::destroy() {
+    vkDestroyBuffer(vk.device, handle, nullptr);
+    vmaFreeMemory(vk.allocator, allocation);
+    *this = Vk_Buffer{};
 }
 
 void vk_initialize(const Vk_Create_Info& create_info) {
@@ -528,20 +534,41 @@ void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
 
 VkPipeline create_pipeline(const Vk_Pipeline_Def&);
 
-VkBuffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name) {
-    VkBufferCreateInfo desc { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-    desc.size           = size;
-    desc.usage          = usage;
-    desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
-    return get_resource_manager()->create_buffer(desc, false, nullptr, name);
+Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name) {
+    VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    buffer_create_info.size        = size;
+    buffer_create_info.usage       = usage;
+    buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo alloc_create_info{};
+    alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    Vk_Buffer buffer;
+    VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &buffer.handle, &buffer.allocation, nullptr));
+    vk_set_debug_name(buffer.handle, name);
+    return buffer;
 }
 
-VkBuffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name) {
-    VkBufferCreateInfo desc { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-    desc.size           = size;
-    desc.usage          = usage;
-    desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
-    return get_resource_manager()->create_buffer(desc, true, buffer_ptr, name);
+Vk_Buffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name) {
+    VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    buffer_create_info.size         = size;
+    buffer_create_info.usage        = usage;
+    buffer_create_info.sharingMode  = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo alloc_create_info{};
+    alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    alloc_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+
+    VmaAllocationInfo alloc_info;
+
+    Vk_Buffer buffer;
+    VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &buffer.handle, &buffer.allocation, &alloc_info));
+    vk_set_debug_name(buffer.handle, name);
+
+    if (buffer_ptr)
+        *buffer_ptr = alloc_info.pMappedData;
+
+    return buffer;
 }
 
 Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate_mipmaps, const uint8_t* pixels, int bytes_per_pixel, const char* name) {
@@ -556,36 +583,44 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
 
     // create image
     {
-        VkImageCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-        desc.imageType      = VK_IMAGE_TYPE_2D;
-        desc.format         = format;
-        desc.extent.width   = width;
-        desc.extent.height  = height;
-        desc.extent.depth   = 1;
-        desc.mipLevels      = mip_levels;
-        desc.arrayLayers    = 1;
-        desc.samples        = VK_SAMPLE_COUNT_1_BIT;
-        desc.tiling         = VK_IMAGE_TILING_OPTIMAL;
-        desc.usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | (generate_mipmaps ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0);
-        desc.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
-        desc.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+        VkImageCreateInfo image_create_info { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+        image_create_info.imageType      = VK_IMAGE_TYPE_2D;
+        image_create_info.format         = format;
+        image_create_info.extent.width   = width;
+        image_create_info.extent.height  = height;
+        image_create_info.extent.depth   = 1;
+        image_create_info.mipLevels      = mip_levels;
+        image_create_info.arrayLayers    = 1;
+        image_create_info.samples        = VK_SAMPLE_COUNT_1_BIT;
+        image_create_info.tiling         = VK_IMAGE_TILING_OPTIMAL;
+        image_create_info.usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | (generate_mipmaps ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0);
+        image_create_info.sharingMode    = VK_SHARING_MODE_EXCLUSIVE;
+        image_create_info.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        image.handle = get_resource_manager()->create_image(desc, name);
+        VmaAllocationCreateInfo alloc_create_info{};
+        alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+        VK_CHECK(vmaCreateImage(vk.allocator, &image_create_info, &alloc_create_info, &image.handle, &image.allocation, nullptr));
+        vk_set_debug_name(image.handle, name);
     }
 
     // create image view
     {
-        VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-        desc.image      = image.handle;
-        desc.viewType   = VK_IMAGE_VIEW_TYPE_2D;
-        desc.format     = format;
-        desc.subresourceRange.aspectMask        = VK_IMAGE_ASPECT_COLOR_BIT;
-        desc.subresourceRange.baseMipLevel      = 0;
-        desc.subresourceRange.levelCount        = VK_REMAINING_MIP_LEVELS;
-        desc.subresourceRange.baseArrayLayer    = 0;
-        desc.subresourceRange.layerCount        = 1;
+        VkImageSubresourceRange subresource_range;
+        subresource_range.aspectMask        = VK_IMAGE_ASPECT_COLOR_BIT;
+        subresource_range.baseMipLevel      = 0;
+        subresource_range.levelCount        = VK_REMAINING_MIP_LEVELS;
+        subresource_range.baseArrayLayer    = 0;
+        subresource_range.layerCount        = 1;
 
-        image.view = get_resource_manager()->create_image_view(desc, (name + std::string(" ImageView")).c_str());
+        VkImageViewCreateInfo create_info { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+        create_info.image               = image.handle;
+        create_info.viewType            = VK_IMAGE_VIEW_TYPE_2D;
+        create_info.format              = format;
+        create_info.subresourceRange    = subresource_range;
+
+        VK_CHECK(vkCreateImageView(vk.device, &create_info, nullptr, &image.view));
+        vk_set_debug_name(image.view, (name + std::string(" (ImageView)")).c_str());
     }
 
     // upload image data

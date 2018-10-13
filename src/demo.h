@@ -22,7 +22,7 @@ struct Rasterization_Resources {
     VkRenderPass                render_pass;
     VkFramebuffer               framebuffer;
 
-    VkBuffer                    uniform_buffer;
+    Vk_Buffer                   uniform_buffer;
     Uniform_Buffer*             mapped_uniform_buffer;
 
     Vk_Image                    texture;
@@ -49,7 +49,7 @@ struct Raytracing_Resources {
     VkPipeline                  pipeline;
     VkDescriptorSet             descriptor_set;
 
-    VkBuffer                    shader_binding_table;
+    Vk_Buffer                   shader_binding_table;
 
     void create(VkImageView output_image_view, const VkGeometryTrianglesNVX& model_triangles);
     void destroy();
@@ -98,8 +98,8 @@ private:
     Vk_Image                    output_image;
     Copy_To_Swapchain           copy_to_swapchain;
 
-    VkBuffer                    vertex_buffer;
-    VkBuffer                    index_buffer;
+    Vk_Buffer                   vertex_buffer;
+    Vk_Buffer                   index_buffer;
     uint32_t                    model_vertex_count;
     uint32_t                    model_index_count;
 

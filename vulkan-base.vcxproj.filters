@@ -2,7 +2,6 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\resource_manager.cpp" />
     <ClCompile Include="src\demo.cpp" />
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\geometry.cpp" />
@@ -33,7 +32,6 @@
     <ClCompile Include="src\matrix.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\resource_manager.h" />
     <ClInclude Include="src\demo.h" />
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\geometry.h" />
