@@ -13,13 +13,6 @@ struct Demo_Create_Info {
     SDL_Window*     window;
 };
 
-struct Context {
-    VkDescriptorPool            descriptor_pool;
-    VkImageView                 output_image_view;
-    Matrix3x4                   model_transform;
-    Matrix3x4                   view_transform;
-};
-
 struct Rasterization_Resources {
     VkDescriptorSetLayout       descriptor_set_layout;
     VkPipelineLayout            pipeline_layout;
@@ -35,11 +28,11 @@ struct Rasterization_Resources {
     Vk_Image                    texture;
     VkSampler                   sampler;
 
-    void create(const Context& ctx);
+    void create(VkDescriptorPool descriptor_pool, VkImageView output_image_view);
     void destroy();
-    void create_framebuffer(const Context& ctx);
+    void create_framebuffer(VkImageView output_image_view);
     void destroy_framebuffer();
-    void update(const Context& ctx);
+    void update(const Matrix3x4& model_transform, const Matrix3x4& view_transform);
 };
 
 struct Raytracing_Resources {
@@ -58,9 +51,9 @@ struct Raytracing_Resources {
 
     VkBuffer                    shader_binding_table;
 
-    void create(const Context& ctx, const VkGeometryTrianglesNVX& model_triangles);
+    void create(VkDescriptorPool descriptor_pool, VkImageView output_image_view, const VkGeometryTrianglesNVX& model_triangles);
     void destroy();
-    void update_resolution_dependent_descriptor(const Context& ct);
+    void update_resolution_dependent_descriptor(VkImageView output_image_view);
 };
 
 struct Copy_To_Swapchain {
@@ -69,9 +62,9 @@ struct Copy_To_Swapchain {
     VkPipeline                      pipeline;
     std::vector<VkDescriptorSet>    sets; // per swapchain image
 
-    void create(const Context& ctx);
+    void create(VkDescriptorPool descriptor_pool, VkImageView output_image_view);
     void destroy();
-    void update_resolution_dependent_descriptors(const Context& ctx);
+    void update_resolution_dependent_descriptors(VkDescriptorPool descriptor_pool, VkImageView output_image_view);
 };
 
 class Vk_Demo {
@@ -85,8 +78,6 @@ public:
     void restore_resolution_dependent_resources();
 
 private:
-    Context get_context() const;
-
     void create_ui_framebuffer();
     void destroy_ui_framebuffer();
     void create_output_image();
