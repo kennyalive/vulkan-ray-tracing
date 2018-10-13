@@ -243,7 +243,7 @@ void Vk_Demo::setup_imgui() {
     init_info.Queue             = vk.queue;
     init_info.DescriptorPool    = vk.descriptor_pool;
 
-    ImGui_ImplVulkan_Init(&init_info, raytracing ? ui_render_pass : raster.render_pass);
+    ImGui_ImplVulkan_Init(&init_info, ui_render_pass);
     ImGui::StyleColorsDark();
 
     vk_record_and_run_commands(vk.command_pool, vk.queue, [](VkCommandBuffer cb) {
@@ -308,9 +308,6 @@ void Vk_Demo::do_imgui() {
         }
         ImGui::End();
     }
-
-    ImGui::Render();
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
 }
 
 using Clock = std::chrono::high_resolution_clock;
@@ -318,7 +315,6 @@ using Time = std::chrono::time_point<Clock>;
 static Time prev_time = Clock::now();
 
 void Vk_Demo::run_frame(bool draw_only_background) {
-    // Update time.
     static double time = 0.0;
     Time current_time = Clock::now();        
     if (animate) {
@@ -332,10 +328,11 @@ void Vk_Demo::run_frame(bool draw_only_background) {
 
     raster.update(model_transform, view_transform);
 
+    do_imgui();
+
     vk_begin_frame();
 
     bool old_vsync = vsync;
-    bool old_raytracing = raytracing;
 
     if (raytracing) {
         const VkBuffer sbt = rt.shader_binding_table.handle;
@@ -348,16 +345,6 @@ void Vk_Demo::run_frame(bool draw_only_background) {
             sbt, 1 * sbt_slot_size, sbt_slot_size, // miss shaders
             sbt, 2 * sbt_slot_size, sbt_slot_size, // hit groups are not used yet
             vk.surface_size.width, vk.surface_size.height);
-
-        // Draw UI.
-        VkRenderPassBeginInfo render_pass_begin_info { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-        render_pass_begin_info.renderPass        = ui_render_pass;
-        render_pass_begin_info.framebuffer       = ui_framebuffer;
-        render_pass_begin_info.renderArea.extent = vk.surface_size;
-
-        vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
-        do_imgui();
-        vkCmdEndRenderPass(vk.command_buffer);
     } else {
         // Set viewport and scisor rect.
         VkViewport viewport{};
@@ -395,8 +382,20 @@ void Vk_Demo::run_frame(bool draw_only_background) {
             vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline);
             vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
         }
+        vkCmdEndRenderPass(vk.command_buffer);
+    }
 
-        do_imgui();
+    // Draw ImGui.
+    {
+        ImGui::Render();
+        
+        VkRenderPassBeginInfo render_pass_begin_info{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+        render_pass_begin_info.renderPass           = ui_render_pass;
+        render_pass_begin_info.framebuffer          = ui_framebuffer;
+        render_pass_begin_info.renderArea.extent    = vk.surface_size;
+
+        vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
         vkCmdEndRenderPass(vk.command_buffer);
     }
 
@@ -427,12 +426,6 @@ void Vk_Demo::run_frame(bool draw_only_background) {
     }
 
     vk_end_frame();
-
-    if (raytracing != old_raytracing) {
-        VK_CHECK(vkDeviceWaitIdle(vk.device));
-        release_imgui();
-        setup_imgui();
-    }
 
     if (vsync != old_vsync) {
         release_resolution_dependent_resources();
