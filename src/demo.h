@@ -28,7 +28,7 @@ struct Rasterization_Resources {
     Vk_Image                    texture;
     VkSampler                   sampler;
 
-    void create(VkDescriptorPool descriptor_pool, VkImageView output_image_view);
+    void create(VkImageView output_image_view);
     void destroy();
     void create_framebuffer(VkImageView output_image_view);
     void destroy_framebuffer();
@@ -51,7 +51,7 @@ struct Raytracing_Resources {
 
     VkBuffer                    shader_binding_table;
 
-    void create(VkDescriptorPool descriptor_pool, VkImageView output_image_view, const VkGeometryTrianglesNVX& model_triangles);
+    void create(VkImageView output_image_view, const VkGeometryTrianglesNVX& model_triangles);
     void destroy();
     void update_resolution_dependent_descriptor(VkImageView output_image_view);
 };
@@ -62,9 +62,9 @@ struct Copy_To_Swapchain {
     VkPipeline                      pipeline;
     std::vector<VkDescriptorSet>    sets; // per swapchain image
 
-    void create(VkDescriptorPool descriptor_pool, VkImageView output_image_view);
+    void create(VkImageView output_image_view);
     void destroy();
-    void update_resolution_dependent_descriptors(VkDescriptorPool descriptor_pool, VkImageView output_image_view);
+    void update_resolution_dependent_descriptors(VkImageView output_image_view);
 };
 
 class Vk_Demo {
@@ -93,7 +93,6 @@ private:
     bool                        animate                 = false;
     bool                        raytracing              = false;
 
-    VkDescriptorPool            descriptor_pool;
     VkRenderPass                ui_render_pass;
     VkFramebuffer               ui_framebuffer;
     Vk_Image                    output_image;

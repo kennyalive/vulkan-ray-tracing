@@ -10,7 +10,6 @@ public:
 
     VkSemaphore             create_semaphore            (const char* name);
     VkCommandPool           create_command_pool         (const VkCommandPoolCreateInfo& desc, const char* name);
-    VkDescriptorPool        create_descriptor_pool      (const VkDescriptorPoolCreateInfo& desc, const char* name);
     VkBuffer                create_buffer               (const VkBufferCreateInfo& desc, bool host_visible, void** mapped_data, const char* name);
     VkImage                 create_image                (const VkImageCreateInfo& desc, const char* name);
     VkImageView             create_image_view           (const VkImageViewCreateInfo& desc, const char* name);
@@ -37,7 +36,6 @@ private:
 
     std::vector<VkSemaphore>            semaphores;
     std::vector<VkCommandPool>          command_pools;
-    std::vector<VkDescriptorPool>       descriptor_pools;
     std::vector<Buffer_Info>            buffers;
     std::vector<Image_Info>             images;
     std::vector<VkImageView>            image_views;

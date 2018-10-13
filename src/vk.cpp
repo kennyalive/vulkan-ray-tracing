@@ -414,6 +414,19 @@ void vk_initialize(const Vk_Create_Info& create_info) {
     }
 
     //
+    // Descriptor pool.
+    //
+    {
+        VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        desc.maxSets = create_info.max_descriptor_sets;
+        desc.poolSizeCount = create_info.descriptor_pool_size_count;
+        desc.pPoolSizes = create_info.descriptor_pool_sizes;
+
+        VK_CHECK(vkCreateDescriptorPool(vk.device, &desc, nullptr, &vk.descriptor_pool));
+        vk_set_debug_name(vk.descriptor_pool, "descriptor_pool");
+    }
+
+    //
     // Select surface format.
     //
     {
@@ -467,6 +480,7 @@ void vk_shutdown() {
     vk.pipelines.clear();
 
     vkDestroyCommandPool(vk.device, vk.command_pool, nullptr);
+    vkDestroyDescriptorPool(vk.device, vk.descriptor_pool, nullptr);
     vkDestroySemaphore(vk.device, vk.image_acquired, nullptr);
     vkDestroySemaphore(vk.device, vk.rendering_finished, nullptr);
     vkDestroyFence(vk.device, vk.rendering_finished_fence, nullptr);

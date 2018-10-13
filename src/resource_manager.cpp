@@ -25,11 +25,6 @@ void Resource_Manager::release_resources() {
     }
     command_pools.clear();
 
-    for (auto descriptor_pool : descriptor_pools) {
-        vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
-    }
-    descriptor_pools.clear();
-
     for (auto entry : buffers) {
         vmaDestroyBuffer(allocator, entry.buffer, entry.allocation);
     }
@@ -95,14 +90,6 @@ VkCommandPool Resource_Manager::create_command_pool(const VkCommandPoolCreateInf
     vk_set_debug_name(command_pool, name);
     command_pools.push_back(command_pool);
     return command_pool;
-}
-
-VkDescriptorPool Resource_Manager::create_descriptor_pool(const VkDescriptorPoolCreateInfo& desc, const char* name) {
-    VkDescriptorPool descriptor_pool;
-    VK_CHECK(vkCreateDescriptorPool(device, &desc, nullptr, &descriptor_pool));
-    vk_set_debug_name(descriptor_pool, name);
-    descriptor_pools.push_back(descriptor_pool);
-    return descriptor_pool;
 }
 
 VkBuffer Resource_Manager::create_buffer(const VkBufferCreateInfo& desc, bool host_visible, void** mapped_data, const char* name) {

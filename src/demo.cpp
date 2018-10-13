@@ -54,9 +54,25 @@ static Vk_Image load_texture(const std::string& texture_file) {
     return texture;
 };
 
+static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
+    {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             16},
+    {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,              16},
+    {VK_DESCRIPTOR_TYPE_SAMPLER,                    16},
+    {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,              16},
+    {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, 16},
+};
+
+constexpr uint32_t max_descriptor_sets = 64;
+
 void Vk_Demo::initialize(const Demo_Create_Info& create_info) {
     this->create_info = create_info;
-    vk_initialize(create_info.vk_create_info);
+    Vk_Create_Info vk_create_info = create_info.vk_create_info;
+
+    vk_create_info.descriptor_pool_sizes        = descriptor_pool_sizes;
+    vk_create_info.descriptor_pool_size_count   = array_length(descriptor_pool_sizes);
+    vk_create_info.max_descriptor_sets          = max_descriptor_sets;
+
+    vk_initialize(vk_create_info);
 
     // Device properties.
     {
@@ -118,24 +134,6 @@ void Vk_Demo::initialize(const Demo_Create_Info& create_info) {
         }
     }
 
-    // Descriptor pool.
-    {
-        VkDescriptorPoolSize pool_sizes[] = {
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             16  },
-            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,              16  },
-            {VK_DESCRIPTOR_TYPE_SAMPLER,                    16  },
-            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,              16  },
-            {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, 16  },
-        };
-
-        VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-        desc.maxSets        = 32;
-        desc.poolSizeCount  = array_length(pool_sizes);
-        desc.pPoolSizes     = pool_sizes;
-
-        descriptor_pool = get_resource_manager()->create_descriptor_pool(desc, "global descriptor pool");
-    }
-
     // color render pass
     {
         VkAttachmentDescription attachments[1] = {};
@@ -181,9 +179,9 @@ void Vk_Demo::initialize(const Demo_Create_Info& create_info) {
     model_triangles.indexCount    = model_index_count;
     model_triangles.indexType     = VK_INDEX_TYPE_UINT32;
 
-    raster.create(descriptor_pool, output_image.view);
-    rt.create(descriptor_pool, output_image.view, model_triangles);
-    copy_to_swapchain.create(descriptor_pool, output_image.view);
+    raster.create(output_image.view);
+    rt.create(output_image.view, model_triangles);
+    copy_to_swapchain.create(output_image.view);
 
     setup_imgui();
 }
@@ -244,7 +242,7 @@ void Vk_Demo::setup_imgui() {
     init_info.Device            = vk.device;
     init_info.QueueFamily       = vk.queue_family_index;
     init_info.Queue             = vk.queue;
-    init_info.DescriptorPool    = descriptor_pool;
+    init_info.DescriptorPool    = vk.descriptor_pool;
 
     ImGui_ImplVulkan_Init(&init_info, raytracing ? ui_render_pass : raster.render_pass);
     ImGui::StyleColorsDark();
@@ -455,11 +453,11 @@ void Vk_Demo::restore_resolution_dependent_resources() {
 
     raster.create_framebuffer(output_image.view);
     rt.update_resolution_dependent_descriptor(output_image.view);
-    copy_to_swapchain.update_resolution_dependent_descriptors(descriptor_pool, output_image.view);
+    copy_to_swapchain.update_resolution_dependent_descriptors(output_image.view);
     prev_time = Clock::now();
 }
 
-void Rasterization_Resources::create(VkDescriptorPool descriptor_pool, VkImageView output_image_view) {
+void Rasterization_Resources::create(VkImageView output_image_view) {
     void* mapped_memory;
     uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_memory, "uniform buffer to store matrices");
@@ -584,7 +582,7 @@ void Rasterization_Resources::create(VkDescriptorPool descriptor_pool, VkImageVi
     //
     {
         VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-        desc.descriptorPool     = descriptor_pool;
+        desc.descriptorPool     = vk.descriptor_pool;
         desc.descriptorSetCount = 1;
         desc.pSetLayouts        = &descriptor_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
@@ -831,7 +829,7 @@ static void create_raytracing_acceleration_structure(const VkGeometryTrianglesNV
     vmaFreeMemory(vk.allocator, scratch_buffer_allocation);
 }
 
-static void create_raytracing_pipeline(VkDescriptorPool descriptor_pool, VkImageView output_image_view, Raytracing_Resources& rt) {
+static void create_raytracing_pipeline(VkImageView output_image_view, Raytracing_Resources& rt) {
     // Descriptor set layout.
     {
         VkDescriptorSetLayoutBinding layout_bindings[2] {};
@@ -892,7 +890,7 @@ static void create_raytracing_pipeline(VkDescriptorPool descriptor_pool, VkImage
     // Descriptor set.
     {
         VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-        desc.descriptorPool     = descriptor_pool;
+        desc.descriptorPool     = vk.descriptor_pool;
         desc.descriptorSetCount = 1;
         desc.pSetLayouts        = &rt.descriptor_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &rt.descriptor_set));
@@ -916,9 +914,9 @@ static void create_raytracing_pipeline(VkDescriptorPool descriptor_pool, VkImage
     }
 }
 
-void Raytracing_Resources::create(VkDescriptorPool descriptor_pool, VkImageView output_image_view, const VkGeometryTrianglesNVX& model_triangles) {
+void Raytracing_Resources::create(VkImageView output_image_view, const VkGeometryTrianglesNVX& model_triangles) {
     create_raytracing_acceleration_structure(model_triangles, *this);
-    create_raytracing_pipeline(descriptor_pool, output_image_view, *this);
+    create_raytracing_pipeline(output_image_view, *this);
 
     constexpr uint32_t group_count = 2;
     VkDeviceSize sbt_size = group_count * shader_header_size;
@@ -956,7 +954,7 @@ void Raytracing_Resources::update_resolution_dependent_descriptor(VkImageView ou
     vkUpdateDescriptorSets(vk.device, array_length(descriptor_writes), descriptor_writes, 0, nullptr);
 }
 
-void Copy_To_Swapchain::create(VkDescriptorPool descriptor_pool, VkImageView output_image_view) {
+void Copy_To_Swapchain::create(VkImageView output_image_view) {
     // Descriptor set layout.
     {
         VkDescriptorSetLayoutBinding layout_bindings[2] {};
@@ -1009,7 +1007,7 @@ void Copy_To_Swapchain::create(VkDescriptorPool descriptor_pool, VkImageView out
         vkDestroyShaderModule(vk.device, copy_shader, nullptr);
     }
 
-    update_resolution_dependent_descriptors(descriptor_pool, output_image_view);
+    update_resolution_dependent_descriptors(output_image_view);
 }
 
 void Copy_To_Swapchain::destroy() {
@@ -1019,14 +1017,14 @@ void Copy_To_Swapchain::destroy() {
     sets.clear();
 }
 
-void Copy_To_Swapchain::update_resolution_dependent_descriptors(VkDescriptorPool descriptor_pool, VkImageView output_image_view) {
+void Copy_To_Swapchain::update_resolution_dependent_descriptors(VkImageView output_image_view) {
     if (sets.size() < vk.swapchain_info.images.size())
     {
         size_t n = vk.swapchain_info.images.size() - sets.size();
         for (size_t i = 0; i < n; i++)
         {
             VkDescriptorSetAllocateInfo alloc_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-            alloc_info.descriptorPool     = descriptor_pool;
+            alloc_info.descriptorPool     = vk.descriptor_pool;
             alloc_info.descriptorSetCount = 1;
             alloc_info.pSetLayouts        = &set_layout;
 

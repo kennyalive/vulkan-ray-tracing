@@ -39,9 +39,14 @@ struct Vk_Pipeline_Def {
 };
 
 struct Vk_Create_Info {
-    SDL_SysWMinfo   windowing_system_info;
-    bool            enable_validation_layers;
-    bool            use_debug_names;
+    SDL_SysWMinfo               windowing_system_info;
+
+    const VkDescriptorPoolSize* descriptor_pool_sizes;
+    uint32_t                    descriptor_pool_size_count;
+    uint32_t                    max_descriptor_sets;
+
+    bool                        enable_validation_layers;
+    bool                        use_debug_names;
 };
 
 struct Vk_Image {
@@ -126,6 +131,8 @@ struct Vk_Instance {
 
     VkCommandPool                   command_pool;
     VkCommandBuffer                 command_buffer;
+
+    VkDescriptorPool                descriptor_pool;
 
     VkSemaphore                     image_acquired;
     VkSemaphore                     rendering_finished;
