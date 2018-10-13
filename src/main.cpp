@@ -90,7 +90,8 @@ int main(int argc, char** argv) {
         error("failed to get platform specific window information");
 
     // Initialize demo.
-    Vk_Demo demo(demo_info);
+    Vk_Demo demo;
+    demo.initialize(demo_info);
 
     // Run main loop.
     while (process_events()) {
@@ -121,5 +122,7 @@ int main(int argc, char** argv) {
         }
         SDL_Delay(1);
     }
+
+    demo.shutdown();
     return 0;
 }

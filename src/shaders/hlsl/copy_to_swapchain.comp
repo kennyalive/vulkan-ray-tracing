@@ -1,20 +1,18 @@
-[[vk::binding(0, 0)]]
-cbuffer Constants {
-    float4x4 mvp;
+[[vk::push_constant]]
+struct  {
     uint2 viewport_size;
-    uint2 pad;
-};
+} constants;
 
-[[vk::binding(0, 1)]]
+[[vk::binding(0, 0)]]
 RWTexture2D<float4> output_image;
 
-[[vk::binding(1, 1)]]
+[[vk::binding(1, 0)]]
 RWTexture2D<float4> swapchain_image;
 
 [numthreads(32, 32, 1)]
 void main(uint3 dispatch_thread_id : SV_DispatchThreadID) {
     int2 loc = int2(dispatch_thread_id.xy);
-    if (loc.x < viewport_size.x && loc.y < viewport_size.y) {
+    if (loc.x < constants.viewport_size.x && loc.y < constants.viewport_size.y) {
         swapchain_image[loc] = output_image.Load(loc);
     }
 }

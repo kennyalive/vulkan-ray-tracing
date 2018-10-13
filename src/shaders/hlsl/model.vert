@@ -1,8 +1,6 @@
 [[vk::binding(0, 0)]]
 cbuffer Constants {
     float4x4 mvp;
-    uint2 viewport_size;
-    uint2 pad;
 };
 
 struct VS2PS {

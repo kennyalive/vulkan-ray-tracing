@@ -1,6 +1,8 @@
 #pragma once
 
+#include "matrix.h"
 #include "vk.h"
+
 #include "sdl/SDL_syswm.h"
 #include <vector>
 
@@ -11,20 +13,71 @@ struct Demo_Create_Info {
     SDL_Window*     window;
 };
 
+struct Context {
+    VkDescriptorPool            descriptor_pool;
+    VkImageView                 output_image_view;
+    Matrix3x4                   model_transform;
+    Matrix3x4                   view_transform;
+};
+
+struct Rasterization_Resources {
+    VkDescriptorSetLayout       descriptor_set_layout;
+    VkPipelineLayout            pipeline_layout;
+    VkPipeline                  pipeline;
+    VkDescriptorSet             descriptor_set;
+
+    VkRenderPass                render_pass;
+    VkFramebuffer               framebuffer;
+
+    VkBuffer                    uniform_buffer;
+    Uniform_Buffer*             mapped_uniform_buffer;
+
+    Vk_Image                    texture;
+    VkSampler                   sampler;
+
+    void create(const Context& ctx);
+    void destroy();
+    void create_framebuffer(const Context& ctx);
+    void destroy_framebuffer();
+    void update(const Context& ctx);
+};
+
+struct Raytracing_Resources {
+    uint32_t                    shader_header_size;
+
+    VkAccelerationStructureNVX  bottom_level_accel;
+    VmaAllocation               bottom_level_accel_allocation;
+
+    VkAccelerationStructureNVX  top_level_accel;
+    VmaAllocation               top_level_accel_allocation;
+
+    VkDescriptorSetLayout       descriptor_set_layout;
+    VkPipelineLayout            pipeline_layout;
+    VkPipeline                  pipeline;
+    VkDescriptorSet             descriptor_set;
+
+    VkBuffer                    shader_binding_table;
+
+    void create(const Context& ctx, const VkGeometryTrianglesNVX& model_triangles);
+    void destroy();
+    void update_resolution_dependent_descriptor(const Context& ct);
+};
+
 struct Copy_To_Swapchain {
     VkDescriptorSetLayout           set_layout;
     VkPipelineLayout                pipeline_layout;
     VkPipeline                      pipeline;
     std::vector<VkDescriptorSet>    sets; // per swapchain image
 
-    void create_resources(VkDescriptorSetLayout global_descriptor_set_layout, VkDescriptorPool descriptor_pool, const Vk_Image& output_image);
-    void destroy_resources(VkDescriptorPool descriptor_pool);
+    void create(const Context& ctx);
+    void destroy();
+    void update_resolution_dependent_descriptors(const Context& ctx);
 };
 
 class Vk_Demo {
 public:
-    Vk_Demo(const Demo_Create_Info& create_info);
-    ~Vk_Demo();
+    void initialize(const Demo_Create_Info& create_info);
+    void shutdown();
 
     void run_frame(bool draw_only_background = false);
 
@@ -32,92 +85,37 @@ public:
     void restore_resolution_dependent_resources();
 
 private:
-    void upload_textures();
-    void upload_geometry();
-    void create_acceleration_structures();
+    Context get_context() const;
 
-    void create_render_passes();
-
-    void create_framebuffers();
-    void destroy_framebuffers();
-
-    void create_global_descriptor_set();
-
-    void create_descriptor_sets();
-    void create_pipeline_layouts();
-    void create_shader_modules();
-    void create_pipelines();
-
-    void create_raytracing_pipeline();
-    void update_raytracing_output_image_descriptor();
-    void create_shader_binding_table();
-
+    void create_ui_framebuffer();
+    void destroy_ui_framebuffer();
     void create_output_image();
 
     void setup_imgui();
     void release_imgui();
     void do_imgui();
 
-    void update_uniform_buffer();
-
 private:
-    const Demo_Create_Info      create_info;
+    Demo_Create_Info            create_info;
     bool                        show_ui                 = true;
     bool                        vsync                   = true;
     bool                        animate                 = false;
     bool                        raytracing              = false;
 
-    VkSampler                   sampler                 = VK_NULL_HANDLE;
-    Vk_Image                    texture;
+    VkDescriptorPool            descriptor_pool;
+    VkRenderPass                ui_render_pass;
+    VkFramebuffer               ui_framebuffer;
+    Vk_Image                    output_image;
+    Copy_To_Swapchain           copy_to_swapchain;
 
-    VkBuffer                    uniform_buffer          = VK_NULL_HANDLE;
-    Uniform_Buffer*             mapped_uniform_buffer   = nullptr;
+    VkBuffer                    vertex_buffer;
+    VkBuffer                    index_buffer;
+    uint32_t                    model_vertex_count;
+    uint32_t                    model_index_count;
 
-    VkBuffer                    vertex_buffer           = VK_NULL_HANDLE;
-    VkBuffer                    index_buffer            = VK_NULL_HANDLE;
-    uint32_t                    model_vertex_count      = 0;
-    uint32_t                    model_index_count       = 0;
+    Matrix3x4                   model_transform;
+    Matrix3x4                   view_transform;
 
-    VkRenderPass                color_depth_render_pass = VK_NULL_HANDLE;
-    VkFramebuffer               color_depth_framebuffer = VK_NULL_HANDLE;
-
-    VkRenderPass                color_render_pass       = VK_NULL_HANDLE;
-    VkFramebuffer               color_framebuffer       = VK_NULL_HANDLE;
-
-    VkDescriptorSetLayout       global_descriptor_set_layout = VK_NULL_HANDLE;
-    VkDescriptorSet             global_descriptor_set        = VK_NULL_HANDLE;
-
-    VkDescriptorPool            descriptor_pool         = VK_NULL_HANDLE;
-    VkDescriptorSetLayout       descriptor_set_layout   = VK_NULL_HANDLE;
-    VkDescriptorSet             descriptor_set          = VK_NULL_HANDLE;
-
-    VkShaderModule              model_vs                = VK_NULL_HANDLE;
-    VkShaderModule              model_fs                = VK_NULL_HANDLE;
-
-    VkPipelineLayout            pipeline_layout         = VK_NULL_HANDLE;
-    VkPipeline                  pipeline                = VK_NULL_HANDLE;
-
-    //
-    // Raytracing resources.
-    //
-    uint32_t                    shader_header_size                  = 0;
-
-    VkAccelerationStructureNVX  bottom_level_accel                  = VK_NULL_HANDLE;
-    VmaAllocation               bottom_level_accel_allocation       = VK_NULL_HANDLE;
-
-    VkAccelerationStructureNVX  top_level_accel                     = VK_NULL_HANDLE;
-    VmaAllocation               top_level_accel_allocation          = VK_NULL_HANDLE;
-
-    VkDescriptorSetLayout       raytracing_descriptor_set_layout    = VK_NULL_HANDLE;
-    VkPipelineLayout            raytracing_pipeline_layout          = VK_NULL_HANDLE;
-    VkPipeline                  raytracing_pipeline                 = VK_NULL_HANDLE;
-    VkDescriptorSet             raytracing_descriptor_set           = VK_NULL_HANDLE;
-
-    VkBuffer                    shader_binding_table                = VK_NULL_HANDLE;
-
-    //
-    // Output image.
-    //
-    Vk_Image output_image = {};
-    Copy_To_Swapchain copy_to_swapchain = {};
+    Rasterization_Resources     raster;
+    Raytracing_Resources        rt;
 };
