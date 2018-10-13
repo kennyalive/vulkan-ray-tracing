@@ -144,7 +144,7 @@ static void create_instance() {
         static const char* layer_names[] = {
             "VK_LAYER_LUNARG_standard_validation"
         };
-        desc.enabledLayerCount = array_length(layer_names);
+        desc.enabledLayerCount = (uint32_t)std::size(layer_names);
         desc.ppEnabledLayerNames = layer_names;
     }    
 
@@ -867,11 +867,10 @@ static VkPipeline create_pipeline(const Vk_Pipeline_Def& def) {
     // Finally create graphics pipeline.
     //
     VkGraphicsPipelineCreateInfo desc { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
-    desc.stageCount             = array_length(shader_stages_state);
+    desc.stageCount             = (uint32_t)std::size(shader_stages_state);
     desc.pStages                = shader_stages_state;
     desc.pVertexInputState      = &vertex_input_state;
     desc.pInputAssemblyState    = &input_assembly_state;
-    desc.pTessellationState     = nullptr;
     desc.pViewportState         = &viewport_state;
     desc.pRasterizationState    = &rasterization_state;
     desc.pMultisampleState      = &multisample_state;

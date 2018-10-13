@@ -68,7 +68,7 @@ void Vk_Demo::initialize(const Demo_Create_Info& create_info) {
     Vk_Create_Info vk_create_info = create_info.vk_create_info;
 
     vk_create_info.descriptor_pool_sizes        = descriptor_pool_sizes;
-    vk_create_info.descriptor_pool_size_count   = array_length(descriptor_pool_sizes);
+    vk_create_info.descriptor_pool_size_count   = (uint32_t)std::size(descriptor_pool_sizes);
     vk_create_info.max_descriptor_sets          = max_descriptor_sets;
 
     vk_initialize(vk_create_info);
@@ -153,7 +153,7 @@ void Vk_Demo::initialize(const Demo_Create_Info& create_info) {
         subpass.pColorAttachments       = &color_attachment_ref;
 
         VkRenderPassCreateInfo create_info{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
-        create_info.attachmentCount = array_length(attachments);
+        create_info.attachmentCount = (uint32_t)std::size(attachments);
         create_info.pAttachments = attachments;
         create_info.subpassCount = 1;
         create_info.pSubpasses = &subpass;
@@ -381,7 +381,7 @@ void Vk_Demo::run_frame(bool draw_only_background) {
         render_pass_begin_info.renderPass        = raster.render_pass;
         render_pass_begin_info.framebuffer       = raster.framebuffer;
         render_pass_begin_info.renderArea.extent = vk.surface_size;
-        render_pass_begin_info.clearValueCount   = array_length(clear_values);
+        render_pass_begin_info.clearValueCount   = (uint32_t)std::size(clear_values);
         render_pass_begin_info.pClearValues      = clear_values;
 
         vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
@@ -504,7 +504,7 @@ void Rasterization_Resources::create(VkImageView output_image_view) {
         bindings[2].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        create_info.bindingCount   = array_length(bindings);
+        create_info.bindingCount   = (uint32_t)std::size(bindings);
         create_info.pBindings      = bindings;
 
         VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &descriptor_set_layout));
@@ -557,7 +557,7 @@ void Rasterization_Resources::create(VkImageView output_image_view) {
         subpass.pDepthStencilAttachment = &depth_attachment_ref;
 
         VkRenderPassCreateInfo create_info{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
-        create_info.attachmentCount = array_length(attachments);
+        create_info.attachmentCount = (uint32_t)std::size(attachments);
         create_info.pAttachments = attachments;
         create_info.subpassCount = 1;
         create_info.pSubpasses = &subpass;
@@ -648,7 +648,7 @@ void Rasterization_Resources::create_framebuffer(VkImageView output_image_view) 
 
     VkFramebufferCreateInfo create_info { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
     create_info.renderPass      = render_pass;
-    create_info.attachmentCount = array_length(attachments);
+    create_info.attachmentCount = (uint32_t)std::size(attachments);
     create_info.pAttachments    = attachments;
     create_info.width           = vk.surface_size.width;
     create_info.height          = vk.surface_size.height;
@@ -855,7 +855,7 @@ static void create_raytracing_pipeline(VkImageView output_image_view, Raytracing
         layout_bindings[1].stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
         VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        create_info.bindingCount    = array_length(layout_bindings);
+        create_info.bindingCount    = (uint32_t)std::size(layout_bindings);
         create_info.pBindings       = layout_bindings;
         VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &rt.descriptor_set_layout));
     }
@@ -887,7 +887,7 @@ static void create_raytracing_pipeline(VkImageView output_image_view, Raytracing
         uint32_t group_numbers[4] = { 0, 1 }; // [raygen] [miss shader]
 
         VkRaytracingPipelineCreateInfoNVX create_info { VK_STRUCTURE_TYPE_RAYTRACING_PIPELINE_CREATE_INFO_NVX };
-        create_info.stageCount          = array_length(stage_infos);
+        create_info.stageCount          = (uint32_t)std::size(stage_infos);
         create_info.pStages             = stage_infos;
         create_info.pGroupNumbers       = group_numbers;
         create_info.maxRecursionDepth   = 1;
@@ -964,7 +964,7 @@ void Raytracing_Resources::update_resolution_dependent_descriptor(VkImageView ou
     descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     descriptor_writes[0].pImageInfo         = &image_info;
 
-    vkUpdateDescriptorSets(vk.device, array_length(descriptor_writes), descriptor_writes, 0, nullptr);
+    vkUpdateDescriptorSets(vk.device, (uint32_t)std::size(descriptor_writes), descriptor_writes, 0, nullptr);
 }
 
 void Copy_To_Swapchain::create(VkImageView output_image_view) {
@@ -982,7 +982,7 @@ void Copy_To_Swapchain::create(VkImageView output_image_view) {
         layout_bindings[1].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
 
         VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        create_info.bindingCount = array_length(layout_bindings);
+        create_info.bindingCount = (uint32_t)std::size(layout_bindings);
         create_info.pBindings = layout_bindings;
         VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &set_layout));
     }
@@ -1071,6 +1071,6 @@ void Copy_To_Swapchain::update_resolution_dependent_descriptors(VkImageView outp
         descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         descriptor_writes[1].pImageInfo         = &swapchain_image_info;
 
-        vkUpdateDescriptorSets(vk.device, array_length(descriptor_writes), descriptor_writes, 0, nullptr);
+        vkUpdateDescriptorSets(vk.device, (uint32_t)std::size(descriptor_writes), descriptor_writes, 0, nullptr);
     }
 }

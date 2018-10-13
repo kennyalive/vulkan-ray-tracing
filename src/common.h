@@ -7,11 +7,6 @@
 
 constexpr float Pi = 3.14159265f;
 
-template <typename T, size_t N>
-constexpr uint32_t array_length(T(&)[N]) {
-    return N;
-}
-
 inline float radians(float degrees) {
     constexpr float deg_2_rad = Pi / 180.f;
     return degrees * deg_2_rad;
