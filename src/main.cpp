@@ -96,8 +96,6 @@ int main(int argc, char** argv) {
     // Run main loop.
     while (process_events()) {
         if (toogle_fullscreen) {
-            demo.run_frame(true); // draw only background during fullscreen toggle to prevent image stretching
-
             if (SDL_GetWindowFlags(the_window) & SDL_WINDOW_FULLSCREEN_DESKTOP)
                 SDL_SetWindowFullscreen(the_window, 0);
             else

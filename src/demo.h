@@ -72,7 +72,7 @@ public:
     void initialize(const Demo_Create_Info& create_info);
     void shutdown();
 
-    void run_frame(bool draw_only_background = false);
+    void run_frame();
 
     void release_resolution_dependent_resources();
     void restore_resolution_dependent_resources();

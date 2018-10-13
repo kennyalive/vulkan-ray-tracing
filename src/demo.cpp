@@ -314,7 +314,7 @@ using Clock = std::chrono::high_resolution_clock;
 using Time = std::chrono::time_point<Clock>;
 static Time prev_time = Clock::now();
 
-void Vk_Demo::run_frame(bool draw_only_background) {
+void Vk_Demo::run_frame() {
     static double time = 0.0;
     Time current_time = Clock::now();        
     if (animate) {
@@ -346,7 +346,6 @@ void Vk_Demo::run_frame(bool draw_only_background) {
             sbt, 2 * sbt_slot_size, sbt_slot_size, // hit groups are not used yet
             vk.surface_size.width, vk.surface_size.height);
     } else {
-        // Set viewport and scisor rect.
         VkViewport viewport{};
         viewport.width = static_cast<float>(vk.surface_size.width);
         viewport.height = static_cast<float>(vk.surface_size.height);
@@ -370,18 +369,14 @@ void Vk_Demo::run_frame(bool draw_only_background) {
         render_pass_begin_info.renderArea.extent = vk.surface_size;
         render_pass_begin_info.clearValueCount   = (uint32_t)std::size(clear_values);
         render_pass_begin_info.pClearValues      = clear_values;
-
+        
         vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
-
-        // Draw model.
-        if (!draw_only_background) {
-            const VkDeviceSize zero_offset = 0;
-            vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer.handle, &zero_offset);
-            vkCmdBindIndexBuffer(vk.command_buffer, index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
-            vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline_layout, 0, 1, &raster.descriptor_set, 0, nullptr);
-            vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline);
-            vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
-        }
+        const VkDeviceSize zero_offset = 0;
+        vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer.handle, &zero_offset);
+        vkCmdBindIndexBuffer(vk.command_buffer, index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline_layout, 0, 1, &raster.descriptor_set, 0, nullptr);
+        vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline);
+        vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
         vkCmdEndRenderPass(vk.command_buffer);
     }
 
