@@ -63,9 +63,8 @@ static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
 
 constexpr uint32_t max_descriptor_sets = 64;
 
-void Vk_Demo::initialize(const Demo_Create_Info& create_info) {
-    this->create_info = create_info;
-    Vk_Create_Info vk_create_info = create_info.vk_create_info;
+void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) {
+    this->sdl_window = sdl_window;
 
     vk_create_info.descriptor_pool_sizes        = descriptor_pool_sizes;
     vk_create_info.descriptor_pool_size_count   = (uint32_t)std::size(descriptor_pool_sizes);
@@ -232,7 +231,7 @@ void Vk_Demo::create_output_image() {
 
 void Vk_Demo::setup_imgui() {
     ImGui::CreateContext();
-    ImGui_ImplSDL2_InitForVulkan(create_info.window);
+    ImGui_ImplSDL2_InitForVulkan(sdl_window);
 
     // Setup Vulkan binding
     ImGui_ImplVulkan_InitInfo init_info{};
@@ -262,7 +261,7 @@ void Vk_Demo::do_imgui() {
     ImGuiIO& io = ImGui::GetIO();
 
     ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame(create_info.window);
+    ImGui_ImplSDL2_NewFrame(sdl_window);
     ImGui::NewFrame();
 
     if (!io.WantCaptureKeyboard) {

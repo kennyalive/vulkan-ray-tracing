@@ -9,14 +9,14 @@
 static bool toogle_fullscreen   = false;
 static bool handle_resize       = false;
 
-static bool parse_command_line(int argc, char** argv, Demo_Create_Info& demo_create_info) {
+static bool parse_command_line(int argc, char** argv, Vk_Create_Info& vk_create_info) {
     bool found_unknown_option = false;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--validation-layers") == 0) {
-            demo_create_info.vk_create_info.enable_validation_layers = true;
+            vk_create_info.enable_validation_layers = true;
         }
         else if (strcmp(argv[i], "--debug-names") == 0) {
-            demo_create_info.vk_create_info.use_debug_names = true;
+            vk_create_info.use_debug_names = true;
         }
         else if (strcmp(argv[i], "--data-dir") == 0) {
             if (i == argc-1) {
@@ -67,8 +67,8 @@ static bool process_events() {
 }
 
 int main(int argc, char** argv) {
-    Demo_Create_Info demo_info{};
-    if (!parse_command_line(argc, argv, demo_info))
+    Vk_Create_Info vk_create_info{};
+    if (!parse_command_line(argc, argv, vk_create_info))
         return 0;
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0)
@@ -83,15 +83,13 @@ int main(int argc, char** argv) {
     if (the_window == nullptr)
         error("failed to create SDL window");
 
-    demo_info.window = the_window;
-
-    SDL_VERSION(&demo_info.vk_create_info.windowing_system_info.version);
-    if (SDL_GetWindowWMInfo(the_window, &demo_info.vk_create_info.windowing_system_info) == SDL_FALSE)
+    SDL_VERSION(&vk_create_info.windowing_system_info.version);
+    if (SDL_GetWindowWMInfo(the_window, &vk_create_info.windowing_system_info) == SDL_FALSE)
         error("failed to get platform specific window information");
 
     // Initialize demo.
-    Vk_Demo demo;
-    demo.initialize(demo_info);
+    Vk_Demo demo{};
+    demo.initialize(vk_create_info, the_window);
 
     // Run main loop.
     while (process_events()) {

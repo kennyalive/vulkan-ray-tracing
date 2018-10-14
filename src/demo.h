@@ -8,11 +8,6 @@
 
 struct Uniform_Buffer;
 
-struct Demo_Create_Info {
-    Vk_Create_Info  vk_create_info;
-    SDL_Window*     window;
-};
-
 struct Rasterization_Resources {
     VkDescriptorSetLayout       descriptor_set_layout;
     VkPipelineLayout            pipeline_layout;
@@ -69,7 +64,7 @@ struct Copy_To_Swapchain {
 
 class Vk_Demo {
 public:
-    void initialize(const Demo_Create_Info& create_info);
+    void initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window);
     void shutdown();
 
     void run_frame();
@@ -87,7 +82,8 @@ private:
     void do_imgui();
 
 private:
-    Demo_Create_Info            create_info;
+    SDL_Window*                 sdl_window;
+
     bool                        show_ui                 = true;
     bool                        vsync                   = true;
     bool                        animate                 = false;

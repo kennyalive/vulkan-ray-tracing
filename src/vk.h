@@ -27,12 +27,12 @@
 struct Vk_Create_Info {
     SDL_SysWMinfo               windowing_system_info;
 
+    bool                        enable_validation_layers;
+    bool                        use_debug_names;
+
     const VkDescriptorPoolSize* descriptor_pool_sizes;
     uint32_t                    descriptor_pool_size_count;
     uint32_t                    max_descriptor_sets;
-
-    bool                        enable_validation_layers;
-    bool                        use_debug_names;
 };
 
 struct Vk_Image {
