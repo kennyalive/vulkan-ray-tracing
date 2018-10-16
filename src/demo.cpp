@@ -18,8 +18,6 @@
 
 struct Uniform_Buffer {
     Matrix4x4   mvp;
-    uint32_t    viewport_size[2];
-    uint32_t    pad[2];
 };
 
 static VkShaderModule load_spirv(const std::string& spirv_file) {
@@ -102,7 +100,7 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
         model_index_count = static_cast<uint32_t>(model.indices.size());
         {
             const VkDeviceSize size = model.vertices.size() * sizeof(model.vertices[0]);
-            vertex_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, "vertex_buffer");
+            vertex_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, "vertex_buffer");
             vk_ensure_staging_buffer_allocation(size);
             memcpy(vk.staging_buffer_ptr, model.vertices.data(), size);
 
@@ -116,7 +114,7 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
         }
         {
             const VkDeviceSize size = model.indices.size() * sizeof(model.indices[0]);
-            index_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, "index_buffer");
+            index_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, "index_buffer");
             vk_ensure_staging_buffer_allocation(size);
             memcpy(vk.staging_buffer_ptr, model.indices.data(), size);
 
@@ -130,7 +128,28 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
         }
     }
 
-    // color render pass
+    // Texture.
+    {
+        texture = load_texture("iron-man/model.jpg");
+
+        VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+        create_info.magFilter           = VK_FILTER_LINEAR;
+        create_info.minFilter           = VK_FILTER_LINEAR;
+        create_info.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        create_info.addressModeU        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.addressModeV        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.addressModeW        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.mipLodBias          = 0.0f;
+        create_info.anisotropyEnable    = VK_FALSE;
+        create_info.maxAnisotropy       = 1;
+        create_info.minLod              = 0.0f;
+        create_info.maxLod              = 12.0f;
+
+        VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &sampler));
+        vk_set_debug_name(sampler, "diffuse_texture_sampler");
+    }
+
+    // UI render pass.
     {
         VkAttachmentDescription attachments[1] = {};
         attachments[0].format           = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -173,10 +192,10 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
     model_triangles.indexData     = index_buffer.handle;
     model_triangles.indexOffset   = 0;
     model_triangles.indexCount    = model_index_count;
-    model_triangles.indexType     = VK_INDEX_TYPE_UINT32;
+    model_triangles.indexType     = VK_INDEX_TYPE_UINT16;
 
-    raster.create(output_image.view);
-    rt.create(output_image.view, model_triangles);
+    raster.create(texture.view, sampler, output_image.view);
+    rt.create(model_triangles, texture.view, sampler, output_image.view);
     copy_to_swapchain.create(output_image.view);
 
     setup_imgui();
@@ -189,15 +208,18 @@ void Vk_Demo::shutdown() {
     vertex_buffer.destroy();
     index_buffer.destroy();
 
-    raster.destroy();
-    rt.destroy();
-    copy_to_swapchain.destroy();;
+    texture.destroy();
+    vkDestroySampler(vk.device, sampler, nullptr);
 
     output_image.destroy();
     destroy_ui_framebuffer();
 
     vkDestroyRenderPass(vk.device, ui_render_pass, nullptr);
     vkDestroyFramebuffer(vk.device, ui_framebuffer, nullptr);
+
+    raster.destroy();
+    rt.destroy();
+    copy_to_swapchain.destroy();;
 
     vk_shutdown();
 }
@@ -342,7 +364,7 @@ void Vk_Demo::run_frame() {
         vkCmdTraceRaysNVX(vk.command_buffer,
             sbt, 0, // raygen shader
             sbt, 1 * sbt_slot_size, sbt_slot_size, // miss shaders
-            sbt, 2 * sbt_slot_size, sbt_slot_size, // hit groups are not used yet
+            sbt, 2 * sbt_slot_size, sbt_slot_size, // chit shaders
             vk.surface_size.width, vk.surface_size.height);
     } else {
         VkViewport viewport{};
@@ -372,7 +394,7 @@ void Vk_Demo::run_frame() {
         vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
         const VkDeviceSize zero_offset = 0;
         vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer.handle, &zero_offset);
-        vkCmdBindIndexBuffer(vk.command_buffer, index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdBindIndexBuffer(vk.command_buffer, index_buffer.handle, 0, VK_INDEX_TYPE_UINT16);
         vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline_layout, 0, 1, &raster.descriptor_set, 0, nullptr);
         vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline);
         vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
@@ -441,36 +463,18 @@ void Vk_Demo::restore_resolution_dependent_resources() {
     create_ui_framebuffer();
 
     raster.create_framebuffer(output_image.view);
-    rt.update_resolution_dependent_descriptor(output_image.view);
+    rt.update_output_image_descriptor(output_image.view);
     copy_to_swapchain.update_resolution_dependent_descriptors(output_image.view);
     prev_time = Clock::now();
 }
 
-void Rasterization_Resources::create(VkImageView output_image_view) {
+void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler, VkImageView output_image_view) {
     void* mapped_memory;
     uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_memory, "uniform buffer to store matrices");
     mapped_uniform_buffer = static_cast<Uniform_Buffer*>(mapped_memory);
 
-    texture = load_texture("iron-man/model.jpg");
-
-    VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-    create_info.magFilter           = VK_FILTER_LINEAR;
-    create_info.minFilter           = VK_FILTER_LINEAR;
-    create_info.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    create_info.addressModeU        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    create_info.addressModeV        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    create_info.addressModeW        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    create_info.mipLodBias          = 0.0f;
-    create_info.anisotropyEnable    = VK_FALSE;
-    create_info.maxAnisotropy       = 1;
-    create_info.minLod              = 0.0f;
-    create_info.maxLod              = 12.0f;
-
-    VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &sampler));
-    vk_set_debug_name(sampler, "diffuse_texture_sampler");
-
-    //
+     //
     // Descriptor set layouts.
     //
     {
@@ -583,7 +587,7 @@ void Rasterization_Resources::create(VkImageView output_image_view) {
         buffer_info.range   = sizeof(Uniform_Buffer);
 
         VkDescriptorImageInfo image_info = {};
-        image_info.imageView    = texture.view;
+        image_info.imageView    = texture_view;
         image_info.imageLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         VkDescriptorImageInfo sampler_info = {};
@@ -616,12 +620,10 @@ void Rasterization_Resources::create(VkImageView output_image_view) {
 }
 
 void Rasterization_Resources::destroy() {
-    texture.destroy();
     uniform_buffer.destroy();
     vkDestroyDescriptorSetLayout(vk.device, descriptor_set_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
     vkDestroyPipeline(vk.device, pipeline, nullptr);
-    vkDestroySampler(vk.device, sampler, nullptr);
     vkDestroyRenderPass(vk.device, render_pass, nullptr);
     vkDestroyFramebuffer(vk.device, framebuffer, nullptr);
     *this = Rasterization_Resources{};
@@ -784,9 +786,10 @@ static void create_raytracing_acceleration_structure(const VkGeometryTrianglesNV
 
         vkGetBufferMemoryRequirements(vk.device, scratch_buffer, &VkMemoryRequirements()); // shut up validation layers
 
-                                                                                           // NOTE: do we really need vkGetAccelerationStructureScratchMemoryRequirementsNVX function in the API?
-                                                                                           // It should be possible to use vkGetBufferMemoryRequirements2 without introducing new API function
-                                                                                           // and without modifying standard way to query memory requirements for the resource.
+        // NOTE: do we really need vkGetAccelerationStructureScratchMemoryRequirementsNVX function in the API?
+        // It should be possible to use vkGetBufferMemoryRequirements2 without introducing new API function
+        // and without modifying standard way to query memory requirements for the resource.
+
         VK_CHECK(vkBindBufferMemory(vk.device, scratch_buffer, alloc_info.deviceMemory, alloc_info.offset));
     }
 
@@ -824,10 +827,10 @@ static void create_raytracing_acceleration_structure(const VkGeometryTrianglesNV
     vmaFreeMemory(vk.allocator, scratch_buffer_allocation);
 }
 
-static void create_raytracing_pipeline(VkImageView output_image_view, Raytracing_Resources& rt) {
-    // Descriptor set layout.
+static void create_raytracing_pipeline(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler, VkImageView output_image_view, Raytracing_Resources& rt) {
+    // descriptor set layout
     {
-        VkDescriptorSetLayoutBinding layout_bindings[2] {};
+        VkDescriptorSetLayoutBinding layout_bindings[6] {};
         layout_bindings[0].binding          = 0;
         layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         layout_bindings[0].descriptorCount  = 1;
@@ -838,13 +841,33 @@ static void create_raytracing_pipeline(VkImageView output_image_view, Raytracing
         layout_bindings[1].descriptorCount  = 1;
         layout_bindings[1].stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
+        layout_bindings[2].binding          = 2;
+        layout_bindings[2].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        layout_bindings[2].descriptorCount  = 1;
+        layout_bindings[2].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+
+        layout_bindings[3].binding          = 3;
+        layout_bindings[3].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        layout_bindings[3].descriptorCount  = 1;
+        layout_bindings[3].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+
+        layout_bindings[4].binding          = 4;
+        layout_bindings[4].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        layout_bindings[4].descriptorCount  = 1;
+        layout_bindings[4].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+
+        layout_bindings[5].binding          = 5;
+        layout_bindings[5].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLER;
+        layout_bindings[5].descriptorCount  = 1;
+        layout_bindings[5].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+
         VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
         create_info.bindingCount    = (uint32_t)std::size(layout_bindings);
         create_info.pBindings       = layout_bindings;
         VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &rt.descriptor_set_layout));
     }
 
-    // Pipeline layout.
+    // pipeline layout
     {
         VkPipelineLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
         create_info.setLayoutCount  = 1;
@@ -852,12 +875,13 @@ static void create_raytracing_pipeline(VkImageView output_image_view, Raytracing
         VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &rt.pipeline_layout));
     }
 
-    // Pipeline.
+    // pipeline
     {
         VkShaderModule rgen_shader = load_spirv("spirv/simple.rgen.spv");
         VkShaderModule miss_shader = load_spirv("spirv/simple.miss.spv");
+        VkShaderModule chit_shader = load_spirv("spirv/simple.chit.spv");
 
-        VkPipelineShaderStageCreateInfo stage_infos[2] {};
+        VkPipelineShaderStageCreateInfo stage_infos[3] {};
         stage_infos[0].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stage_infos[0].stage    = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
         stage_infos[0].module   = rgen_shader;
@@ -868,7 +892,12 @@ static void create_raytracing_pipeline(VkImageView output_image_view, Raytracing
         stage_infos[1].module   = miss_shader;
         stage_infos[1].pName    = "main";
 
-        uint32_t group_numbers[4] = { 0, 1 }; // [raygen] [miss shader]
+        stage_infos[2].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stage_infos[2].stage    = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+        stage_infos[2].module   = chit_shader;
+        stage_infos[2].pName    = "main";
+
+        uint32_t group_numbers[3] = { 0, 1, 2}; // [raygen] [miss] [chit]
 
         VkRaytracingPipelineCreateInfoNVX create_info { VK_STRUCTURE_TYPE_RAYTRACING_PIPELINE_CREATE_INFO_NVX };
         create_info.stageCount          = (uint32_t)std::size(stage_infos);
@@ -880,9 +909,10 @@ static void create_raytracing_pipeline(VkImageView output_image_view, Raytracing
 
         vkDestroyShaderModule(vk.device, rgen_shader, nullptr);
         vkDestroyShaderModule(vk.device, miss_shader, nullptr);
+        vkDestroyShaderModule(vk.device, chit_shader, nullptr);
     }
 
-    // Descriptor set.
+    // descriptor set
     {
         VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
         desc.descriptorPool     = vk.descriptor_pool;
@@ -890,30 +920,72 @@ static void create_raytracing_pipeline(VkImageView output_image_view, Raytracing
         desc.pSetLayouts        = &rt.descriptor_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &rt.descriptor_set));
 
-        rt.update_resolution_dependent_descriptor(output_image_view);
+        rt.update_output_image_descriptor(output_image_view);
 
-        // Update acceleration structure slot.
         VkDescriptorAccelerationStructureInfoNVX accel_info { VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
-        accel_info.accelerationStructureCount = 1;
-        accel_info.pAccelerationStructures = &rt.top_level_accel;
+        accel_info.accelerationStructureCount   = 1;
+        accel_info.pAccelerationStructures      = &rt.top_level_accel;
 
-        VkWriteDescriptorSet descriptor_write = {};
-        descriptor_write.sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_write.pNext              = &accel_info;
-        descriptor_write.dstSet             = rt.descriptor_set;
-        descriptor_write.dstBinding         = 1;
-        descriptor_write.descriptorCount    = 1;
-        descriptor_write.descriptorType     = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;;
+        VkDescriptorBufferInfo index_buffer_info;
+        index_buffer_info.buffer  = model_triangles.indexData;
+        index_buffer_info.offset  = model_triangles.indexOffset;
+        index_buffer_info.range   = model_triangles.indexCount * (model_triangles.indexType == VK_INDEX_TYPE_UINT16 ? 2 : 4);
 
-        vkUpdateDescriptorSets(vk.device, 1, &descriptor_write, 0, nullptr);
+        VkDescriptorBufferInfo vertex_buffer_info;
+        vertex_buffer_info.buffer  = model_triangles.vertexData;
+        vertex_buffer_info.offset  = model_triangles.vertexOffset; // assume that position is the first vertex attribute
+        vertex_buffer_info.range   = model_triangles.vertexCount * sizeof(Vertex);
+
+        VkDescriptorImageInfo image_info = {};
+        image_info.sampler      = sampler;
+        image_info.imageView    = texture_view;
+        image_info.imageLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkWriteDescriptorSet descriptor_writes[5] = {};
+        descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[0].pNext              = &accel_info;
+        descriptor_writes[0].dstSet             = rt.descriptor_set;
+        descriptor_writes[0].dstBinding         = 1;
+        descriptor_writes[0].descriptorCount    = 1;
+        descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+
+        descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[1].dstSet             = rt.descriptor_set;
+        descriptor_writes[1].dstBinding         = 2;
+        descriptor_writes[1].descriptorCount    = 1;
+        descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptor_writes[1].pBufferInfo        = &index_buffer_info;
+
+        descriptor_writes[2].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[2].dstSet             = rt.descriptor_set;
+        descriptor_writes[2].dstBinding         = 3;
+        descriptor_writes[2].descriptorCount    = 1;
+        descriptor_writes[2].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptor_writes[2].pBufferInfo        = &vertex_buffer_info;
+
+        descriptor_writes[3].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[3].dstSet             = rt.descriptor_set;
+        descriptor_writes[3].dstBinding         = 4;
+        descriptor_writes[3].descriptorCount    = 1;
+        descriptor_writes[3].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        descriptor_writes[3].pImageInfo         = &image_info;
+
+        descriptor_writes[4].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[4].dstSet             = rt.descriptor_set;
+        descriptor_writes[4].dstBinding         = 5;
+        descriptor_writes[4].descriptorCount    = 1;
+        descriptor_writes[4].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER;
+        descriptor_writes[4].pImageInfo         = &image_info;
+
+        vkUpdateDescriptorSets(vk.device, (uint32_t)std::size(descriptor_writes), descriptor_writes, 0, nullptr);
     }
 }
 
-void Raytracing_Resources::create(VkImageView output_image_view, const VkGeometryTrianglesNVX& model_triangles) {
+void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler, VkImageView output_image_view) {
     create_raytracing_acceleration_structure(model_triangles, *this);
-    create_raytracing_pipeline(output_image_view, *this);
+    create_raytracing_pipeline(model_triangles, texture_view, sampler, output_image_view, *this);
 
-    constexpr uint32_t group_count = 2;
+    constexpr uint32_t group_count = 3;
     VkDeviceSize sbt_size = group_count * shader_header_size;
 
     void* mapped_memory;
@@ -935,7 +1007,7 @@ void Raytracing_Resources::destroy() {
     vkDestroyPipeline(vk.device, pipeline, nullptr);
 }
 
-void Raytracing_Resources::update_resolution_dependent_descriptor(VkImageView output_image_view) {
+void Raytracing_Resources::update_output_image_descriptor(VkImageView output_image_view) {
     VkDescriptorImageInfo image_info = {};
     image_info.imageView    = output_image_view;
     image_info.imageLayout  = VK_IMAGE_LAYOUT_GENERAL;

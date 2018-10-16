@@ -10,8 +10,7 @@ struct VS2PS {
 
 VS2PS main(
     float4 position : POSITION,
-    float2 uv      : TEXCOORD,
-    float3 normal : NORMAL)
+    float2 uv      : TEXCOORD)
 {
     VS2PS data;
     data.position = mul(mvp, position);

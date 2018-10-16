@@ -20,10 +20,12 @@ struct Rasterization_Resources {
     Vk_Buffer                   uniform_buffer;
     Uniform_Buffer*             mapped_uniform_buffer;
 
-    Vk_Image                    texture;
-    VkSampler                   sampler;
+    void create(
+        VkImageView texture_view,
+        VkSampler sample,
+        VkImageView output_image_view
+    );
 
-    void create(VkImageView output_image_view);
     void destroy();
     void create_framebuffer(VkImageView output_image_view);
     void destroy_framebuffer();
@@ -46,9 +48,15 @@ struct Raytracing_Resources {
 
     Vk_Buffer                   shader_binding_table;
 
-    void create(VkImageView output_image_view, const VkGeometryTrianglesNVX& model_triangles);
+    void create(
+        const VkGeometryTrianglesNVX& model_triangles,
+        VkImageView texture_view,
+        VkSampler sampler,
+        VkImageView output_image_view
+    );
+
     void destroy();
-    void update_resolution_dependent_descriptor(VkImageView output_image_view);
+    void update_output_image_descriptor(VkImageView output_image_view);
 };
 
 struct Copy_To_Swapchain {
@@ -101,6 +109,9 @@ private:
 
     Matrix3x4                   model_transform;
     Matrix3x4                   view_transform;
+
+    Vk_Image                    texture;
+    VkSampler                   sampler;
 
     Rasterization_Resources     raster;
     Raytracing_Resources        rt;

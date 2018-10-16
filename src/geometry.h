@@ -8,8 +8,9 @@
 
 struct Vertex {
     Vector pos;
+    float pad;
     Vector2 tex_coord;
-    Vector normal;
+    Vector2 pad2;
 
     bool operator==(const Vertex& other) const {
         return pos == other.pos && tex_coord == other.tex_coord;
@@ -23,32 +24,26 @@ struct Vertex {
         return {binding_desc};
     }
 
-    static std::array<VkVertexInputAttributeDescription, 3> get_attributes() {
+    static std::array<VkVertexInputAttributeDescription, 2> get_attributes() {
         VkVertexInputAttributeDescription position_attrib;
         position_attrib.location = 0;
         position_attrib.binding = 0;
         position_attrib.format = VK_FORMAT_R32G32B32_SFLOAT;
-        position_attrib.offset = offsetof(struct Vertex, pos);
+        position_attrib.offset = 0;
 
         VkVertexInputAttributeDescription tex_coord_attrib;
         tex_coord_attrib.location = 1;
         tex_coord_attrib.binding = 0;
         tex_coord_attrib.format = VK_FORMAT_R32G32_SFLOAT;
-        tex_coord_attrib.offset = offsetof(struct Vertex, tex_coord);
+        tex_coord_attrib.offset = 16;
 
-        VkVertexInputAttributeDescription normal_attrib;
-        normal_attrib.location = 2;
-        normal_attrib.binding = 0;
-        normal_attrib.format = VK_FORMAT_R32G32B32_SFLOAT;
-        normal_attrib.offset = offsetof(struct Vertex, normal);
-
-        return {position_attrib, tex_coord_attrib, normal_attrib};
+        return {position_attrib, tex_coord_attrib};
     }
 };
 
 struct Model {
     std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
+    std::vector<uint16_t> indices;
 };
 
 Model load_obj_model(const std::string& path);
