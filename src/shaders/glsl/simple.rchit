@@ -2,6 +2,8 @@
 #extension GL_NVX_raytracing : require
 #extension GL_EXT_shader_16bit_storage : require
 
+#include "utils.glsl"
+
 struct Vertex {
     vec3 pos;
     float pad;
@@ -22,17 +24,6 @@ layout(std430, binding=3) readonly buffer Vertices {
 
 layout(binding=4) uniform texture2D image;
 layout(binding=5) uniform sampler image_sampler;
-
-float srgb_encode(float c) {
-    if (c <= 0.0031308f)
-        return 12.92f * c;
-    else
-        return 1.055f * pow(c, 1.f/2.4f) - 0.055f;
-}
-
-vec3 srgb_encode(vec3 c) {
-    return vec3(srgb_encode(c.r), srgb_encode(c.g), srgb_encode(c.b));
-}
 
 void main() {
     uint i0 = uint(index_buffer[gl_PrimitiveID*3 + 0]);
