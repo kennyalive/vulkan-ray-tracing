@@ -7,7 +7,6 @@
     <ClCompile Include="src\geometry.cpp" />
     <ClCompile Include="src\common.cpp" />
     <ClCompile Include="src\vma_impl.cpp" />
-    <ClCompile Include="src\debug.cpp" />
     <ClCompile Include="third_party\volk\volk.c">
       <Filter>3rdparty\volk</Filter>
     </ClCompile>
@@ -36,7 +35,6 @@
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\geometry.h" />
     <ClInclude Include="src\common.h" />
-    <ClInclude Include="src\debug.h" />
     <ClInclude Include="third_party\imgui\impl\imgui_impl_sdl.h">
       <Filter>3rdparty\imgui\impl</Filter>
     </ClInclude>

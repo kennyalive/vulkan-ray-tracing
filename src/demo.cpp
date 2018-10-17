@@ -1,6 +1,5 @@
 #include "common.h"
 #include "demo.h"
-#include "debug.h"
 #include "geometry.h"
 #include "matrix.h"
 #include "vk.h"

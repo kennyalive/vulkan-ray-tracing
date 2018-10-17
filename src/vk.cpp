@@ -1,5 +1,4 @@
 #include "common.h"
-#include "debug.h"
 #include "geometry.h"
 #include "vk.h"
 
@@ -321,6 +320,25 @@ static void destroy_depth_buffer() {
     vk.depth_info = Depth_Buffer_Info{};
 }
 
+static VKAPI_ATTR VkBool32 VKAPI_CALL debug_utils_messenger_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT          message_severity,
+    VkDebugUtilsMessageTypeFlagsEXT                 message_type,
+    const VkDebugUtilsMessengerCallbackDataEXT*     callback_data,
+    void*                                           user_data)
+{
+    if (strstr(callback_data->pMessage, "Device Extension VK_NVX_raytracing is not supported by this layer.") != 0 ||
+        strstr(callback_data->pMessage, "pProperties->pNext chain includes a structure with unknown VkStructureType"))
+        return VK_FALSE;
+
+#ifdef _WIN32
+    printf("%s\n", callback_data->pMessage);
+    OutputDebugStringA(callback_data->pMessage);
+    OutputDebugStringA("\n");
+    DebugBreak();
+#endif
+    return VK_FALSE;
+}
+
 void Vk_Image::destroy() {
     vkDestroyImage(vk.device, handle, nullptr);
     vkDestroyImageView(vk.device, view, nullptr);
@@ -354,7 +372,19 @@ void vk_initialize(const Vk_Create_Info& create_info) {
     volkLoadInstance(vk.instance);
 
     // Create debug messenger as early as possible (even before VkDevice is created).
-    vk_create_debug_utils_messenger();
+    {
+        VkDebugUtilsMessengerCreateInfoEXT desc{ VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
+
+        desc.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+
+        desc.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+
+        desc.pfnUserCallback = &debug_utils_messenger_callback;
+        VK_CHECK(vkCreateDebugUtilsMessengerEXT(vk.instance, &desc, nullptr, &vk.debug_utils_messenger));
+    }
 
     create_device();
     volkLoadDevice(vk.device);
@@ -489,7 +519,7 @@ void vk_shutdown() {
     vmaDestroyAllocator(vk.allocator);
     vkDestroyDevice(vk.device, nullptr);
     vkDestroySurfaceKHR(vk.instance, vk.surface, nullptr);
-    vk_destroy_debug_utils_messenger();
+    vkDestroyDebugUtilsMessengerEXT(vk.instance, vk.debug_utils_messenger, nullptr);
     vkDestroyInstance(vk.instance, nullptr);
 }
 
