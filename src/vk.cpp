@@ -734,6 +734,22 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
     return image;
 }
 
+VkShaderModule vk_load_spirv(const std::string& spirv_file) {
+    std::vector<uint8_t> bytes = read_binary_file(spirv_file);
+
+    if (bytes.size() % 4 != 0) {
+        error("Vulkan: SPIR-V binary buffer size is not multiple of 4");
+    }
+
+    VkShaderModuleCreateInfo create_info { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO } ;
+    create_info.codeSize = bytes.size();
+    create_info.pCode = reinterpret_cast<const uint32_t*>(bytes.data());
+
+    VkShaderModule shader_module;
+    VK_CHECK(vkCreateShaderModule(vk.device, &create_info, nullptr, &shader_module));
+    return shader_module;
+}
+
 Vk_Image vk_create_image(int width, int height, VkFormat format, VkImageCreateFlags usage_flags, const char* name) {
     Vk_Image image;
 

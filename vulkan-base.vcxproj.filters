@@ -29,6 +29,8 @@
       <Filter>3rdparty\imgui</Filter>
     </ClCompile>
     <ClCompile Include="src\matrix.cpp" />
+    <ClCompile Include="src\raytracing_resources.cpp" />
+    <ClCompile Include="src\rasterization_resources.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\demo.h" />
@@ -52,6 +54,8 @@
     </ClInclude>
     <ClInclude Include="src\matrix.h" />
     <ClInclude Include="src\vector.h" />
+    <ClInclude Include="src\raytracing_resources.h" />
+    <ClInclude Include="src\rasterization_resources.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="3rdparty">
