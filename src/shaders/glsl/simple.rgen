@@ -1,27 +1,18 @@
 #version 460
 #extension GL_NVX_raytracing : require
 
+#include "utils.glsl"
+
 layout(binding = 0, rgba8) uniform image2D image;
 layout(binding = 1) uniform accelerationStructureNVX accel;
 
 layout(location = 0) rayPayloadNVX vec3 color;
 
+const float tmin = 1e-3f;
+const float tmax = 1e+3f;
+
 void main() {
-    vec2 pixel_center = vec2(gl_LaunchIDNVX.xy) + vec2(0.5);
-    vec2 uv = pixel_center / vec2(gl_LaunchSizeNVX.xy);
-    color = vec3(uv.x, uv.y, 0.0);
-
-    const float tan_fovy_over_2 = 0.414; // tan(45/2)
-    float aspect_ratio = float(gl_LaunchSizeNVX.x) / float(gl_LaunchSizeNVX.y);
-    float horz_half_dist = aspect_ratio * tan_fovy_over_2;
-    float vert_half_dist = tan_fovy_over_2;
-    vec2 uv2 = 2.0 * uv - 1.0;
-    float dir_x = uv2.x * horz_half_dist;
-    float dir_y = -uv2.y * vert_half_dist;
-
-    vec3 dir = normalize(vec3(dir_x, dir_y, -1.f));
-    vec3 origin = vec3(0, 0.0, 3);
-
-    traceNVX(accel, gl_RayFlagsOpaqueNVX, 0xff, 0, 0, 0, origin, 1e-3f, dir, 1e3f, 0);
+    Ray ray = generate_ray(vec2(gl_LaunchIDNVX.xy) + vec2(0.5));
+    traceNVX(accel, gl_RayFlagsOpaqueNVX, 0xff, 0, 0, 0, ray.origin, tmin, ray.direction, tmax, 0);
     imageStore(image, ivec2(gl_LaunchIDNVX.xy), vec4(color, 1.0));
 }

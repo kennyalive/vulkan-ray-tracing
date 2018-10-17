@@ -9,7 +9,7 @@ if not exist %spirv_dir% (
 set glslang=glslc.exe
 
 for %%f in (glsl\*.rgen) do (
-    %glslang% -O -o %spirv_dir%\%%~nf.rgen.spv %%f
+    %glslang% -o %spirv_dir%\%%~nf.rgen.spv %%f
 )
 
 for %%f in (glsl\*.rmiss) do (
