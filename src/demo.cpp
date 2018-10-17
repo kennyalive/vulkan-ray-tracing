@@ -348,6 +348,7 @@ void Vk_Demo::run_frame() {
     view_transform = look_at_transform(Vector(0, 0.5, 3.0), Vector(0), Vector(0, 1, 0));
 
     raster.update(model_transform, view_transform);
+    rt.update_instance(model_transform);
 
     do_imgui();
 
@@ -356,16 +357,33 @@ void Vk_Demo::run_frame() {
     bool old_vsync = vsync;
 
     if (raytracing) {
+        vkCmdBuildAccelerationStructureNVX(vk.command_buffer,
+            VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX,
+            1, rt.instance_buffer, 0,
+            0, nullptr,
+            VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NVX,
+            VK_TRUE, rt.top_level_accel, VK_NULL_HANDLE,
+            rt.scratch_buffer, 0);
+
+        VkMemoryBarrier barrier { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+        barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX;
+        barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX;
+
+        vkCmdPipelineBarrier(vk.command_buffer, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX,
+            0, 1, &barrier, 0, nullptr, 0, nullptr);
+
         const VkBuffer sbt = rt.shader_binding_table.handle;
         const uint32_t sbt_slot_size = rt.shader_header_size;
 
         vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, rt.pipeline_layout, 0, 1, &rt.descriptor_set, 0, nullptr);
         vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, rt.pipeline);
+
         vkCmdTraceRaysNVX(vk.command_buffer,
             sbt, 0, // raygen shader
             sbt, 1 * sbt_slot_size, sbt_slot_size, // miss shaders
             sbt, 2 * sbt_slot_size, sbt_slot_size, // chit shaders
             vk.surface_size.width, vk.surface_size.height);
+
     } else {
         VkViewport viewport{};
         viewport.width = static_cast<float>(vk.surface_size.width);
@@ -656,7 +674,7 @@ void Rasterization_Resources::update(const Matrix3x4& model_transform, const Mat
     mapped_uniform_buffer->mvp = mvp;
 }
 
-static void create_raytracing_acceleration_structure(const VkGeometryTrianglesNVX& triangles, Raytracing_Resources& rt) {
+void Raytracing_Resources::create_acceleration_structure(const VkGeometryTrianglesNVX& triangles) {
     VkGeometryNVX geometry { VK_STRUCTURE_TYPE_GEOMETRY_NVX };
     geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NVX;
     geometry.geometry.triangles = triangles;
@@ -691,73 +709,44 @@ static void create_raytracing_acceleration_structure(const VkGeometryTrianglesNV
             create_info.geometryCount = 1;
             create_info.pGeometries = &geometry;
 
-            VK_CHECK(vkCreateAccelerationStructureNVX(vk.device, &create_info, nullptr, &rt.bottom_level_accel));
-            allocate_acceleration_structure_memory(rt.bottom_level_accel, &rt.bottom_level_accel_allocation);
-            vk_set_debug_name(rt.bottom_level_accel, "bottom_level_accel");
+            VK_CHECK(vkCreateAccelerationStructureNVX(vk.device, &create_info, nullptr, &bottom_level_accel));
+            allocate_acceleration_structure_memory(bottom_level_accel, &bottom_level_accel_allocation);
+            vk_set_debug_name(bottom_level_accel, "bottom_level_accel");
+
+            VK_CHECK(vkGetAccelerationStructureHandleNVX(vk.device, bottom_level_accel, sizeof(uint64_t), &bottom_level_accel_handle));
         }
 
         // Top level.
         {
             VkAccelerationStructureCreateInfoNVX create_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NVX };
             create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX;
+            create_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NVX;
             create_info.instanceCount = 1;
 
-            VK_CHECK(vkCreateAccelerationStructureNVX(vk.device, &create_info, nullptr, &rt.top_level_accel));
-            allocate_acceleration_structure_memory(rt.top_level_accel, &rt.top_level_accel_allocation);
-            vk_set_debug_name(rt.top_level_accel, "top_level_accel");
+            VK_CHECK(vkCreateAccelerationStructureNVX(vk.device, &create_info, nullptr, &top_level_accel));
+            allocate_acceleration_structure_memory(top_level_accel, &top_level_accel_allocation);
+            vk_set_debug_name(top_level_accel, "top_level_accel");
         }
     }
 
-    // Create instance buffer
-    VkBuffer instance_buffer = VK_NULL_HANDLE;
-    VmaAllocation instance_buffer_allocation = VK_NULL_HANDLE;
-    {
-        uint64_t bottom_level_accel_handle;
-        VK_CHECK(vkGetAccelerationStructureHandleNVX(vk.device, rt.bottom_level_accel, sizeof(uint64_t), &bottom_level_accel_handle));
-
-        struct Instance {
-            Matrix3x4   transform;
-            uint32_t    instance_id : 24;
-            uint32_t    instance_mask : 8;
-            uint32_t    instance_contribution_to_hit_group_index : 24;
-            uint32_t    flags : 8;
-            uint64_t    acceleration_structure_handle;
-        } instance{};
-
-        instance.transform = Matrix3x4::identity;
-        instance.instance_mask = 0xff;
-        instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NVX;
-        instance.acceleration_structure_handle = bottom_level_accel_handle;
-
-        VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-        buffer_create_info.size = sizeof(Instance);
-        buffer_create_info.usage = VK_BUFFER_USAGE_RAYTRACING_BIT_NVX;
-
-        VmaAllocationCreateInfo alloc_create_info {};
-        alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-        alloc_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-
-        VmaAllocationInfo alloc_info;
-        VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &instance_buffer, &instance_buffer_allocation, &alloc_info));
-        memcpy(alloc_info.pMappedData, &instance, sizeof(Instance));
-    }
-
-    // Create scratch buffert required to build acceleration structures.
-    VkBuffer scratch_buffer = VK_NULL_HANDLE;
-    VmaAllocation scratch_buffer_allocation = VK_NULL_HANDLE;
+    // Create scratch buffert required to build/update acceleration structures.
     {
         VkMemoryRequirements scratch_memory_requirements;
         {
             VkAccelerationStructureMemoryRequirementsInfoNVX accel_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX };
             VkMemoryRequirements2 reqs_holder { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2 };
 
-            accel_info.accelerationStructure = rt.bottom_level_accel;
+            accel_info.accelerationStructure = bottom_level_accel;
             vkGetAccelerationStructureScratchMemoryRequirementsNVX(vk.device, &accel_info, &reqs_holder);
             VkMemoryRequirements reqs_a = reqs_holder.memoryRequirements;
 
-            accel_info.accelerationStructure = rt.top_level_accel;
+            accel_info.accelerationStructure = top_level_accel;
             vkGetAccelerationStructureScratchMemoryRequirementsNVX(vk.device, &accel_info, &reqs_holder);
             VkMemoryRequirements reqs_b = reqs_holder.memoryRequirements;
+
+            // NOTE: do we really need vkGetAccelerationStructureScratchMemoryRequirementsNVX function in the API?
+            // It should be possible to use vkGetBufferMemoryRequirements2 without introducing new API function
+            // and without modifying standard way to query memory requirements for the resource.
 
             // Right now the spec does not provide additional guarantees related to scratch
             // buffer allocations, so the following asserts could fail.
@@ -775,40 +764,35 @@ static void create_raytracing_acceleration_structure(const VkGeometryTrianglesNV
 
         // NOTE: do not use vmaCreateBuffer since it does not allow to specify 'alignment'
         // returned from vkGetAccelerationStructureScratchMemoryRequirementsNVX.
-        VmaAllocationInfo alloc_info;
-        VK_CHECK(vmaAllocateMemory(vk.allocator, &scratch_memory_requirements, &alloc_create_info, &scratch_buffer_allocation, &alloc_info));
+        VK_CHECK(vmaAllocateMemory(vk.allocator, &scratch_memory_requirements, &alloc_create_info, &scratch_buffer_allocation, nullptr));
 
         VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
         buffer_create_info.size = scratch_memory_requirements.size;
         buffer_create_info.usage = VK_BUFFER_USAGE_RAYTRACING_BIT_NVX;
-        buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        vkCreateBuffer(vk.device, &buffer_create_info, nullptr, &scratch_buffer);
 
+        VK_CHECK(vkCreateBuffer(vk.device, &buffer_create_info, nullptr, &scratch_buffer));
         vkGetBufferMemoryRequirements(vk.device, scratch_buffer, &VkMemoryRequirements()); // shut up validation layers
-
-        // NOTE: do we really need vkGetAccelerationStructureScratchMemoryRequirementsNVX function in the API?
-        // It should be possible to use vkGetBufferMemoryRequirements2 without introducing new API function
-        // and without modifying standard way to query memory requirements for the resource.
-
-        VK_CHECK(vkBindBufferMemory(vk.device, scratch_buffer, alloc_info.deviceMemory, alloc_info.offset));
+        VK_CHECK(vmaBindBufferMemory(vk.allocator, scratch_buffer_allocation, scratch_buffer));
     }
 
     // Build acceleration structures.
+    update_instance(Matrix3x4::identity);
+
     Timestamp t;
 
     vk_record_and_run_commands(vk.command_pool, vk.queue,
-        [&rt, instance_buffer, scratch_buffer, &geometry](VkCommandBuffer command_buffer)
+        [this, &geometry](VkCommandBuffer command_buffer)
     {
-        VkMemoryBarrier barrier { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-        barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX;
-        barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX;
-
         vkCmdBuildAccelerationStructureNVX(command_buffer,
             VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX,
             0, VK_NULL_HANDLE, 0,
             1, &geometry,
-            VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX, VK_FALSE, rt.bottom_level_accel, VK_NULL_HANDLE,
+            VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX, VK_FALSE, bottom_level_accel, VK_NULL_HANDLE,
             scratch_buffer, 0);
+
+        VkMemoryBarrier barrier { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+        barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX;
+        barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX;
 
         vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX,
             0, 1, &barrier, 0, nullptr, 0, nullptr);
@@ -817,14 +801,11 @@ static void create_raytracing_acceleration_structure(const VkGeometryTrianglesNV
             VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX,
             1, instance_buffer, 0,
             0, nullptr,
-            VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX, VK_FALSE, rt.top_level_accel, VK_NULL_HANDLE,
+            VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NVX,
+            VK_FALSE, top_level_accel, VK_NULL_HANDLE,
             scratch_buffer, 0);
     });
     printf("\nAcceleration structures build time = %lld microseconds\n", elapsed_microseconds(t));
-
-    vmaDestroyBuffer(vk.allocator, instance_buffer, instance_buffer_allocation);
-    vkDestroyBuffer(vk.device, scratch_buffer, nullptr);
-    vmaFreeMemory(vk.allocator, scratch_buffer_allocation);
 }
 
 static void create_raytracing_pipeline(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler, VkImageView output_image_view, Raytracing_Resources& rt) {
@@ -982,15 +963,32 @@ static void create_raytracing_pipeline(const VkGeometryTrianglesNVX& model_trian
 }
 
 void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler, VkImageView output_image_view) {
-    create_raytracing_acceleration_structure(model_triangles, *this);
+    // Instance buffer.
+    {
+        VkBufferCreateInfo buffer_create_info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+        buffer_create_info.size = sizeof(VkInstanceNVX);
+        buffer_create_info.usage = VK_BUFFER_USAGE_RAYTRACING_BIT_NVX;
+
+        VmaAllocationCreateInfo alloc_create_info{};
+        alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+        alloc_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+
+        VmaAllocationInfo alloc_info;
+        VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &instance_buffer, &instance_buffer_allocation, &alloc_info));
+        mapped_instance_buffer = (VkInstanceNVX*)alloc_info.pMappedData;
+    }
+
+    create_acceleration_structure(model_triangles);
     create_raytracing_pipeline(model_triangles, texture_view, sampler, output_image_view, *this);
 
-    constexpr uint32_t group_count = 3;
-    VkDeviceSize sbt_size = group_count * shader_header_size;
-
-    void* mapped_memory;
-    shader_binding_table = vk_create_host_visible_buffer(sbt_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, &mapped_memory, "shader_binding_table");
-    VK_CHECK(vkGetRaytracingShaderHandlesNVX(vk.device, pipeline, 0, group_count, sbt_size, mapped_memory));
+    // Shader binding table.
+    {
+        constexpr uint32_t group_count = 3;
+        VkDeviceSize sbt_size = group_count * shader_header_size;
+        void* mapped_memory;
+        shader_binding_table = vk_create_host_visible_buffer(sbt_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, &mapped_memory, "shader_binding_table");
+        VK_CHECK(vkGetRaytracingShaderHandlesNVX(vk.device, pipeline, 0, group_count, sbt_size, mapped_memory));
+    }
 }
 
 void Raytracing_Resources::destroy() {
@@ -1001,6 +999,9 @@ void Raytracing_Resources::destroy() {
 
     vkDestroyAccelerationStructureNVX(vk.device, top_level_accel, nullptr);
     vmaFreeMemory(vk.allocator, top_level_accel_allocation);
+
+    vmaDestroyBuffer(vk.allocator, scratch_buffer, scratch_buffer_allocation);
+    vmaDestroyBuffer(vk.allocator, instance_buffer, instance_buffer_allocation);
 
     vkDestroyDescriptorSetLayout(vk.device, descriptor_set_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
@@ -1021,6 +1022,16 @@ void Raytracing_Resources::update_output_image_descriptor(VkImageView output_ima
     descriptor_writes[0].pImageInfo         = &image_info;
 
     vkUpdateDescriptorSets(vk.device, (uint32_t)std::size(descriptor_writes), descriptor_writes, 0, nullptr);
+}
+
+void Raytracing_Resources::update_instance(const Matrix3x4& model_transform) {
+    VkInstanceNVX& instance = *mapped_instance_buffer;
+    instance.transform                                  = model_transform;
+    instance.instance_id                                = 0;
+    instance.instance_mask                              = 0xff;
+    instance.instance_contribution_to_hit_group_index   = 0;
+    instance.flags                                      = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NVX;
+    instance.acceleration_structure_handle              = bottom_level_accel_handle;
 }
 
 void Copy_To_Swapchain::create(VkImageView output_image_view) {
