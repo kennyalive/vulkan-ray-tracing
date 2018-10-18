@@ -209,9 +209,8 @@ static void create_device() {
 
     // create VkDevice
     {
-        const char* device_extensions[] = {
-            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-            VK_NVX_RAYTRACING_EXTENSION_NAME
+        std::vector<const char*> device_extensions = {
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME
         };
 
         uint32_t count = 0;
@@ -219,16 +218,21 @@ static void create_device() {
         std::vector<VkExtensionProperties> extension_properties(count);
         VK_CHECK(vkEnumerateDeviceExtensionProperties(vk.physical_device, nullptr, &count, extension_properties.data()));
 
-        for (auto name : device_extensions) {
-            bool supported = false;
+        auto is_extension_supported = [&extension_properties](const char* extension_name) {
             for (const auto& property : extension_properties) {
-                if (!strcmp(property.extensionName, name)) {
-                    supported = true;
-                    break;
+                if (!strcmp(property.extensionName, extension_name)) {
+                    return true;
                 }
             }
-            if (!supported)
-                error("Vulkan: required device extension is not available: " + std::string(name));
+            return false;
+        };
+        for (auto required_extension : device_extensions) {
+            if (!is_extension_supported(required_extension))
+                error("Vulkan: required device extension is not available: " + std::string(required_extension));
+        }
+        if (is_extension_supported(VK_NVX_RAYTRACING_EXTENSION_NAME)) {
+            device_extensions.push_back(VK_NVX_RAYTRACING_EXTENSION_NAME);
+            vk.raytracing_supported = true;
         }
 
         const float priority = 1.0;
@@ -243,8 +247,8 @@ static void create_device() {
         VkDeviceCreateInfo device_desc { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
         device_desc.queueCreateInfoCount    = 1;
         device_desc.pQueueCreateInfos       = &queue_desc;
-        device_desc.enabledExtensionCount   = sizeof(device_extensions)/sizeof(device_extensions[0]);
-        device_desc.ppEnabledExtensionNames = device_extensions;
+        device_desc.enabledExtensionCount   = (uint32_t)device_extensions.size();
+        device_desc.ppEnabledExtensionNames = device_extensions.data();
         device_desc.pEnabledFeatures = &features;
 
         VK_CHECK(vkCreateDevice(vk.physical_device, &device_desc, nullptr, &vk.device));
@@ -453,10 +457,17 @@ void vk_initialize(const Vk_Create_Info& create_info) {
     // Descriptor pool.
     //
     {
+        std::vector<VkDescriptorPoolSize> pool_sizes;
+        for (uint32_t i = 0; i < create_info.descriptor_pool_size_count; i++) {
+            if (create_info.descriptor_pool_sizes[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX && !vk.raytracing_supported)
+                continue;
+
+            pool_sizes.push_back(create_info.descriptor_pool_sizes[i]);
+        }
         VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
         desc.maxSets = create_info.max_descriptor_sets;
-        desc.poolSizeCount = create_info.descriptor_pool_size_count;
-        desc.pPoolSizes = create_info.descriptor_pool_sizes;
+        desc.poolSizeCount = (uint32_t)pool_sizes.size();
+        desc.pPoolSizes = pool_sizes.data();
 
         VK_CHECK(vkCreateDescriptorPool(vk.device, &desc, nullptr, &vk.descriptor_pool));
         vk_set_debug_name(vk.descriptor_pool, "descriptor_pool");

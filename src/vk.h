@@ -189,6 +189,7 @@ struct Vk_Instance {
     uint32_t                        queue_family_index;
     VkDevice                        device;
     VkQueue                         queue;
+    bool                            raytracing_supported;
 
     VmaAllocator                    allocator;
 

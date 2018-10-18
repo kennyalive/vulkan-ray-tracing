@@ -174,7 +174,10 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
     model_triangles.indexType     = VK_INDEX_TYPE_UINT16;
 
     raster.create(texture.view, sampler, output_image.view);
-    rt.create(model_triangles, texture.view, sampler, output_image.view);
+
+    if (vk.raytracing_supported)
+        rt.create(model_triangles, texture.view, sampler, output_image.view);
+
     copy_to_swapchain.create(output_image.view);
 
     setup_imgui();
@@ -199,7 +202,10 @@ void Vk_Demo::shutdown() {
     vkDestroyFramebuffer(vk.device, ui_framebuffer, nullptr);
 
     raster.destroy();
-    rt.destroy();
+
+    if (vk.raytracing_supported)
+        rt.destroy();
+
     copy_to_swapchain.destroy();;
 
     vk_shutdown();
@@ -219,7 +225,10 @@ void Vk_Demo::restore_resolution_dependent_resources() {
     create_ui_framebuffer();
 
     raster.create_framebuffer(output_image.view);
-    rt.update_output_image_descriptor(output_image.view);
+
+    if (vk.raytracing_supported)
+        rt.update_output_image_descriptor(output_image.view);
+
     copy_to_swapchain.update_resolution_dependent_descriptors(output_image.view);
     last_frame_time = Clock::now();
 }
@@ -344,7 +353,10 @@ void Vk_Demo::run_frame() {
     model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(30.0f));
     view_transform = look_at_transform(Vector(0, 0.5, 3.0), Vector(0), Vector(0, 1, 0));
     raster.update(model_transform, view_transform);
-    rt.update_instance(model_transform);
+
+    if (vk.raytracing_supported)
+        rt.update_instance(model_transform);
+
     do_imgui();
 
     vk_begin_frame();
@@ -463,8 +475,8 @@ void Vk_Demo::draw_raytraced_image() {
 
     vkCmdTraceRaysNVX(vk.command_buffer,
         sbt, 0, // raygen shader
-        sbt, 1 * sbt_slot_size, sbt_slot_size, // miss shaders
-        sbt, 2 * sbt_slot_size, sbt_slot_size, // chit shaders
+        sbt, 1 * sbt_slot_size, sbt_slot_size, // miss shader
+        sbt, 2 * sbt_slot_size, sbt_slot_size, // chit shader
         vk.surface_size.width, vk.surface_size.height);
 }
 
