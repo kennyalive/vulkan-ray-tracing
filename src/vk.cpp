@@ -309,11 +309,15 @@ static void create_depth_buffer() {
         VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.depth_info.image_view));
     }
 
-    VkImageAspectFlags image_aspect_flags = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    VkImageSubresourceRange subresource_range{};
+    subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    subresource_range.levelCount = 1;
+    subresource_range.layerCount = 1;
 
-    vk_record_and_run_commands(vk.command_pool, vk.queue, [&image_aspect_flags](VkCommandBuffer command_buffer) {
-        vk_record_image_layout_transition(command_buffer, vk.depth_info.image, image_aspect_flags,
-            0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+    vk_record_and_run_commands(vk.command_pool, vk.queue, [&subresource_range](VkCommandBuffer command_buffer) {
+        vk_cmd_image_barrier_for_subresource(command_buffer, vk.depth_info.image, subresource_range,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            0, 0,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     });
 }
@@ -673,31 +677,39 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
         region.imageOffset = VkOffset3D{ 0, 0, 0 };
         region.imageExtent = VkExtent3D{ (uint32_t)width, (uint32_t)height, 1 };
 
-        vk_record_and_run_commands(vk.command_pool, vk.queue,
-            [&image, &region, generate_mipmaps, width, height, mip_levels](VkCommandBuffer command_buffer) {
+        VkImageSubresourceRange subresource_range{};
+        subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        subresource_range.levelCount = 1;
+        subresource_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
-            vk_record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
-                0, VK_ACCESS_TRANSFER_WRITE_BIT,
-                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                0 /* first mip level */);
+        vk_record_and_run_commands(vk.command_pool, vk.queue,
+            [&image, &region, &subresource_range, width, height, mip_levels](VkCommandBuffer command_buffer) {
+
+            subresource_range.baseMipLevel = 0;
+
+            vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  VK_PIPELINE_STAGE_TRANSFER_BIT,
+                0,                                  VK_ACCESS_TRANSFER_WRITE_BIT,
+                VK_IMAGE_LAYOUT_UNDEFINED,          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
             vkCmdCopyBufferToImage(command_buffer, vk.staging_buffer, image.handle,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-            if (!generate_mipmaps) {
-                vk_record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
-                    VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                    0 /* first mip level */);
+            if (mip_levels == 1) {
+                vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                    VK_ACCESS_TRANSFER_WRITE_BIT,           0,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                return;
             }
 
             VkImageBlit blit{};
-            blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            blit.srcSubresource.baseArrayLayer = 0;
-            blit.srcSubresource.layerCount = 1;
-            blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            blit.dstSubresource.baseArrayLayer = 0;
-            blit.dstSubresource.layerCount = 1;
+            blit.srcSubresource.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.srcSubresource.baseArrayLayer  = 0;
+            blit.srcSubresource.layerCount      = 1;
+            blit.dstSubresource.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+            blit.dstSubresource.baseArrayLayer  = 0;
+            blit.dstSubresource.layerCount      = 1;
 
             int32_t w = (int32_t)width;
             int32_t h = (int32_t)height;
@@ -712,33 +724,35 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
                 blit.dstSubresource.mipLevel = i;
                 blit.dstOffsets[1] = VkOffset3D { w, h, 1 };
 
-                vk_record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
-                    VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    i-1);
+                subresource_range.baseMipLevel = i-1;
+                vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    VK_ACCESS_TRANSFER_WRITE_BIT,           VK_ACCESS_TRANSFER_READ_BIT,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-                vk_record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
-                    0, VK_ACCESS_TRANSFER_WRITE_BIT,
-                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    i);
+                subresource_range.baseMipLevel = i;
+                vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
+                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,      VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    0,                                      VK_ACCESS_TRANSFER_WRITE_BIT,
+                    VK_IMAGE_LAYOUT_UNDEFINED,              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
                 vkCmdBlitImage(command_buffer,
                     image.handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                     image.handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                     1, &blit, VK_FILTER_LINEAR);
 
-                vk_record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
-                    VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_READ_BIT,
-                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                    i-1);
+                subresource_range.baseMipLevel = i-1;
+                vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                    VK_ACCESS_TRANSFER_READ_BIT,            0,
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
 
-            if (generate_mipmaps) {
-                 vk_record_image_layout_transition(command_buffer, image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
-                        VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        mip_levels - 1);
-            }
+            subresource_range.baseMipLevel = mip_levels - 1;
+            vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
+                VK_PIPELINE_STAGE_TRANSFER_BIT,         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                VK_ACCESS_TRANSFER_WRITE_BIT,           0,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         });
     }
 
@@ -1005,34 +1019,47 @@ void vk_record_and_run_commands(VkCommandPool command_pool, VkQueue queue, std::
     vkFreeCommandBuffers(vk.device, command_pool, 1, &command_buffer);
 }
 
-void vk_record_image_layout_transition(
-    VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags aspect_mask,
-    VkAccessFlags src_access_flags, VkAccessFlags dst_access_flags,
-    VkImageLayout old_layout, VkImageLayout new_layout,
-    uint32_t mip_level)
+void vk_cmd_image_barrier(
+    VkCommandBuffer command_buffer, VkImage image,
+    VkPipelineStageFlags    src_stage_mask,     VkPipelineStageFlags    dst_stage_mask,
+    VkAccessFlags           src_access_mask,    VkAccessFlags           dst_access_mask,
+    VkImageLayout           old_layout,         VkImageLayout           new_layout)
 {
     VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    barrier.srcAccessMask                   = src_access_flags;
-    barrier.dstAccessMask                   = dst_access_flags;
-    barrier.oldLayout                       = old_layout;
-    barrier.newLayout                       = new_layout;
-    barrier.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image                           = image;
+    barrier.srcAccessMask       = src_access_mask;
+    barrier.dstAccessMask       = dst_access_mask;
+    barrier.oldLayout           = old_layout;
+    barrier.newLayout           = new_layout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image               = image;
 
-    barrier.subresourceRange.aspectMask     = aspect_mask;
+    barrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel   = 0;
+    barrier.subresourceRange.levelCount     = VK_REMAINING_MIP_LEVELS;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount     = VK_REMAINING_ARRAY_LAYERS;
 
-    if (mip_level == VK_REMAINING_MIP_LEVELS) {
-        barrier.subresourceRange.baseMipLevel   = 0;
-        barrier.subresourceRange.levelCount     = VK_REMAINING_MIP_LEVELS;
-    } else {
-        barrier.subresourceRange.baseMipLevel   = mip_level;
-        barrier.subresourceRange.levelCount     = 1;
-    }
+    vkCmdPipelineBarrier(command_buffer, src_stage_mask, dst_stage_mask, 0,
+        0, nullptr, 0, nullptr, 1, &barrier);
+}
 
+void vk_cmd_image_barrier_for_subresource(
+    VkCommandBuffer command_buffer, VkImage image, const VkImageSubresourceRange& subresource_range,
+    VkPipelineStageFlags    src_stage_mask,     VkPipelineStageFlags    dst_stage_mask,
+    VkAccessFlags           src_access_flags,   VkAccessFlags           dst_access_flags,
+    VkImageLayout           old_layout,         VkImageLayout           new_layout)
+{
+    VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    barrier.srcAccessMask       = src_access_flags;
+    barrier.dstAccessMask       = dst_access_flags;
+    barrier.oldLayout           = old_layout;
+    barrier.newLayout           = new_layout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image               = image;
+    barrier.subresourceRange    = subresource_range;
 
-    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
+    vkCmdPipelineBarrier(command_buffer, src_stage_mask, dst_stage_mask, 0,
         0, nullptr, 0, nullptr, 1, &barrier);
 }

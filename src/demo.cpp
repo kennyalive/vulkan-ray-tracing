@@ -138,8 +138,8 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
         attachments[0].storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
         attachments[0].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachments[0].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[0].initialLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        attachments[0].finalLayout      = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        attachments[0].initialLayout    = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachments[0].finalLayout      = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkAttachmentReference color_attachment_ref;
         color_attachment_ref.attachment = 0;
@@ -253,12 +253,14 @@ void Vk_Demo::destroy_ui_framebuffer() {
 
 void Vk_Demo::create_output_image() {
     output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_R16G16B16A16_SFLOAT,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, "output_image");
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, "output_image");
 
     if (raytracing) {
         vk_record_and_run_commands(vk.command_pool, vk.queue, [this](VkCommandBuffer command_buffer) {
-            vk_record_image_layout_transition(command_buffer, output_image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
-                0, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+            vk_cmd_image_barrier(command_buffer, output_image.handle,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                0,                                  0,
+                VK_IMAGE_LAYOUT_UNDEFINED,          VK_IMAGE_LAYOUT_GENERAL);
         });
     }
 }
@@ -369,21 +371,42 @@ void Vk_Demo::run_frame() {
     if (vk.raytracing_supported)
         rt.update_instance(model_transform);
 
+    bool old_vsync = vsync;
+    bool old_raytracing = raytracing;
+
     do_imgui();
 
     vk_begin_frame();
-    bool old_vsync = vsync;
 
     // Draw image.
-    if (raytracing)
+    if (raytracing) {
+        if (old_raytracing == false) {
+            vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                0,                                  VK_ACCESS_SHADER_WRITE_BIT,
+                VK_IMAGE_LAYOUT_UNDEFINED,          VK_IMAGE_LAYOUT_GENERAL);
+        }
         draw_raytraced_image();
+    }
     else
        draw_rasterized_image();
 
     // Draw ImGui.
     {
         ImGui::Render();
-        
+
+        if (raytracing) {
+            vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+                VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX,   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_SHADER_WRITE_BIT,             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_GENERAL,                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        } else {
+            vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                0,                                          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        }
+
         VkRenderPassBeginInfo render_pass_begin_info{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
         render_pass_begin_info.renderPass           = ui_render_pass;
         render_pass_begin_info.framebuffer          = ui_framebuffer;
@@ -392,6 +415,18 @@ void Vk_Demo::run_frame() {
         vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
         vkCmdEndRenderPass(vk.command_buffer);
+
+        if (raytracing) {
+            vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,           VK_ACCESS_SHADER_READ_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,       VK_IMAGE_LAYOUT_GENERAL);
+        } else {
+            vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,           VK_ACCESS_SHADER_READ_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
     }
 
     // Copy output image to swapchain.
@@ -402,25 +437,17 @@ void Vk_Demo::run_frame() {
         uint32_t group_count_x = (vk.surface_size.width + group_size_x - 1) / group_size_x;
         uint32_t group_count_y = (vk.surface_size.height + group_size_y - 1) / group_size_y;
 
-        VkImageMemoryBarrier output_image_barrier { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-        output_image_barrier.srcAccessMask = raytracing ? VK_ACCESS_SHADER_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        output_image_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        output_image_barrier.oldLayout = raytracing ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        output_image_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        output_image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        output_image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        output_image_barrier.image = output_image.handle;
-        output_image_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        output_image_barrier.subresourceRange.levelCount = 1;
-        output_image_barrier.subresourceRange.layerCount = 1;
+        if (raytracing) {
+            vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+                VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX,   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_ACCESS_SHADER_WRITE_BIT,             VK_ACCESS_SHADER_READ_BIT,
+                VK_IMAGE_LAYOUT_GENERAL,                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
 
-        vkCmdPipelineBarrier(vk.command_buffer,
-            raytracing ? VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            0, 0, nullptr, 0, nullptr, 1, &output_image_barrier);
-
-        vk_record_image_layout_transition(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index], VK_IMAGE_ASPECT_COLOR_BIT,
-            0, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0,                                  VK_ACCESS_SHADER_WRITE_BIT,
+            VK_IMAGE_LAYOUT_UNDEFINED,          VK_IMAGE_LAYOUT_GENERAL);
 
         uint32_t push_constants[] = { vk.surface_size.width, vk.surface_size.height };
 
@@ -433,8 +460,17 @@ void Vk_Demo::run_frame() {
         vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, copy_to_swapchain.pipeline);
         vkCmdDispatch(vk.command_buffer, group_count_x, group_count_y, 1);
 
-        vk_record_image_layout_transition(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index], VK_IMAGE_ASPECT_COLOR_BIT,
-            VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_MEMORY_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            VK_ACCESS_SHADER_WRITE_BIT,             0,
+            VK_IMAGE_LAYOUT_GENERAL,                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+        if (raytracing) {
+            vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,   VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX,
+                VK_ACCESS_SHADER_READ_BIT,              VK_ACCESS_SHADER_WRITE_BIT,
+                VK_IMAGE_LAYOUT_UNDEFINED,              VK_IMAGE_LAYOUT_GENERAL);
+        }
     }
 
     vk_end_frame();
