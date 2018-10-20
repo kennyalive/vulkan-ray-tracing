@@ -4,9 +4,7 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\demo.cpp" />
     <ClCompile Include="src\vk.cpp" />
-    <ClCompile Include="src\geometry.cpp" />
     <ClCompile Include="src\common.cpp" />
-    <ClCompile Include="src\vma_impl.cpp" />
     <ClCompile Include="third_party\volk\volk.c">
       <Filter>3rdparty\volk</Filter>
     </ClCompile>
@@ -32,11 +30,11 @@
     <ClCompile Include="src\copy_to_swapchain.cpp" />
     <ClCompile Include="src\rt_resources.cpp" />
     <ClCompile Include="src\raster_resources.cpp" />
+    <ClCompile Include="src\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\demo.h" />
     <ClInclude Include="src\vk.h" />
-    <ClInclude Include="src\geometry.h" />
     <ClInclude Include="src\common.h" />
     <ClInclude Include="third_party\imgui\impl\imgui_impl_sdl.h">
       <Filter>3rdparty\imgui\impl</Filter>
@@ -58,6 +56,7 @@
     <ClInclude Include="src\copy_to_swapchain.h" />
     <ClInclude Include="src\rt_resources.h" />
     <ClInclude Include="src\raster_resources.h" />
+    <ClInclude Include="src\utils.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="3rdparty">

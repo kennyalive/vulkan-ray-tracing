@@ -6,6 +6,8 @@
 #include <array>
 #include <vector>
 
+Vk_Image load_texture(const std::string& texture_file);
+
 struct Vertex {
     Vector pos;
     float pad;

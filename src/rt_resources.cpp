@@ -1,5 +1,5 @@
-#include "geometry.h"
 #include "rt_resources.h"
+#include "utils.h"
 
 #include <algorithm>
 #include <cassert>

@@ -1,6 +1,9 @@
 #include "common.h"
-#include "geometry.h"
+
+#define VMA_IMPLEMENTATION
 #include "vk.h"
+
+#include "utils.h"
 
 #include <algorithm>
 #include <cassert>

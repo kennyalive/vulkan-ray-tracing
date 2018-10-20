@@ -1,11 +1,8 @@
 #include "common.h"
 #include "demo.h"
-#include "geometry.h"
 #include "matrix.h"
 #include "vk.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "utils.h"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_internal.h"
@@ -15,21 +12,6 @@
 #include "sdl/SDL_scancode.h"
 
 #include <chrono>
-
-static Vk_Image load_texture(const std::string& texture_file) {
-    int w, h;
-    int component_count;
-
-    std::string abs_path = get_resource_path(texture_file);
-
-    auto rgba_pixels = stbi_load(abs_path.c_str(), &w, &h, &component_count,STBI_rgb_alpha);
-    if (rgba_pixels == nullptr)
-        error("failed to load image file: " + abs_path);
-
-    Vk_Image texture = vk_create_texture(w, h, VK_FORMAT_R8G8B8A8_SRGB, true, rgba_pixels, 4, texture_file.c_str());
-    stbi_image_free(rgba_pixels);
-    return texture;
-};
 
 static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
     {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             16},
