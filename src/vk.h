@@ -104,7 +104,7 @@ VkPipeline vk_create_graphics_pipeline(
 void vk_begin_frame();
 void vk_end_frame();
 
-void vk_record_and_run_commands(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder);
+void vk_execute(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder);
 
 // Barrier for all subresources of non-depth image.
 void vk_cmd_image_barrier(

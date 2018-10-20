@@ -1,5 +1,5 @@
 #include "geometry.h"
-#include "raytracing_resources.h"
+#include "rt_resources.h"
 
 #include <algorithm>
 #include <cassert>
@@ -181,7 +181,7 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
     // Build acceleration structures.
     Timestamp t;
 
-    vk_record_and_run_commands(vk.command_pool, vk.queue,
+    vk_execute(vk.command_pool, vk.queue,
         [this, &geometry](VkCommandBuffer command_buffer)
     {
         vkCmdBuildAccelerationStructureNVX(command_buffer,

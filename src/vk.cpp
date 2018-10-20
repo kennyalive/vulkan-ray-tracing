@@ -314,7 +314,7 @@ static void create_depth_buffer() {
     subresource_range.levelCount = 1;
     subresource_range.layerCount = 1;
 
-    vk_record_and_run_commands(vk.command_pool, vk.queue, [&subresource_range](VkCommandBuffer command_buffer) {
+    vk_execute(vk.command_pool, vk.queue, [&subresource_range](VkCommandBuffer command_buffer) {
         vk_cmd_image_barrier_for_subresource(command_buffer, vk.depth_info.image, subresource_range,
             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
             0, 0,
@@ -682,7 +682,7 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
         subresource_range.levelCount = 1;
         subresource_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
-        vk_record_and_run_commands(vk.command_pool, vk.queue,
+        vk_execute(vk.command_pool, vk.queue,
             [&image, &region, &subresource_range, width, height, mip_levels](VkCommandBuffer command_buffer) {
 
             subresource_range.baseMipLevel = 0;
@@ -993,7 +993,7 @@ void vk_end_frame() {
     STOP_TIMER("vkQueuePresentKHR")
 }
 
-void vk_record_and_run_commands(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder) {
+void vk_execute(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder) {
 
     VkCommandBufferAllocateInfo alloc_info { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     alloc_info.commandPool          = command_pool;

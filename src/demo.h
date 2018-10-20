@@ -1,25 +1,13 @@
 #pragma once
 
+#include "copy_to_swapchain.h"
 #include "matrix.h"
+#include "raster_resources.h"
+#include "rt_resources.h"
 #include "vk.h"
-
-#include "rasterization_resources.h"
-#include "raytracing_resources.h"
 
 #include "sdl/SDL_syswm.h"
 #include <vector>
-
-struct Copy_To_Swapchain {
-    VkDescriptorSetLayout           set_layout;
-    VkPipelineLayout                pipeline_layout;
-    VkPipeline                      pipeline;
-    VkSampler                       point_sampler;
-    std::vector<VkDescriptorSet>    sets; // per swapchain image
-
-    void create(VkImageView output_image_view);
-    void destroy();
-    void update_resolution_dependent_descriptors(VkImageView output_image_view);
-};
 
 class Vk_Demo {
 public:
@@ -42,6 +30,8 @@ private:
 
     void draw_rasterized_image();
     void draw_raytraced_image();
+    void draw_imgui();
+    void copy_output_image_to_swapchain();
 
 private:
     using Clock = std::chrono::high_resolution_clock;
