@@ -8,6 +8,7 @@
 #include "stb_image.h"
 
 #include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
 #include "imgui/impl/imgui_impl_vulkan.h"
 #include "imgui/impl/imgui_impl_sdl.h"
 
@@ -137,8 +138,8 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
         attachments[0].storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
         attachments[0].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachments[0].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[0].initialLayout    = VK_IMAGE_LAYOUT_GENERAL;
-        attachments[0].finalLayout      = VK_IMAGE_LAYOUT_GENERAL;
+        attachments[0].initialLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        attachments[0].finalLayout      = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         VkAttachmentReference color_attachment_ref;
         color_attachment_ref.attachment = 0;
@@ -252,12 +253,14 @@ void Vk_Demo::destroy_ui_framebuffer() {
 
 void Vk_Demo::create_output_image() {
     output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_R16G16B16A16_SFLOAT,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT, "output image");
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, "output_image");
 
-    vk_record_and_run_commands(vk.command_pool, vk.queue, [this](VkCommandBuffer command_buffer) {
-        vk_record_image_layout_transition(command_buffer, output_image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
-            0, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-    });
+    if (raytracing) {
+        vk_record_and_run_commands(vk.command_pool, vk.queue, [this](VkCommandBuffer command_buffer) {
+            vk_record_image_layout_transition(command_buffer, output_image.handle, VK_IMAGE_ASPECT_COLOR_BIT,
+                0, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        });
+    }
 }
 
 void Vk_Demo::setup_imgui() {
@@ -324,7 +327,16 @@ void Vk_Demo::do_imgui() {
             ImGui::Spacing();
             ImGui::Checkbox("Vertical sync", &vsync);
             ImGui::Checkbox("Animate", &animate);
+
+            if (!vk.raytracing_supported) {
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+            }
             ImGui::Checkbox("Raytracing", &raytracing);
+            if (!vk.raytracing_supported) {
+                ImGui::PopItemFlag();
+                ImGui::PopStyleVar();
+            }
 
             if (ImGui::BeginPopupContextWindow()) {
                 if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;
@@ -389,6 +401,23 @@ void Vk_Demo::run_frame() {
 
         uint32_t group_count_x = (vk.surface_size.width + group_size_x - 1) / group_size_x;
         uint32_t group_count_y = (vk.surface_size.height + group_size_y - 1) / group_size_y;
+
+        VkImageMemoryBarrier output_image_barrier { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+        output_image_barrier.srcAccessMask = raytracing ? VK_ACCESS_SHADER_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        output_image_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        output_image_barrier.oldLayout = raytracing ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        output_image_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        output_image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        output_image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        output_image_barrier.image = output_image.handle;
+        output_image_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        output_image_barrier.subresourceRange.levelCount = 1;
+        output_image_barrier.subresourceRange.layerCount = 1;
+
+        vkCmdPipelineBarrier(vk.command_buffer,
+            raytracing ? VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX : VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &output_image_barrier);
 
         vk_record_image_layout_transition(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index], VK_IMAGE_ASPECT_COLOR_BIT,
             0, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
@@ -483,16 +512,21 @@ void Vk_Demo::draw_raytraced_image() {
 void Copy_To_Swapchain::create(VkImageView output_image_view) {
     // Descriptor set layout.
     {
-        VkDescriptorSetLayoutBinding layout_bindings[2] {};
+        VkDescriptorSetLayoutBinding layout_bindings[3] {};
         layout_bindings[0].binding          = 0;
-        layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLER;
         layout_bindings[0].descriptorCount  = 1;
         layout_bindings[0].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
 
         layout_bindings[1].binding          = 1;
-        layout_bindings[1].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layout_bindings[1].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         layout_bindings[1].descriptorCount  = 1;
         layout_bindings[1].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        layout_bindings[2].binding          = 2;
+        layout_bindings[2].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        layout_bindings[2].descriptorCount  = 1;
+        layout_bindings[2].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
 
         VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
         create_info.bindingCount = (uint32_t)std::size(layout_bindings);
@@ -533,6 +567,13 @@ void Copy_To_Swapchain::create(VkImageView output_image_view) {
         vkDestroyShaderModule(vk.device, copy_shader, nullptr);
     }
 
+    // Point sampler.
+    {
+        VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+        VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &point_sampler));
+        vk_set_debug_name(point_sampler, "point_sampler");
+    }
+
     update_resolution_dependent_descriptors(output_image_view);
 }
 
@@ -540,6 +581,7 @@ void Copy_To_Swapchain::destroy() {
     vkDestroyDescriptorSetLayout(vk.device, set_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
     vkDestroyPipeline(vk.device, pipeline, nullptr);
+    vkDestroySampler(vk.device, point_sampler, nullptr);
     sets.clear();
 }
 
@@ -557,12 +599,25 @@ void Copy_To_Swapchain::update_resolution_dependent_descriptors(VkImageView outp
             VkDescriptorSet set;
             VK_CHECK(vkAllocateDescriptorSets(vk.device, &alloc_info, &set));
             sets.push_back(set);
+
+            VkDescriptorImageInfo sampler_info{};
+            sampler_info.sampler = point_sampler;
+
+            VkWriteDescriptorSet descriptor_writes[1] = {};
+            descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptor_writes[0].dstSet             = set;
+            descriptor_writes[0].dstBinding         = 0;
+            descriptor_writes[0].descriptorCount    = 1;
+            descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER;
+            descriptor_writes[0].pImageInfo         = &sampler_info;
+
+            vkUpdateDescriptorSets(vk.device, (uint32_t)std::size(descriptor_writes), descriptor_writes, 0, nullptr);
         }
     }
 
     VkDescriptorImageInfo src_image_info{};
     src_image_info.imageView    = output_image_view;
-    src_image_info.imageLayout  = VK_IMAGE_LAYOUT_GENERAL;
+    src_image_info.imageLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     for (size_t i = 0; i < vk.swapchain_info.images.size(); i++) {
         VkDescriptorImageInfo swapchain_image_info{};
@@ -572,14 +627,14 @@ void Copy_To_Swapchain::update_resolution_dependent_descriptors(VkImageView outp
         VkWriteDescriptorSet descriptor_writes[2] = {};
         descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptor_writes[0].dstSet             = sets[i];
-        descriptor_writes[0].dstBinding         = 0;
+        descriptor_writes[0].dstBinding         = 1;
         descriptor_writes[0].descriptorCount    = 1;
-        descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         descriptor_writes[0].pImageInfo         = &src_image_info;
 
         descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptor_writes[1].dstSet             = sets[i];
-        descriptor_writes[1].dstBinding         = 1;
+        descriptor_writes[1].dstBinding         = 2;
         descriptor_writes[1].descriptorCount    = 1;
         descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         descriptor_writes[1].pImageInfo         = &swapchain_image_info;

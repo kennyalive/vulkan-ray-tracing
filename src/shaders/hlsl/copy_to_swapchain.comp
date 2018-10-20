@@ -4,15 +4,21 @@ struct  {
 } constants;
 
 [[vk::binding(0, 0)]]
-RWTexture2D<float4> output_image;
+SamplerState point_sampler;
 
 [[vk::binding(1, 0)]]
+Texture2D<float4> output_image;
+
+[[vk::binding(2, 0)]]
 RWTexture2D<float4> swapchain_image;
 
 [numthreads(32, 32, 1)]
 void main(uint3 dispatch_thread_id : SV_DispatchThreadID) {
     int2 loc = int2(dispatch_thread_id.xy);
+    
     if (loc.x < constants.viewport_size.x && loc.y < constants.viewport_size.y) {
-        swapchain_image[loc] = output_image.Load(loc);
+        float s = (dispatch_thread_id.x + 0.5f)/constants.viewport_size.x;
+        float t = (dispatch_thread_id.y + 0.5f)/constants.viewport_size.y;
+        swapchain_image[loc] = output_image.SampleLevel(point_sampler, float2(s, t), 0);
     }
 }
