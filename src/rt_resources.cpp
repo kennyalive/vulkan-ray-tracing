@@ -51,19 +51,7 @@ void Raytracing_Resources::destroy() {
 }
 
 void Raytracing_Resources::update_output_image_descriptor(VkImageView output_image_view) {
-    VkDescriptorImageInfo image_info = {};
-    image_info.imageView    = output_image_view;
-    image_info.imageLayout  = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkWriteDescriptorSet descriptor_writes[1] = {};
-    descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptor_writes[0].dstSet             = descriptor_set;
-    descriptor_writes[0].dstBinding         = 0;
-    descriptor_writes[0].descriptorCount    = 1;
-    descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descriptor_writes[0].pImageInfo         = &image_info;
-
-    vkUpdateDescriptorSets(vk.device, (uint32_t)std::size(descriptor_writes), descriptor_writes, 0, nullptr);
+    Descriptor_Writes(descriptor_set).storage_image(0, output_image_view);
 }
 
 void Raytracing_Resources::update_instance(const Matrix3x4& model_transform) {
@@ -302,61 +290,15 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
         desc.pSetLayouts        = &descriptor_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
 
-        VkDescriptorAccelerationStructureInfoNVX accel_info { VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
-        accel_info.accelerationStructureCount   = 1;
-        accel_info.pAccelerationStructures      = &top_level_accel;
-
-        VkDescriptorBufferInfo index_buffer_info;
-        index_buffer_info.buffer  = model_triangles.indexData;
-        index_buffer_info.offset  = model_triangles.indexOffset;
-        index_buffer_info.range   = model_triangles.indexCount * (model_triangles.indexType == VK_INDEX_TYPE_UINT16 ? 2 : 4);
-
-        VkDescriptorBufferInfo vertex_buffer_info;
-        vertex_buffer_info.buffer  = model_triangles.vertexData;
-        vertex_buffer_info.offset  = model_triangles.vertexOffset; // assume that position is the first vertex attribute
-        vertex_buffer_info.range   = model_triangles.vertexCount * sizeof(Vertex);
-
-        VkDescriptorImageInfo image_info = {};
-        image_info.sampler      = sampler;
-        image_info.imageView    = texture_view;
-        image_info.imageLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        VkWriteDescriptorSet descriptor_writes[5] = {};
-        descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[0].pNext              = &accel_info;
-        descriptor_writes[0].dstSet             = descriptor_set;
-        descriptor_writes[0].dstBinding         = 1;
-        descriptor_writes[0].descriptorCount    = 1;
-        descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
-
-        descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[1].dstSet             = descriptor_set;
-        descriptor_writes[1].dstBinding         = 2;
-        descriptor_writes[1].descriptorCount    = 1;
-        descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptor_writes[1].pBufferInfo        = &index_buffer_info;
-
-        descriptor_writes[2].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[2].dstSet             = descriptor_set;
-        descriptor_writes[2].dstBinding         = 3;
-        descriptor_writes[2].descriptorCount    = 1;
-        descriptor_writes[2].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptor_writes[2].pBufferInfo        = &vertex_buffer_info;
-
-        descriptor_writes[3].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[3].dstSet             = descriptor_set;
-        descriptor_writes[3].dstBinding         = 4;
-        descriptor_writes[3].descriptorCount    = 1;
-        descriptor_writes[3].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        descriptor_writes[3].pImageInfo         = &image_info;
-
-        descriptor_writes[4].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[4].dstSet             = descriptor_set;
-        descriptor_writes[4].dstBinding         = 5;
-        descriptor_writes[4].descriptorCount    = 1;
-        descriptor_writes[4].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER;
-        descriptor_writes[4].pImageInfo         = &image_info;
-
-        vkUpdateDescriptorSets(vk.device, (uint32_t)std::size(descriptor_writes), descriptor_writes, 0, nullptr);
+        Descriptor_Writes(descriptor_set)
+            .acceleration_structure(1, top_level_accel)
+            .storage_buffer(2, model_triangles.indexData,
+                               model_triangles.indexOffset,
+                               model_triangles.indexCount * (model_triangles.indexType == VK_INDEX_TYPE_UINT16 ? 2 : 4))
+            .storage_buffer(3, model_triangles.vertexData,
+                               model_triangles.vertexOffset, /* assume that position is the first vertex attribute */
+                               model_triangles.vertexCount * sizeof(Vertex))
+            .sampled_image(4, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .sampler(5, sampler);
     }
 }

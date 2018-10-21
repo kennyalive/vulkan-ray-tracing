@@ -1,5 +1,6 @@
 #include "matrix.h"
 #include "raster_resources.h"
+#include "utils.h"
 
 struct Uniform_Buffer {
     Matrix4x4   mvp;
@@ -116,41 +117,10 @@ void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler
         desc.pSetLayouts        = &descriptor_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
 
-        VkDescriptorBufferInfo buffer_info;
-        buffer_info.buffer  = uniform_buffer.handle;
-        buffer_info.offset  = 0;
-        buffer_info.range   = sizeof(Uniform_Buffer);
-
-        VkDescriptorImageInfo image_info = {};
-        image_info.imageView    = texture_view;
-        image_info.imageLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        VkDescriptorImageInfo sampler_info = {};
-        sampler_info.sampler = sampler;
-
-        VkWriteDescriptorSet descriptor_writes[3] = {};
-        descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[0].dstSet             = descriptor_set;
-        descriptor_writes[0].dstBinding         = 0;
-        descriptor_writes[0].descriptorCount    = 1;
-        descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptor_writes[0].pBufferInfo        = &buffer_info;
-
-        descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[1].dstSet             = descriptor_set;
-        descriptor_writes[1].dstBinding         = 1;
-        descriptor_writes[1].descriptorCount    = 1;
-        descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        descriptor_writes[1].pImageInfo         = &image_info;
-
-        descriptor_writes[2].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[2].dstSet             = descriptor_set;
-        descriptor_writes[2].dstBinding         = 2;
-        descriptor_writes[2].descriptorCount    = 1;
-        descriptor_writes[2].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER;
-        descriptor_writes[2].pImageInfo         = &sampler_info;
-
-        vkUpdateDescriptorSets(vk.device, 3, descriptor_writes, 0, nullptr);
+        Descriptor_Writes(descriptor_set)
+            .uniform_buffer (0, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
+            .sampled_image  (1, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .sampler        (2, sampler);
     }
 }
 

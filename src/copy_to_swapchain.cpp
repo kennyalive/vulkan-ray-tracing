@@ -1,4 +1,5 @@
 #include "copy_to_swapchain.h"
+#include "utils.h"
 
 void Copy_To_Swapchain::create() {
     // set layout
@@ -89,45 +90,13 @@ void Copy_To_Swapchain::update_resolution_dependent_descriptors(VkImageView outp
             VK_CHECK(vkAllocateDescriptorSets(vk.device, &alloc_info, &set));
             sets.push_back(set);
 
-            VkDescriptorImageInfo sampler_info{};
-            sampler_info.sampler = point_sampler;
-
-            VkWriteDescriptorSet descriptor_writes[1] = {};
-            descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptor_writes[0].dstSet             = set;
-            descriptor_writes[0].dstBinding         = 0;
-            descriptor_writes[0].descriptorCount    = 1;
-            descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER;
-            descriptor_writes[0].pImageInfo         = &sampler_info;
-
-            vkUpdateDescriptorSets(vk.device, (uint32_t)std::size(descriptor_writes), descriptor_writes, 0, nullptr);
+            Descriptor_Writes(set).sampler(0, point_sampler);
         }
     }
 
-    VkDescriptorImageInfo src_image_info{};
-    src_image_info.imageView    = output_image_view;
-    src_image_info.imageLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
     for (size_t i = 0; i < vk.swapchain_info.images.size(); i++) {
-        VkDescriptorImageInfo swapchain_image_info{};
-        swapchain_image_info.imageView      = vk.swapchain_info.image_views[i];
-        swapchain_image_info.imageLayout    = VK_IMAGE_LAYOUT_GENERAL;
-
-        VkWriteDescriptorSet descriptor_writes[2] = {};
-        descriptor_writes[0].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[0].dstSet             = sets[i];
-        descriptor_writes[0].dstBinding         = 1;
-        descriptor_writes[0].descriptorCount    = 1;
-        descriptor_writes[0].descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        descriptor_writes[0].pImageInfo         = &src_image_info;
-
-        descriptor_writes[1].sType              = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[1].dstSet             = sets[i];
-        descriptor_writes[1].dstBinding         = 2;
-        descriptor_writes[1].descriptorCount    = 1;
-        descriptor_writes[1].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        descriptor_writes[1].pImageInfo         = &swapchain_image_info;
-
-        vkUpdateDescriptorSets(vk.device, (uint32_t)std::size(descriptor_writes), descriptor_writes, 0, nullptr);
+        Descriptor_Writes(sets[i])
+            .sampled_image(1, output_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .storage_image(2, vk.swapchain_info.image_views[i]);
     }
 }
