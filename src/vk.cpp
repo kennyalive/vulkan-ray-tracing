@@ -11,6 +11,16 @@
 #include <iostream>
 #include <vector>
 
+static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
+    {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             16},
+    {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,              16},
+    {VK_DESCRIPTOR_TYPE_SAMPLER,                    16},
+    {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,              16},
+    {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, 16},
+};
+
+constexpr uint32_t max_descriptor_sets = 64;
+
 //
 // Vk_Instance is a container that stores common Vulkan resources like vulkan instance,
 // device, command pool, swapchain, etc.
@@ -465,14 +475,14 @@ void vk_initialize(const Vk_Create_Info& create_info) {
     //
     {
         std::vector<VkDescriptorPoolSize> pool_sizes;
-        for (uint32_t i = 0; i < create_info.descriptor_pool_size_count; i++) {
-            if (create_info.descriptor_pool_sizes[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX && !vk.raytracing_supported)
+        for (size_t i = 0; i < std::size(descriptor_pool_sizes); i++) {
+            if (descriptor_pool_sizes[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX && !vk.raytracing_supported)
                 continue;
 
-            pool_sizes.push_back(create_info.descriptor_pool_sizes[i]);
+            pool_sizes.push_back(descriptor_pool_sizes[i]);
         }
         VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-        desc.maxSets = create_info.max_descriptor_sets;
+        desc.maxSets = max_descriptor_sets;
         desc.poolSizeCount = (uint32_t)pool_sizes.size();
         desc.pPoolSizes = pool_sizes.data();
 

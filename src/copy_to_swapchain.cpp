@@ -1,6 +1,6 @@
 #include "copy_to_swapchain.h"
 
-void Copy_To_Swapchain::create(VkImageView output_image_view) {
+void Copy_To_Swapchain::create() {
     // set layout
     {
         VkDescriptorSetLayoutBinding layout_bindings[3] {};
@@ -64,8 +64,6 @@ void Copy_To_Swapchain::create(VkImageView output_image_view) {
         VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &point_sampler));
         vk_set_debug_name(point_sampler, "point_sampler");
     }
-
-    update_resolution_dependent_descriptors(output_image_view);
 }
 
 void Copy_To_Swapchain::destroy() {

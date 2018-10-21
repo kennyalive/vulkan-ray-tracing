@@ -9,7 +9,7 @@ struct Copy_To_Swapchain {
     VkSampler                       point_sampler;
     std::vector<VkDescriptorSet>    sets; // per swapchain image
 
-    void create(VkImageView output_image_view);
+    void create();
     void destroy();
     void update_resolution_dependent_descriptors(VkImageView output_image_view);
 };

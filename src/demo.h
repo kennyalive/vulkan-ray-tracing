@@ -16,14 +16,11 @@ public:
 
     void release_resolution_dependent_resources();
     void restore_resolution_dependent_resources();
+    bool vsync_enabled() const { return vsync; }
 
     void run_frame();
 
 private:
-    void create_ui_framebuffer();
-    void destroy_ui_framebuffer();
-    void create_output_image();
-
     void setup_imgui();
     void release_imgui();
     void do_imgui();

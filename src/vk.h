@@ -29,10 +29,6 @@ struct Vk_Create_Info {
 
     bool                        enable_validation_layers;
     bool                        use_debug_names;
-
-    const VkDescriptorPoolSize* descriptor_pool_sizes;
-    uint32_t                    descriptor_pool_size_count;
-    uint32_t                    max_descriptor_sets;
 };
 
 struct Vk_Image {

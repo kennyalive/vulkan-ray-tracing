@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cassert>
 
-void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler, VkImageView output_image_view) {
+void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler) {
     // Instance buffer.
     {
         VkBufferCreateInfo buffer_create_info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
@@ -21,7 +21,7 @@ void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles,
     }
 
     create_acceleration_structure(model_triangles);
-    create_pipeline(model_triangles, texture_view, sampler, output_image_view);
+    create_pipeline(model_triangles, texture_view, sampler);
 
     // Shader binding table.
     {
@@ -209,7 +209,7 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
     printf("\nAcceleration structures build time = %lld microseconds\n", elapsed_microseconds(t));
 }
 
-void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler, VkImageView output_image_view) {
+void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler) {
     // descriptor set layout
     {
         VkDescriptorSetLayoutBinding layout_bindings[6] {};
@@ -301,8 +301,6 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
         desc.descriptorSetCount = 1;
         desc.pSetLayouts        = &descriptor_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
-
-        update_output_image_descriptor(output_image_view);
 
         VkDescriptorAccelerationStructureInfoNVX accel_info { VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
         accel_info.accelerationStructureCount   = 1;

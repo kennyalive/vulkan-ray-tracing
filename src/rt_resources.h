@@ -37,17 +37,12 @@ struct Raytracing_Resources {
 
     Vk_Buffer                   shader_binding_table;
 
-    void create(
-        const VkGeometryTrianglesNVX& model_triangles,
-        VkImageView texture_view,
-        VkSampler sampler,
-        VkImageView output_image_view
-    );
+    void create(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler);
     void destroy();
     void update_output_image_descriptor(VkImageView output_image_view);
     void update_instance(const Matrix3x4& model_transform);
 
 private:
     void create_acceleration_structure(const VkGeometryTrianglesNVX& triangles);
-    void create_pipeline(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler, VkImageView output_image_view);
+    void create_pipeline(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler);
 };

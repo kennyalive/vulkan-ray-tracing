@@ -13,30 +13,18 @@
 
 #include <chrono>
 
-static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
-    {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             16},
-    {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,              16},
-    {VK_DESCRIPTOR_TYPE_SAMPLER,                    16},
-    {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,              16},
-    {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, 16},
-};
-
-constexpr uint32_t max_descriptor_sets = 64;
-
 void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) {
     this->sdl_window = sdl_window;
-
-    vk_create_info.descriptor_pool_sizes        = descriptor_pool_sizes;
-    vk_create_info.descriptor_pool_size_count   = (uint32_t)std::size(descriptor_pool_sizes);
-    vk_create_info.max_descriptor_sets          = max_descriptor_sets;
-
     vk_initialize(vk_create_info);
 
     // Device properties.
     {
-        VkPhysicalDeviceRaytracingPropertiesNVX raytracing_properties { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAYTRACING_PROPERTIES_NVX };
         VkPhysicalDeviceProperties2 physical_device_properties { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-        physical_device_properties.pNext = &raytracing_properties;
+
+        VkPhysicalDeviceRaytracingPropertiesNVX raytracing_properties { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAYTRACING_PROPERTIES_NVX };
+        if (vk.raytracing_supported)
+            physical_device_properties.pNext = &raytracing_properties;
+        
         vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
 
         rt.shader_header_size = raytracing_properties.shaderHeaderSize;
@@ -47,7 +35,6 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
             VK_VERSION_MINOR(physical_device_properties.properties.apiVersion),
             VK_VERSION_PATCH(physical_device_properties.properties.apiVersion)
         );
-
 
         if (vk.raytracing_supported) {
             printf("\n");
@@ -145,68 +132,82 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
         vk_set_debug_name(ui_render_pass, "ui_render_pass");
     }
 
-    create_output_image();
-    create_ui_framebuffer();
+    raster.create(texture.view, sampler);
 
-    VkGeometryTrianglesNVX model_triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NVX };
-    model_triangles.vertexData    = vertex_buffer.handle;
-    model_triangles.vertexOffset  = 0;
-    model_triangles.vertexCount   = model_vertex_count;
-    model_triangles.vertexStride  = sizeof(Vertex);
-    model_triangles.vertexFormat  = VK_FORMAT_R32G32B32_SFLOAT;
-    model_triangles.indexData     = index_buffer.handle;
-    model_triangles.indexOffset   = 0;
-    model_triangles.indexCount    = model_index_count;
-    model_triangles.indexType     = VK_INDEX_TYPE_UINT16;
+    if (vk.raytracing_supported) {
+        VkGeometryTrianglesNVX model_triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NVX };
+        model_triangles.vertexData    = vertex_buffer.handle;
+        model_triangles.vertexOffset  = 0;
+        model_triangles.vertexCount   = model_vertex_count;
+        model_triangles.vertexStride  = sizeof(Vertex);
+        model_triangles.vertexFormat  = VK_FORMAT_R32G32B32_SFLOAT;
+        model_triangles.indexData     = index_buffer.handle;
+        model_triangles.indexOffset   = 0;
+        model_triangles.indexCount    = model_index_count;
+        model_triangles.indexType     = VK_INDEX_TYPE_UINT16;
 
-    raster.create(texture.view, sampler, output_image.view);
+        rt.create(model_triangles, texture.view, sampler);
+    }
 
-    if (vk.raytracing_supported)
-        rt.create(model_triangles, texture.view, sampler, output_image.view);
-
-    copy_to_swapchain.create(output_image.view);
+    copy_to_swapchain.create();
+    restore_resolution_dependent_resources();
     setup_imgui();
-    last_frame_time = Clock::now();
 }
 
 void Vk_Demo::shutdown() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
     release_imgui();
-
     vertex_buffer.destroy();
     index_buffer.destroy();
-
     texture.destroy();
+    copy_to_swapchain.destroy();
     vkDestroySampler(vk.device, sampler, nullptr);
-
-    output_image.destroy();
-    destroy_ui_framebuffer();
-
     vkDestroyRenderPass(vk.device, ui_render_pass, nullptr);
-    vkDestroyFramebuffer(vk.device, ui_framebuffer, nullptr);
+    release_resolution_dependent_resources();
 
     raster.destroy();
-
     if (vk.raytracing_supported)
         rt.destroy();
-
-    copy_to_swapchain.destroy();;
-
+    
     vk_shutdown();
 }
 
 void Vk_Demo::release_resolution_dependent_resources() {
-    VK_CHECK(vkDeviceWaitIdle(vk.device));
-    destroy_ui_framebuffer();
+    vkDestroyFramebuffer(vk.device, ui_framebuffer, nullptr);
+    ui_framebuffer = VK_NULL_HANDLE;
+
     raster.destroy_framebuffer();
     output_image.destroy();
-    vk_release_resolution_dependent_resources();
 }
 
 void Vk_Demo::restore_resolution_dependent_resources() {
-    vk_restore_resolution_dependent_resources(vsync);
-    create_output_image();
-    create_ui_framebuffer();
+    // output image
+    {
+        output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, "output_image");
+
+        if (raytracing) {
+            vk_execute(vk.command_pool, vk.queue, [this](VkCommandBuffer command_buffer) {
+                vk_cmd_image_barrier(command_buffer, output_image.handle,
+                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                    0,                                  0,
+                    VK_IMAGE_LAYOUT_UNDEFINED,          VK_IMAGE_LAYOUT_GENERAL);
+            });
+        }
+    }
+
+    // imgui framebuffer
+    {
+        VkFramebufferCreateInfo create_info { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+        create_info.renderPass      = ui_render_pass;
+        create_info.attachmentCount = 1;
+        create_info.pAttachments    = &output_image.view;
+        create_info.width           = vk.surface_size.width;
+        create_info.height          = vk.surface_size.height;
+        create_info.layers          = 1;
+
+        VK_CHECK(vkCreateFramebuffer(vk.device, &create_info, nullptr, &ui_framebuffer));
+    }
 
     raster.create_framebuffer(output_image.view);
 
@@ -215,37 +216,6 @@ void Vk_Demo::restore_resolution_dependent_resources() {
 
     copy_to_swapchain.update_resolution_dependent_descriptors(output_image.view);
     last_frame_time = Clock::now();
-}
-
-void Vk_Demo::create_ui_framebuffer() {
-    VkFramebufferCreateInfo create_info { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-    create_info.renderPass      = ui_render_pass;
-    create_info.attachmentCount = 1;
-    create_info.pAttachments    = &output_image.view;
-    create_info.width           = vk.surface_size.width;
-    create_info.height          = vk.surface_size.height;
-    create_info.layers          = 1;
-
-    VK_CHECK(vkCreateFramebuffer(vk.device, &create_info, nullptr, &ui_framebuffer));
-}
-
-void Vk_Demo::destroy_ui_framebuffer() {
-    vkDestroyFramebuffer(vk.device, ui_framebuffer, nullptr);
-    ui_framebuffer = VK_NULL_HANDLE;
-}
-
-void Vk_Demo::create_output_image() {
-    output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_R16G16B16A16_SFLOAT,
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, "output_image");
-
-    if (raytracing) {
-        vk_execute(vk.command_pool, vk.queue, [this](VkCommandBuffer command_buffer) {
-            vk_cmd_image_barrier(command_buffer, output_image.handle,
-                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                0,                                  0,
-                VK_IMAGE_LAYOUT_UNDEFINED,          VK_IMAGE_LAYOUT_GENERAL);
-        });
-    }
 }
 
 void Vk_Demo::setup_imgui() {
@@ -292,9 +262,7 @@ void Vk_Demo::run_frame() {
     if (vk.raytracing_supported)
         rt.update_instance(model_transform);
 
-    bool old_vsync = vsync;
     bool old_raytracing = raytracing;
-
     do_imgui();
 
     vk_begin_frame();
@@ -314,11 +282,6 @@ void Vk_Demo::run_frame() {
     draw_imgui();
     copy_output_image_to_swapchain();
     vk_end_frame();
-
-    if (vsync != old_vsync) {
-        release_resolution_dependent_resources();
-        restore_resolution_dependent_resources();
-    }
 }
 
 void Vk_Demo::draw_rasterized_image() {

@@ -5,7 +5,7 @@ struct Uniform_Buffer {
     Matrix4x4   mvp;
 };
 
-void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler, VkImageView output_image_view) {
+void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler) {
     void* mapped_memory;
     uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_memory, "uniform buffer to store matrices");
@@ -92,8 +92,6 @@ void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler
 
         VK_CHECK(vkCreateRenderPass(vk.device, &create_info, nullptr, &render_pass));
         vk_set_debug_name(render_pass, "color_depth_render_pass");
-
-        create_framebuffer(output_image_view);
     }
 
     // Pipeline.
@@ -162,7 +160,6 @@ void Rasterization_Resources::destroy() {
     vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
     vkDestroyPipeline(vk.device, pipeline, nullptr);
     vkDestroyRenderPass(vk.device, render_pass, nullptr);
-    vkDestroyFramebuffer(vk.device, framebuffer, nullptr);
     *this = Rasterization_Resources{};
 }
 

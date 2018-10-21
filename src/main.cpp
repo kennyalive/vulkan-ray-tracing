@@ -91,6 +91,9 @@ int main(int argc, char** argv) {
     Vk_Demo demo{};
     demo.initialize(vk_create_info, the_window);
 
+    bool prev_vsync = demo.vsync_enabled();
+    bool handle_vsync_toggle = false;
+
     // Run main loop.
     while (process_events()) {
         if (toogle_fullscreen) {
@@ -103,18 +106,28 @@ int main(int argc, char** argv) {
             toogle_fullscreen = false;
         }
 
-        if (handle_resize) {
+        if (handle_resize || handle_vsync_toggle) {
             if (vk.swapchain_info.handle != VK_NULL_HANDLE) {
+                VK_CHECK(vkDeviceWaitIdle(vk.device));
                 demo.release_resolution_dependent_resources();
+                vk_release_resolution_dependent_resources();
             }
             handle_resize = false;
+            handle_vsync_toggle = false;
         }
 
         if ((SDL_GetWindowFlags(the_window) & SDL_WINDOW_MINIMIZED) == 0) {
             if (vk.swapchain_info.handle == VK_NULL_HANDLE) {
+                vk_restore_resolution_dependent_resources(demo.vsync_enabled());
                 demo.restore_resolution_dependent_resources();
             }
+
             demo.run_frame();
+
+            if (prev_vsync != demo.vsync_enabled()) {
+                prev_vsync = demo.vsync_enabled();
+                handle_vsync_toggle = true;
+            }
         }
         SDL_Delay(1);
     }
