@@ -4,7 +4,16 @@
 #include <algorithm>
 #include <cassert>
 
+namespace {
+struct Uniform_Buffer {
+    Matrix3x4 camera_to_world;
+};
+}
+
 void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler) {
+    uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "rr_uniform_buffer");
+
     // Instance buffer.
     {
         VkBufferCreateInfo buffer_create_info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
@@ -34,6 +43,7 @@ void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles,
 }
 
 void Raytracing_Resources::destroy() {
+    uniform_buffer.destroy();
     shader_binding_table.destroy();
 
     vkDestroyAccelerationStructureNVX(vk.device, bottom_level_accel, nullptr);
@@ -54,7 +64,7 @@ void Raytracing_Resources::update_output_image_descriptor(VkImageView output_ima
     Descriptor_Writes(descriptor_set).storage_image(0, output_image_view);
 }
 
-void Raytracing_Resources::update_instance(const Matrix3x4& model_transform) {
+void Raytracing_Resources::update(const Matrix3x4& model_transform, const Matrix3x4& camera_to_world_transform) {
     VkInstanceNVX& instance = *mapped_instance_buffer;
     instance.transform                                  = model_transform;
     instance.instance_id                                = 0;
@@ -62,6 +72,8 @@ void Raytracing_Resources::update_instance(const Matrix3x4& model_transform) {
     instance.instance_contribution_to_hit_group_index   = 0;
     instance.flags                                      = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NVX;
     instance.acceleration_structure_handle              = bottom_level_accel_handle;
+
+    static_cast<Uniform_Buffer*>(mapped_uniform_buffer)->camera_to_world = camera_to_world_transform;
 }
 
 void Raytracing_Resources::create_acceleration_structure(const VkGeometryTrianglesNVX& triangles) {
@@ -104,7 +116,7 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
             vk_set_debug_name(bottom_level_accel, "bottom_level_accel");
 
             VK_CHECK(vkGetAccelerationStructureHandleNVX(vk.device, bottom_level_accel, sizeof(uint64_t), &bottom_level_accel_handle));
-            update_instance(Matrix3x4::identity);
+            update(Matrix3x4::identity, Matrix3x4::identity);
         }
 
         // Top level.
@@ -200,7 +212,7 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
 void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler) {
     // descriptor set layout
     {
-        VkDescriptorSetLayoutBinding layout_bindings[6] {};
+        VkDescriptorSetLayoutBinding layout_bindings[7] {};
         layout_bindings[0].binding          = 0;
         layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         layout_bindings[0].descriptorCount  = 1;
@@ -212,9 +224,9 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
         layout_bindings[1].stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
         layout_bindings[2].binding          = 2;
-        layout_bindings[2].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        layout_bindings[2].descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         layout_bindings[2].descriptorCount  = 1;
-        layout_bindings[2].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+        layout_bindings[2].stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
         layout_bindings[3].binding          = 3;
         layout_bindings[3].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -222,14 +234,19 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
         layout_bindings[3].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
 
         layout_bindings[4].binding          = 4;
-        layout_bindings[4].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        layout_bindings[4].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         layout_bindings[4].descriptorCount  = 1;
         layout_bindings[4].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
 
         layout_bindings[5].binding          = 5;
-        layout_bindings[5].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLER;
+        layout_bindings[5].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         layout_bindings[5].descriptorCount  = 1;
         layout_bindings[5].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+
+        layout_bindings[6].binding          = 6;
+        layout_bindings[6].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLER;
+        layout_bindings[6].descriptorCount  = 1;
+        layout_bindings[6].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
 
         VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
         create_info.bindingCount    = (uint32_t)std::size(layout_bindings);
@@ -292,13 +309,14 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
 
         Descriptor_Writes(descriptor_set)
             .acceleration_structure(1, top_level_accel)
-            .storage_buffer(2, model_triangles.indexData,
+            .uniform_buffer(2, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
+            .storage_buffer(3, model_triangles.indexData,
                                model_triangles.indexOffset,
                                model_triangles.indexCount * (model_triangles.indexType == VK_INDEX_TYPE_UINT16 ? 2 : 4))
-            .storage_buffer(3, model_triangles.vertexData,
+            .storage_buffer(4, model_triangles.vertexData,
                                model_triangles.vertexOffset, /* assume that position is the first vertex attribute */
                                model_triangles.vertexCount * sizeof(Vertex))
-            .sampled_image(4, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-            .sampler(5, sampler);
+            .sampled_image(5, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .sampler(6, sampler);
     }
 }

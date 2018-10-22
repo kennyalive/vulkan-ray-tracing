@@ -1,10 +1,15 @@
 #version 460
 #extension GL_NVX_raytracing : require
 
+layout(row_major) uniform;
 #include "utils.glsl"
 
 layout(binding = 0, rgba8) uniform image2D image;
 layout(binding = 1) uniform accelerationStructureNVX accel;
+
+layout(binding=2) uniform Uniform_Block {
+    mat4x3 camera_to_world;
+};
 
 layout(location = 0) rayPayloadNVX vec3 color;
 
@@ -12,7 +17,7 @@ const float tmin = 1e-3f;
 const float tmax = 1e+3f;
 
 void main() {
-    Ray ray = generate_ray(vec2(gl_LaunchIDNVX.xy) + vec2(0.5));
+    Ray ray = generate_ray(camera_to_world, vec2(gl_LaunchIDNVX.xy) + vec2(0.5));
     traceNVX(accel, gl_RayFlagsOpaqueNVX, 0xff, 0, 0, 0, ray.origin, tmin, ray.direction, tmax, 0);
     imageStore(image, ivec2(gl_LaunchIDNVX.xy), vec4(color, 1.0));
 }

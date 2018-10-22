@@ -3,7 +3,7 @@ struct Ray {
     vec3 direction;
 };
 
-Ray generate_ray(vec2 film_position) {
+Ray generate_ray(mat4x3 camera_to_world, vec2 film_position) {
     const float tan_fovy_over_2 = 0.414; // tan(45/2)
 
     vec2 uv = film_position / vec2(gl_LaunchSizeNVX.xy);
@@ -15,8 +15,8 @@ Ray generate_ray(vec2 film_position) {
     float dir_y = -uv2.y * vert_half_dist;
 
     Ray ray;
-    ray.origin = vec3(0, 0, 3);
-    ray.direction = normalize(vec3(dir_x, dir_y, -1.f));
+    ray.origin = camera_to_world[3];
+    ray.direction = camera_to_world * vec4(normalize(vec3(dir_x, dir_y, -1.f)), 0.f);
     return ray;
 }
 

@@ -4,11 +4,15 @@
 
 #include <cmath>
 
+struct Vector4;
+
 struct Vector {
     float x, y, z;
 
     explicit Vector(float v = 0.f)
         : x(v), y(v), z(v) {}
+
+    explicit Vector(Vector4 v);
 
     Vector(float x, float y, float z)
         : x(x), y(y), z(z) {}
@@ -143,6 +147,10 @@ struct Vector4 {
         return (&x)[index];
     }
 };
+
+inline Vector::Vector(Vector4 v)
+    : x(v.x), y(v.y), z(v.z) 
+{}
 
 inline Vector operator+(const Vector& v1, const Vector& v2) {
     return Vector(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z);

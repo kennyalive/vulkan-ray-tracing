@@ -8,6 +8,7 @@ struct Matrix3x4 {
 
     void set_column(int column_index, Vector c);
     void set_row(int row_index, Vector4 r);
+    Vector4 get_row(int row) const;
 };
 
 struct Matrix4x4 {

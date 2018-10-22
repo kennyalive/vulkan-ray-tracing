@@ -246,7 +246,7 @@ void Vk_Demo::release_imgui() {
 }
 
 void Vk_Demo::run_frame() {
-    // Update time.
+    // Update frame.
     Time current_time = Clock::now();
     if (animate) {
         double time_delta = std::chrono::duration_cast<std::chrono::microseconds>(current_time - last_frame_time).count() / 1e6;
@@ -254,28 +254,35 @@ void Vk_Demo::run_frame() {
     }
     last_frame_time = current_time;
 
-    // Update resources.
+    Vector camera_pos = Vector(0, 0.5, 3.0);
     model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(30.0f));
-    view_transform = look_at_transform(Vector(0, 0.5, 3.0), Vector(0), Vector(0, 1, 0));
+    view_transform = look_at_transform(camera_pos, Vector(0), Vector(0, 1, 0));
     raster.update(model_transform, view_transform);
 
+    Matrix3x4 camera_to_world_transform;
+    camera_to_world_transform.set_column(0, Vector(view_transform.get_row(0)));
+    camera_to_world_transform.set_column(1, Vector(view_transform.get_row(1)));
+    camera_to_world_transform.set_column(2, Vector(view_transform.get_row(2)));
+    camera_to_world_transform.set_column(3, camera_pos);
+
     if (vk.raytracing_supported)
-        rt.update_instance(model_transform);
+        rt.update(model_transform, camera_to_world_transform);
 
     bool old_raytracing = raytracing;
     do_imgui();
 
+    // Draw frame.
     vk_begin_frame();
 
-    if (raytracing) {
-        if (old_raytracing == false) {
-            vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                0,                                  VK_ACCESS_SHADER_WRITE_BIT,
-                VK_IMAGE_LAYOUT_UNDEFINED,          VK_IMAGE_LAYOUT_GENERAL);
-        }
-        draw_raytraced_image();
+    if (raytracing && !old_raytracing) {
+        vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0, VK_ACCESS_SHADER_WRITE_BIT,
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
     }
+
+    if (raytracing)
+        draw_raytraced_image();
     else
        draw_rasterized_image();
 

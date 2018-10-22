@@ -2,15 +2,15 @@
 #include "raster_resources.h"
 #include "utils.h"
 
+namespace {
 struct Uniform_Buffer {
     Matrix4x4   mvp;
 };
+}
 
 void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler) {
-    void* mapped_memory;
     uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_memory, "uniform buffer to store matrices");
-    mapped_uniform_buffer = static_cast<Uniform_Buffer*>(mapped_memory);
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "raster_uniform_buffer");
 
     //
     // Descriptor set layouts.
@@ -157,5 +157,5 @@ void Rasterization_Resources::update(const Matrix3x4& model_transform, const Mat
     float aspect_ratio = (float)vk.surface_size.width / (float)vk.surface_size.height;
     Matrix4x4 proj = perspective_transform_opengl_z01(radians(45.0f), aspect_ratio, 0.1f, 50.0f);
     Matrix4x4 mvp = proj * view_transform * model_transform;
-    mapped_uniform_buffer->mvp = mvp;
+    static_cast<Uniform_Buffer*>(mapped_uniform_buffer)->mvp = mvp;
 }

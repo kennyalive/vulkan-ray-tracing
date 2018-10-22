@@ -28,6 +28,11 @@ void Matrix3x4::set_row(int row_index, Vector4 r) {
     a[row_index][3] = r.w;
 }
 
+Vector4 Matrix3x4::get_row(int row) const {
+    assert(row >= 0 && row < 3);
+    return Vector4(a[row][0], a[row][1], a[row][2], a[row][3]);
+}
+
 Matrix3x4 operator*(const Matrix3x4& m1, const Matrix3x4& m2) {
     Matrix3x4 m;
     m.a[0][0] = m1.a[0][0]*m2.a[0][0] + m1.a[0][1]*m2.a[1][0] + m1.a[0][2]*m2.a[2][0];

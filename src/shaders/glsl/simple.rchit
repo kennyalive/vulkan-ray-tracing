@@ -14,16 +14,16 @@ struct Vertex {
 layout (location=0) rayPayloadInNVX vec3 color;
 layout (location=1) hitAttributeNVX vec3 attribs;
 
-layout(std430, binding=2) readonly buffer Indices {
+layout(std430, binding=3) readonly buffer Indices {
     uint16_t index_buffer[];
 };
 
-layout(std430, binding=3) readonly buffer Vertices {
+layout(std430, binding=4) readonly buffer Vertices {
     Vertex vertex_buffer[];
 };
 
-layout(binding=4) uniform texture2D image;
-layout(binding=5) uniform sampler image_sampler;
+layout(binding=5) uniform texture2D image;
+layout(binding=6) uniform sampler image_sampler;
 
 void main() {
     uint i0 = uint(index_buffer[gl_PrimitiveID*3 + 0]);

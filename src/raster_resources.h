@@ -3,7 +3,6 @@
 #include "vk.h"
 
 struct Matrix3x4;
-struct Uniform_Buffer;
 
 struct Rasterization_Resources {
     VkDescriptorSetLayout       descriptor_set_layout;
@@ -15,7 +14,7 @@ struct Rasterization_Resources {
     VkFramebuffer               framebuffer;
 
     Vk_Buffer                   uniform_buffer;
-    Uniform_Buffer*             mapped_uniform_buffer;
+    void*                       mapped_uniform_buffer;
 
     void create(VkImageView texture_view, VkSampler sample);
     void destroy();
