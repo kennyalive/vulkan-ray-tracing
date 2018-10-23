@@ -254,7 +254,6 @@ void Vk_Demo::run_frame() {
     }
     last_frame_time = current_time;
 
-    Vector camera_pos = Vector(0, 0.5, 3.0);
     model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(30.0f));
     view_transform = look_at_transform(camera_pos, Vector(0), Vector(0, 1, 0));
     raster.update(model_transform, view_transform);
@@ -445,6 +444,12 @@ void Vk_Demo::do_imgui() {
     if (!io.WantCaptureKeyboard) {
         if (ImGui::IsKeyPressed(SDL_SCANCODE_F10)) {
             show_ui = !show_ui;
+        }
+        if (ImGui::IsKeyPressed(SDL_SCANCODE_W)) {
+            camera_pos.z -= 0.2f;
+        }
+        if (ImGui::IsKeyPressed(SDL_SCANCODE_S)) {
+            camera_pos.z += 0.2f;
         }
     }
 
