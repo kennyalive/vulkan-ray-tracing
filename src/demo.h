@@ -4,6 +4,7 @@
 #include "matrix.h"
 #include "raster_resources.h"
 #include "rt_resources.h"
+#include "utils.h"
 #include "vk.h"
 
 #include "sdl/SDL_syswm.h"
@@ -62,4 +63,12 @@ private:
 
     Rasterization_Resources     raster;
     Raytracing_Resources        rt;
+
+    GPU_Time_Keeper             time_keeper;
+    struct {
+        GPU_Time_Interval*      frame;
+        GPU_Time_Interval*      draw;
+        GPU_Time_Interval*      ui;
+        GPU_Time_Interval*      compute_copy;
+    } gpu_times;
 };

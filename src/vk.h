@@ -18,11 +18,8 @@
 #include <string>
 #include <vector>
 
-#define VK_CHECK(function_call) { \
-    VkResult result = function_call; \
-    if (result < 0) \
-        error(std::string("Vulkan: ") + string_VkResult(result) + " returned by " + #function_call); \
-}
+#define VK_CHECK_RESULT(result) if (result < 0) error(std::string("Error: ") + string_VkResult(result));
+#define VK_CHECK(function_call) { VkResult result = function_call;  VK_CHECK_RESULT(result); }
 
 struct Vk_Create_Info {
     SDL_SysWMinfo               windowing_system_info;
@@ -60,10 +57,6 @@ struct Vk_Graphics_Pipeline_State {
     uint32_t                                dynamic_state_count;
 };
 
-//
-// Initialization.
-//
-
 // Initializes VK_Instance structure.
 // After calling this function we get fully functional vulkan subsystem.
 void vk_initialize(const Vk_Create_Info& create_info);
@@ -74,9 +67,6 @@ void vk_shutdown();
 void vk_release_resolution_dependent_resources();
 void vk_restore_resolution_dependent_resources(bool vsync);
 
-//
-// Resources allocation.
-//
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size);
 Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name);
 Vk_Buffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name);
@@ -94,9 +84,7 @@ VkPipeline vk_create_graphics_pipeline(
     VkShaderModule                      fragment_shader
 );
 
-//
-// Rendering setup.
-//
+
 void vk_begin_frame();
 void vk_end_frame();
 
@@ -118,9 +106,8 @@ void vk_cmd_image_barrier_for_subresource(
     VkImageLayout           old_layout,         VkImageLayout           new_layout
 );
 
-//
-// Debug utils.
-//
+uint32_t vk_allocate_timestamp_queries(uint32_t count);
+
 template <typename Vk_Object_Type>
 void vk_set_debug_name(Vk_Object_Type object, const char* name) {
     if (!vk.create_info.use_debug_names)
@@ -194,6 +181,7 @@ struct Vk_Instance {
     uint32_t                        queue_family_index;
     VkDevice                        device;
     VkQueue                         queue;
+    double                          timestamp_period_ms;
     bool                            raytracing_supported;
 
     VmaAllocator                    allocator;
@@ -213,6 +201,9 @@ struct Vk_Instance {
     VkSemaphore                     image_acquired;
     VkSemaphore                     rendering_finished;
     VkFence                         rendering_finished_fence;
+
+    VkQueryPool                     timestamp_query_pool;
+    uint32_t                        timestamp_query_count;
 
     // Host visible memory used to copy image data to device local memory.
     VkBuffer                        staging_buffer;

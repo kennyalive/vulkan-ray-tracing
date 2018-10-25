@@ -20,6 +20,7 @@ static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
 };
 
 constexpr uint32_t max_descriptor_sets = 64;
+constexpr uint32_t max_timestamp_queries = 64;
 
 //
 // Vk_Instance is a container that stores common Vulkan resources like vulkan instance,
@@ -184,6 +185,7 @@ static void create_device() {
             if (VK_VERSION_MAJOR(props.apiVersion) == 1 && VK_VERSION_MINOR(props.apiVersion) >= 1)
             {
                 vk.physical_device = physical_device;
+                vk.timestamp_period_ms = (double)props.limits.timestampPeriod * 1e-6;
                 break;
             }
         }
@@ -436,9 +438,7 @@ void vk_initialize(const Vk_Create_Info& create_info) {
     allocator_info.pVulkanFunctions = &alloc_funcs;
     VK_CHECK(vmaCreateAllocator(&allocator_info, &vk.allocator));
 
-    //
     // Sync primitives.
-    //
     {
         VkSemaphoreCreateInfo desc { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
         VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.image_acquired));
@@ -449,9 +449,7 @@ void vk_initialize(const Vk_Create_Info& create_info) {
         VK_CHECK(vkCreateFence(vk.device, &fence_desc, nullptr, &vk.rendering_finished_fence));
     }
 
-    //
     // Command pool.
-    //
     {
         VkCommandPoolCreateInfo desc { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
         desc.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -459,9 +457,7 @@ void vk_initialize(const Vk_Create_Info& create_info) {
         VK_CHECK(vkCreateCommandPool(vk.device, &desc, nullptr, &vk.command_pool));
     }
 
-    //
     // Command buffer.
-    //
     {
         VkCommandBufferAllocateInfo alloc_info { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
         alloc_info.commandPool        = vk.command_pool;
@@ -470,9 +466,7 @@ void vk_initialize(const Vk_Create_Info& create_info) {
         VK_CHECK(vkAllocateCommandBuffers(vk.device, &alloc_info, &vk.command_buffer));
     }
 
-    //
     // Descriptor pool.
-    //
     {
         std::vector<VkDescriptorPoolSize> pool_sizes;
         for (size_t i = 0; i < std::size(descriptor_pool_sizes); i++) {
@@ -490,9 +484,7 @@ void vk_initialize(const Vk_Create_Info& create_info) {
         vk_set_debug_name(vk.descriptor_pool, "descriptor_pool");
     }
 
-    //
     // Select surface format.
-    //
     {
         uint32_t format_count;
         VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(vk.physical_device, vk.surface, &format_count, nullptr));
@@ -528,6 +520,15 @@ void vk_initialize(const Vk_Create_Info& create_info) {
 
     create_swapchain(true);
     create_depth_buffer();
+
+    // Query pool.
+    {
+        VkQueryPoolCreateInfo create_info { VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
+        create_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+        create_info.queryCount = max_timestamp_queries;
+        VK_CHECK(vkCreateQueryPool(vk.device, &create_info, nullptr, &vk.timestamp_query_pool));
+
+    }
 }
 
 void vk_shutdown() {
@@ -542,6 +543,7 @@ void vk_shutdown() {
     vkDestroySemaphore(vk.device, vk.image_acquired, nullptr);
     vkDestroySemaphore(vk.device, vk.rendering_finished, nullptr);
     vkDestroyFence(vk.device, vk.rendering_finished_fence, nullptr);
+    vkDestroyQueryPool(vk.device, vk.timestamp_query_pool, nullptr);
     destroy_swapchain();
     destroy_depth_buffer();
     vmaDestroyAllocator(vk.allocator);
@@ -1075,4 +1077,12 @@ void vk_cmd_image_barrier_for_subresource(
 
     vkCmdPipelineBarrier(command_buffer, src_stage_mask, dst_stage_mask, 0,
         0, nullptr, 0, nullptr, 1, &barrier);
+}
+
+uint32_t vk_allocate_timestamp_queries(uint32_t count) {
+    assert(count > 0);
+    assert(vk.timestamp_query_count + count <= max_timestamp_queries);
+    uint32_t first_query = vk.timestamp_query_count;
+    vk.timestamp_query_count += count;
+    return first_query;
 }

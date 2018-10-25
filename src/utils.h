@@ -44,6 +44,40 @@ struct Descriptor_Writes {
     void commit();
 };
 
+struct GPU_Time_Interval {
+    uint32_t    start_query; // end query == (start_query + 1)
+    float       length_ms;
+
+    void begin();
+    void end();
+};
+
+constexpr uint32_t max_time_intervals = 128;
+
+struct GPU_Time_Keeper {
+    GPU_Time_Interval time_intervals[max_time_intervals];
+    uint32_t time_interval_count;
+
+    GPU_Time_Interval* allocate_time_interval();
+    void initialize_time_intervals();
+    void next_frame();
+};
+
+struct GPU_Time_Scope {
+    GPU_Time_Scope(GPU_Time_Interval* time_interval) {
+        this->time_interval = time_interval;
+        time_interval->begin();
+    }
+    ~GPU_Time_Scope() {
+        time_interval->end();
+    }
+
+private:
+    GPU_Time_Interval* time_interval;
+};
+
+#define GPU_TIME_SCOPE(time_interval) GPU_Time_Scope gpu_time_scope##__LINE__(time_interval)
+
 struct Vertex {
     Vector pos;
     float pad;

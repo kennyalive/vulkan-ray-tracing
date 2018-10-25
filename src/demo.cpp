@@ -152,6 +152,12 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
     copy_to_swapchain.create();
     restore_resolution_dependent_resources();
     setup_imgui();
+
+    gpu_times.frame = time_keeper.allocate_time_interval();
+    gpu_times.draw = time_keeper.allocate_time_interval();
+    gpu_times.ui = time_keeper.allocate_time_interval();
+    gpu_times.compute_copy = time_keeper.allocate_time_interval();
+    time_keeper.initialize_time_intervals();
 }
 
 void Vk_Demo::shutdown() {
@@ -272,6 +278,8 @@ void Vk_Demo::run_frame() {
 
     // Draw frame.
     vk_begin_frame();
+    time_keeper.next_frame();
+    gpu_times.frame->begin();
 
     if (raytracing && !old_raytracing) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
@@ -287,10 +295,13 @@ void Vk_Demo::run_frame() {
 
     draw_imgui();
     copy_output_image_to_swapchain();
+    gpu_times.frame->end();
     vk_end_frame();
 }
 
 void Vk_Demo::draw_rasterized_image() {
+    GPU_TIME_SCOPE(gpu_times.draw);
+
     VkViewport viewport{};
     viewport.width = static_cast<float>(vk.surface_size.width);
     viewport.height = static_cast<float>(vk.surface_size.height);
@@ -326,6 +337,8 @@ void Vk_Demo::draw_rasterized_image() {
 }
 
 void Vk_Demo::draw_raytraced_image() {
+    GPU_TIME_SCOPE(gpu_times.draw);
+
     vkCmdBuildAccelerationStructureNVX(vk.command_buffer,
         VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX,
         1, rt.instance_buffer, 0,
@@ -355,6 +368,8 @@ void Vk_Demo::draw_raytraced_image() {
 }
 
 void Vk_Demo::draw_imgui() {
+    GPU_TIME_SCOPE(gpu_times.ui);
+
     ImGui::Render();
 
     if (raytracing) {
@@ -392,6 +407,8 @@ void Vk_Demo::draw_imgui() {
 }
 
 void Vk_Demo::copy_output_image_to_swapchain() {
+    GPU_TIME_SCOPE(gpu_times.compute_copy);
+
     const uint32_t group_size_x = 32; // according to shader
     const uint32_t group_size_y = 32;
 
@@ -472,6 +489,10 @@ void Vk_Demo::do_imgui() {
             ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
         {
             ImGui::Text("%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
+            ImGui::Text("Frame time         : %.2f ms", gpu_times.frame->length_ms);
+            ImGui::Text("Draw time          : %.2f ms", gpu_times.draw->length_ms);
+            ImGui::Text("UI time            : %.2f ms", gpu_times.ui->length_ms);
+            ImGui::Text("Compute copy time  : %.2f ms", gpu_times.compute_copy->length_ms);
             ImGui::Separator();
             ImGui::Spacing();
             ImGui::Checkbox("Vertical sync", &vsync);

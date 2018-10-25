@@ -203,3 +203,44 @@ void Descriptor_Writes::commit() {
         write_count = 0;
     }
 }
+
+void GPU_Time_Interval::begin() {
+    vkCmdWriteTimestamp(vk.command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk.timestamp_query_pool, start_query);
+}
+void GPU_Time_Interval::end() {
+    vkCmdWriteTimestamp(vk.command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk.timestamp_query_pool, start_query + 1);
+}
+
+GPU_Time_Interval* GPU_Time_Keeper::allocate_time_interval() {
+    assert(time_interval_count < max_time_intervals);
+    GPU_Time_Interval* time_interval = &time_intervals[time_interval_count++];
+
+    time_interval->start_query = vk_allocate_timestamp_queries(2);
+    time_interval->length_ms = 0.f;
+    return time_interval;
+}
+
+void GPU_Time_Keeper::initialize_time_intervals() {
+    vk_execute(vk.command_pool, vk.queue, [this](VkCommandBuffer command_buffer) {
+        vkCmdResetQueryPool(command_buffer, vk.timestamp_query_pool, 0, 2 * time_interval_count);
+        for (uint32_t i = 0; i < time_interval_count; i++) {
+            vkCmdWriteTimestamp(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk.timestamp_query_pool, time_intervals[i].start_query);
+            vkCmdWriteTimestamp(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk.timestamp_query_pool, time_intervals[i].start_query + 1);
+        }
+    });
+}
+
+void GPU_Time_Keeper::next_frame() {
+    uint64_t timestamps[2*max_time_intervals];
+    const uint32_t query_count = 2 * time_interval_count;
+    VkResult result = vkGetQueryPoolResults(vk.device, vk.timestamp_query_pool, 0, query_count, query_count * sizeof(uint64_t), timestamps, 0, VK_QUERY_RESULT_64_BIT);
+    VK_CHECK_RESULT(result);
+    assert(result != VK_NOT_READY);
+
+    for (uint32_t i = 0; i < time_interval_count; i++) {
+        assert(timestamps[2*i + 1] >= timestamps[2*i]);
+        time_intervals[i].length_ms = time_intervals[i].length_ms*0.9f + 0.1f * float(double(timestamps[2*i + 1] - timestamps[2*i]) * vk.timestamp_period_ms);
+    }
+
+    vkCmdResetQueryPool(vk.command_buffer, vk.timestamp_query_pool, 0, query_count);
+}
