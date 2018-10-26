@@ -12,33 +12,11 @@ void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler
     uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "raster_uniform_buffer");
 
-    //
-    // Descriptor set layouts.
-    //
-    {
-        VkDescriptorSetLayoutBinding bindings[3] = {};
-        bindings[0].binding         = 0;
-        bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        bindings[0].descriptorCount = 1;
-        bindings[0].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
-
-        bindings[1].binding         = 1;
-        bindings[1].descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        bindings[1].descriptorCount = 1;
-        bindings[1].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        bindings[2].binding         = 2;
-        bindings[2].descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLER;
-        bindings[2].descriptorCount = 1;
-        bindings[2].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        VkDescriptorSetLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        create_info.bindingCount   = (uint32_t)std::size(bindings);
-        create_info.pBindings      = bindings;
-
-        VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &descriptor_set_layout));
-        vk_set_debug_name(descriptor_set_layout, "raster_descriptor_set_layout");
-    }
+    descriptor_set_layout = Descriptor_Set_Layout()
+        .uniform_buffer (0, VK_SHADER_STAGE_VERTEX_BIT)
+        .sampled_image  (1, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .sampler        (2, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .create         ("raster_set_layout");
 
     // Pipeline layout.
     {

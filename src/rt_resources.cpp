@@ -210,49 +210,16 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
 }
 
 void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler) {
-    // descriptor set layout
-    {
-        VkDescriptorSetLayoutBinding layout_bindings[7] {};
-        layout_bindings[0].binding          = 0;
-        layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        layout_bindings[0].descriptorCount  = 1;
-        layout_bindings[0].stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
-        layout_bindings[1].binding          = 1;
-        layout_bindings[1].descriptorType   = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
-        layout_bindings[1].descriptorCount  = 1;
-        layout_bindings[1].stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
-
-        layout_bindings[2].binding          = 2;
-        layout_bindings[2].descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        layout_bindings[2].descriptorCount  = 1;
-        layout_bindings[2].stageFlags       = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
-
-        layout_bindings[3].binding          = 3;
-        layout_bindings[3].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        layout_bindings[3].descriptorCount  = 1;
-        layout_bindings[3].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
-
-        layout_bindings[4].binding          = 4;
-        layout_bindings[4].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        layout_bindings[4].descriptorCount  = 1;
-        layout_bindings[4].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
-
-        layout_bindings[5].binding          = 5;
-        layout_bindings[5].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        layout_bindings[5].descriptorCount  = 1;
-        layout_bindings[5].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
-
-        layout_bindings[6].binding          = 6;
-        layout_bindings[6].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLER;
-        layout_bindings[6].descriptorCount  = 1;
-        layout_bindings[6].stageFlags       = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
-
-        VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        create_info.bindingCount    = (uint32_t)std::size(layout_bindings);
-        create_info.pBindings       = layout_bindings;
-        VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &descriptor_set_layout));
-    }
+    descriptor_set_layout = Descriptor_Set_Layout()
+        .storage_image  (0, VK_SHADER_STAGE_RAYGEN_BIT_NVX)
+        .accelerator    (1, VK_SHADER_STAGE_RAYGEN_BIT_NVX)
+        .uniform_buffer (2, VK_SHADER_STAGE_RAYGEN_BIT_NVX)
+        .storage_buffer (3, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
+        .storage_buffer (4, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
+        .sampled_image  (5, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
+        .sampler        (6, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
+        .create         ("rt_set_layout");
 
     // pipeline layout
     {
@@ -308,7 +275,7 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
 
         Descriptor_Writes(descriptor_set)
-            .acceleration_structure(1, top_level_accel)
+            .accelerator(1, top_level_accel)
             .uniform_buffer(2, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
             .storage_buffer(3, model_triangles.indexData,
                                model_triangles.indexOffset,

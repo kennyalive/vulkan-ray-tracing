@@ -2,29 +2,12 @@
 #include "utils.h"
 
 void Copy_To_Swapchain::create() {
-    // set layout
-    {
-        VkDescriptorSetLayoutBinding layout_bindings[3] {};
-        layout_bindings[0].binding          = 0;
-        layout_bindings[0].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLER;
-        layout_bindings[0].descriptorCount  = 1;
-        layout_bindings[0].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
 
-        layout_bindings[1].binding          = 1;
-        layout_bindings[1].descriptorType   = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        layout_bindings[1].descriptorCount  = 1;
-        layout_bindings[1].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        layout_bindings[2].binding          = 2;
-        layout_bindings[2].descriptorType   = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        layout_bindings[2].descriptorCount  = 1;
-        layout_bindings[2].stageFlags       = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        create_info.bindingCount = (uint32_t)std::size(layout_bindings);
-        create_info.pBindings = layout_bindings;
-        VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &set_layout));
-    }
+    set_layout = Descriptor_Set_Layout()
+        .sampler        (0, VK_SHADER_STAGE_COMPUTE_BIT)
+        .sampled_image  (1, VK_SHADER_STAGE_COMPUTE_BIT)
+        .storage_image  (2, VK_SHADER_STAGE_COMPUTE_BIT)
+        .create         ("copy_to_swapchain_set_layout");
 
     // pipeline layout
     {

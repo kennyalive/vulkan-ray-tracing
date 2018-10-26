@@ -92,6 +92,9 @@ Model load_obj_model(const std::string& path) {
     return model;
 }
 
+//
+// Descriptor_Writes
+//
 Descriptor_Writes& Descriptor_Writes::sampled_image(uint32_t binding, VkImageView image_view, VkImageLayout layout) {
     assert(write_count < max_writes);
     VkDescriptorImageInfo& image = resource_infos[write_count].image;
@@ -176,7 +179,7 @@ Descriptor_Writes& Descriptor_Writes::storage_buffer(uint32_t binding, VkBuffer 
     return *this;
 }
 
-Descriptor_Writes& Descriptor_Writes::acceleration_structure(uint32_t binding, VkAccelerationStructureNVX acceleration_structure) {
+Descriptor_Writes& Descriptor_Writes::accelerator(uint32_t binding, VkAccelerationStructureNVX acceleration_structure) {
     assert(write_count < max_writes);
     Accel_Info& accel_info = resource_infos[write_count].accel_info;
     accel_info.handle = acceleration_structure;
@@ -202,6 +205,65 @@ void Descriptor_Writes::commit() {
         vkUpdateDescriptorSets(vk.device, write_count, descriptor_writes, 0, nullptr);
         write_count = 0;
     }
+}
+
+//
+// Descriptor_Set_Layout
+//
+static VkDescriptorSetLayoutBinding get_set_layout_binding(uint32_t binding, VkDescriptorType descriptor_type, VkShaderStageFlags stage_flags) {
+    VkDescriptorSetLayoutBinding entry{};
+    entry.binding           = binding;
+    entry.descriptorType    = descriptor_type;
+    entry.descriptorCount   = 1;
+    entry.stageFlags        = stage_flags;
+    return entry;
+}
+
+Descriptor_Set_Layout& Descriptor_Set_Layout::sampled_image(uint32_t binding, VkShaderStageFlags stage_flags) {
+    assert(binding_count < max_bindings);
+    bindings[binding_count++] = get_set_layout_binding(binding, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, stage_flags);
+    return *this;
+}
+
+Descriptor_Set_Layout& Descriptor_Set_Layout::storage_image(uint32_t binding, VkShaderStageFlags stage_flags) {
+    assert(binding_count < max_bindings);
+    bindings[binding_count++] = get_set_layout_binding(binding, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, stage_flags);
+    return *this;
+}
+
+Descriptor_Set_Layout& Descriptor_Set_Layout::sampler(uint32_t binding, VkShaderStageFlags stage_flags) {
+    assert(binding_count < max_bindings);
+    bindings[binding_count++] = get_set_layout_binding(binding, VK_DESCRIPTOR_TYPE_SAMPLER, stage_flags);
+    return *this;
+}
+
+Descriptor_Set_Layout& Descriptor_Set_Layout::uniform_buffer(uint32_t binding, VkShaderStageFlags stage_flags) {
+    assert(binding_count < max_bindings);
+    bindings[binding_count++] = get_set_layout_binding(binding, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, stage_flags);
+    return *this;
+}
+
+Descriptor_Set_Layout& Descriptor_Set_Layout::storage_buffer(uint32_t binding, VkShaderStageFlags stage_flags) {
+    assert(binding_count < max_bindings);
+    bindings[binding_count++] = get_set_layout_binding(binding, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, stage_flags);
+    return *this;
+}
+
+Descriptor_Set_Layout& Descriptor_Set_Layout::accelerator(uint32_t binding, VkShaderStageFlags stage_flags) {
+    assert(binding_count < max_bindings);
+    bindings[binding_count++] = get_set_layout_binding(binding, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, stage_flags);
+    return *this;
+}
+
+VkDescriptorSetLayout Descriptor_Set_Layout::create(const char* name) {
+    VkDescriptorSetLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+    create_info.bindingCount    = binding_count;
+    create_info.pBindings       = bindings;
+
+    VkDescriptorSetLayout set_layout;
+    VK_CHECK(vkCreateDescriptorSetLayout(vk.device, &create_info, nullptr, &set_layout));
+    vk_set_debug_name(set_layout, name);
+    return set_layout;
 }
 
 void GPU_Time_Interval::begin() {
