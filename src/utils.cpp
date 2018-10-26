@@ -237,9 +237,11 @@ void GPU_Time_Keeper::next_frame() {
     VK_CHECK_RESULT(result);
     assert(result != VK_NOT_READY);
 
+    const float influence = 0.25f;
+
     for (uint32_t i = 0; i < time_interval_count; i++) {
         assert(timestamps[2*i + 1] >= timestamps[2*i]);
-        time_intervals[i].length_ms = time_intervals[i].length_ms*0.9f + 0.1f * float(double(timestamps[2*i + 1] - timestamps[2*i]) * vk.timestamp_period_ms);
+        time_intervals[i].length_ms = (1.f-influence) * time_intervals[i].length_ms + influence * float(double(timestamps[2*i + 1] - timestamps[2*i]) * vk.timestamp_period_ms);
     }
 
     vkCmdResetQueryPool(vk.command_buffer, vk.timestamp_query_pool, 0, query_count);

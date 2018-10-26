@@ -22,16 +22,18 @@ public:
     void run_frame();
 
 private:
-    void setup_imgui();
-    void release_imgui();
-    void do_imgui();
-
+    void draw_frame();
     void draw_rasterized_image();
     void draw_raytraced_image();
     void draw_imgui();
     void copy_output_image_to_swapchain();
+    void do_imgui();
 
 private:
+    struct UI_Result {
+        bool raytracing_toggled;
+    };
+
     using Clock = std::chrono::high_resolution_clock;
     using Time  = std::chrono::time_point<Clock>;
 
@@ -44,6 +46,8 @@ private:
 
     Time                        last_frame_time;
     double                      sim_time;
+
+    UI_Result                   ui_result;
 
     VkRenderPass                ui_render_pass;
     VkFramebuffer               ui_framebuffer;

@@ -151,7 +151,28 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
 
     copy_to_swapchain.create();
     restore_resolution_dependent_resources();
-    setup_imgui();
+
+    // ImGui setup.
+    {
+        ImGui::CreateContext();
+        ImGui_ImplSDL2_InitForVulkan(sdl_window);
+
+        ImGui_ImplVulkan_InitInfo init_info{};
+        init_info.Instance          = vk.instance;
+        init_info.PhysicalDevice    = vk.physical_device;
+        init_info.Device            = vk.device;
+        init_info.QueueFamily       = vk.queue_family_index;
+        init_info.Queue             = vk.queue;
+        init_info.DescriptorPool    = vk.descriptor_pool;
+
+        ImGui_ImplVulkan_Init(&init_info, ui_render_pass);
+        ImGui::StyleColorsDark();
+
+        vk_execute(vk.command_pool, vk.queue, [](VkCommandBuffer cb) {
+            ImGui_ImplVulkan_CreateFontsTexture(cb);
+        });
+        ImGui_ImplVulkan_InvalidateFontUploadObjects();
+    }
 
     gpu_times.frame = time_keeper.allocate_time_interval();
     gpu_times.draw = time_keeper.allocate_time_interval();
@@ -162,7 +183,11 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
 
 void Vk_Demo::shutdown() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
-    release_imgui();
+
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+
     vertex_buffer.destroy();
     index_buffer.destroy();
     texture.destroy();
@@ -224,35 +249,7 @@ void Vk_Demo::restore_resolution_dependent_resources() {
     last_frame_time = Clock::now();
 }
 
-void Vk_Demo::setup_imgui() {
-    ImGui::CreateContext();
-    ImGui_ImplSDL2_InitForVulkan(sdl_window);
-
-    ImGui_ImplVulkan_InitInfo init_info{};
-    init_info.Instance          = vk.instance;
-    init_info.PhysicalDevice    = vk.physical_device;
-    init_info.Device            = vk.device;
-    init_info.QueueFamily       = vk.queue_family_index;
-    init_info.Queue             = vk.queue;
-    init_info.DescriptorPool    = vk.descriptor_pool;
-
-    ImGui_ImplVulkan_Init(&init_info, ui_render_pass);
-    ImGui::StyleColorsDark();
-
-    vk_execute(vk.command_pool, vk.queue, [](VkCommandBuffer cb) {
-        ImGui_ImplVulkan_CreateFontsTexture(cb);
-    });
-    ImGui_ImplVulkan_InvalidateFontUploadObjects();
-}
-
-void Vk_Demo::release_imgui() {
-    ImGui_ImplVulkan_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
-    ImGui::DestroyContext();
-}
-
 void Vk_Demo::run_frame() {
-    // Update frame.
     Time current_time = Clock::now();
     if (animate) {
         double time_delta = std::chrono::duration_cast<std::chrono::microseconds>(current_time - last_frame_time).count() / 1e6;
@@ -275,13 +272,15 @@ void Vk_Demo::run_frame() {
 
     bool old_raytracing = raytracing;
     do_imgui();
+    draw_frame();
+}
 
-    // Draw frame.
+void Vk_Demo::draw_frame() {
     vk_begin_frame();
     time_keeper.next_frame();
     gpu_times.frame->begin();
 
-    if (raytracing && !old_raytracing) {
+    if (raytracing && ui_result.raytracing_toggled) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             0, VK_ACCESS_SHADER_WRITE_BIT,
@@ -291,7 +290,7 @@ void Vk_Demo::run_frame() {
     if (raytracing)
         draw_raytraced_image();
     else
-       draw_rasterized_image();
+        draw_rasterized_image();
 
     draw_imgui();
     copy_output_image_to_swapchain();
@@ -452,6 +451,7 @@ void Vk_Demo::copy_output_image_to_swapchain() {
 }
 
 void Vk_Demo::do_imgui() {
+    ui_result = UI_Result{};
     ImGuiIO& io = ImGui::GetIO();
 
     ImGui_ImplVulkan_NewFrame();
@@ -502,7 +502,7 @@ void Vk_Demo::do_imgui() {
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
                 ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
             }
-            ImGui::Checkbox("Raytracing", &raytracing);
+            ui_result.raytracing_toggled = ImGui::Checkbox("Raytracing", &raytracing);
             if (!vk.raytracing_supported) {
                 ImGui::PopItemFlag();
                 ImGui::PopStyleVar();
