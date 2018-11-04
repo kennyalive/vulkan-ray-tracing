@@ -1,21 +1,19 @@
 #version 460
 #extension GL_NVX_raytracing : require
-#extension GL_EXT_shader_16bit_storage : require
 
 #include "utils.glsl"
 
 struct Vertex {
-    vec3 pos;
-    float pad;
-    vec2 uv;
-    vec2 pad2;
+    float px, py, pz;
+    float nx, ny, nz;
+    float u, v;
 };
 
 layout (location=0) rayPayloadInNVX vec3 color;
 layout (location=1) hitAttributeNVX vec3 attribs;
 
 layout(std430, binding=3) readonly buffer Indices {
-    uint16_t index_buffer[];
+    uint index_buffer[];
 };
 
 layout(std430, binding=4) readonly buffer Vertices {
@@ -30,9 +28,9 @@ void main() {
     uint i1 = uint(index_buffer[gl_PrimitiveID*3 + 1]);
     uint i2 = uint(index_buffer[gl_PrimitiveID*3 + 2]);
 
-    vec2 uv0 = fract(vertex_buffer[i0].uv);
-    vec2 uv1 = fract(vertex_buffer[i1].uv);
-    vec2 uv2 = fract(vertex_buffer[i2].uv);
+    vec2 uv0 = fract(vec2(vertex_buffer[i0].u, vertex_buffer[i0].v));
+    vec2 uv1 = fract(vec2(vertex_buffer[i1].u, vertex_buffer[i1].v));
+    vec2 uv2 = fract(vec2(vertex_buffer[i2].u, vertex_buffer[i2].v));
 
     vec3 b = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
     vec2 uv = fract(uv0*b.x + uv1*b.y + uv2*b.z);

@@ -9,7 +9,11 @@ struct Vector4;
 struct Vector {
     float x, y, z;
 
-    explicit Vector(float v = 0.f)
+    static const Vector zero;
+
+    Vector() {}
+    
+    explicit Vector(float v)
         : x(v), y(v), z(v) {}
 
     explicit Vector(Vector4 v);
@@ -88,6 +92,10 @@ struct Vector {
         return *this / length();
     }
 
+    void normalize() {
+        *this /= length();
+    }
+
     bool is_normalized(float epsilon = 1e-3f) const {
         return std::abs(length() - 1.f) < epsilon;
     }
@@ -95,6 +103,8 @@ struct Vector {
 
 struct Vector2 {
     float x, y;
+
+    static const Vector2 zero;
 
     explicit Vector2(float v = 0.f)
         : x(v), y(v) {}

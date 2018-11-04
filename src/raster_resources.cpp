@@ -1,10 +1,12 @@
 #include "matrix.h"
+#include "mesh.h"
 #include "raster_resources.h"
 #include "utils.h"
 
 namespace {
 struct Uniform_Buffer {
-    Matrix4x4   mvp;
+    Matrix4x4   model_view_proj;
+    Matrix4x4   model_view;
 };
 }
 
@@ -158,6 +160,8 @@ void Rasterization_Resources::destroy_framebuffer() {
 void Rasterization_Resources::update(const Matrix3x4& model_transform, const Matrix3x4& view_transform) {
     float aspect_ratio = (float)vk.surface_size.width / (float)vk.surface_size.height;
     Matrix4x4 proj = perspective_transform_opengl_z01(radians(45.0f), aspect_ratio, 0.1f, 50.0f);
-    Matrix4x4 mvp = proj * view_transform * model_transform;
-    static_cast<Uniform_Buffer*>(mapped_uniform_buffer)->mvp = mvp;
+    Matrix4x4 model_view = Matrix4x4::identity * view_transform * model_transform;
+    Matrix4x4 model_view_proj = proj * view_transform * model_transform;
+    static_cast<Uniform_Buffer*>(mapped_uniform_buffer)->model_view_proj = model_view_proj;
+    static_cast<Uniform_Buffer*>(mapped_uniform_buffer)->model_view = model_view;
 }

@@ -1,3 +1,4 @@
+#include "mesh.h"
 #include "rt_resources.h"
 #include "utils.h"
 

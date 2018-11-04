@@ -1,6 +1,7 @@
 #include "common.h"
 #include "demo.h"
 #include "matrix.h"
+#include "mesh.h"
 #include "vk.h"
 #include "utils.h"
 
@@ -47,14 +48,15 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
 
     // Geometry buffers.
     {
-        Model model = load_obj_model(get_resource_path("iron-man/model.obj"));
-        model_vertex_count = static_cast<uint32_t>(model.vertices.size());
-        model_index_count = static_cast<uint32_t>(model.indices.size());
+        Mesh mesh = load_obj_mesh(get_resource_path("iron-man/model.obj"));
+
+        model_vertex_count = static_cast<uint32_t>(mesh.vertices.size());
+        model_index_count = static_cast<uint32_t>(mesh.indices.size());
         {
-            const VkDeviceSize size = model.vertices.size() * sizeof(model.vertices[0]);
+            const VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
             vertex_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, "vertex_buffer");
             vk_ensure_staging_buffer_allocation(size);
-            memcpy(vk.staging_buffer_ptr, model.vertices.data(), size);
+            memcpy(vk.staging_buffer_ptr, mesh.vertices.data(), size);
 
             vk_execute(vk.command_pool, vk.queue, [&size, this](VkCommandBuffer command_buffer) {
                 VkBufferCopy region;
@@ -65,10 +67,10 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
             });
         }
         {
-            const VkDeviceSize size = model.indices.size() * sizeof(model.indices[0]);
+            const VkDeviceSize size = mesh.indices.size() * sizeof(mesh.indices[0]);
             index_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, "index_buffer");
             vk_ensure_staging_buffer_allocation(size);
-            memcpy(vk.staging_buffer_ptr, model.indices.data(), size);
+            memcpy(vk.staging_buffer_ptr, mesh.indices.data(), size);
 
             vk_execute(vk.command_pool, vk.queue, [&size, this](VkCommandBuffer command_buffer) {
                 VkBufferCopy region;
@@ -144,7 +146,7 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
         model_triangles.indexData     = index_buffer.handle;
         model_triangles.indexOffset   = 0;
         model_triangles.indexCount    = model_index_count;
-        model_triangles.indexType     = VK_INDEX_TYPE_UINT16;
+        model_triangles.indexType     = VK_INDEX_TYPE_UINT32;
 
         rt.create(model_triangles, texture.view, sampler);
     }
@@ -328,7 +330,7 @@ void Vk_Demo::draw_rasterized_image() {
     vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
     const VkDeviceSize zero_offset = 0;
     vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &vertex_buffer.handle, &zero_offset);
-    vkCmdBindIndexBuffer(vk.command_buffer, index_buffer.handle, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdBindIndexBuffer(vk.command_buffer, index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
     vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline_layout, 0, 1, &raster.descriptor_set, 0, nullptr);
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline);
     vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
