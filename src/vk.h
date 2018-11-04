@@ -1,7 +1,5 @@
 #pragma once
 
-#include "common.h"
-
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
 #define NOMINMAX

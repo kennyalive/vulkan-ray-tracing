@@ -78,8 +78,32 @@ void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler
         VkShaderModule vertex_shader = vk_load_spirv("spirv/model.vert.spv");
         VkShaderModule fragment_shader = vk_load_spirv("spirv/model.frag.spv");
 
-        pipeline = vk_create_graphics_pipeline(get_default_graphics_pipeline_state(),
-            pipeline_layout, render_pass, vertex_shader, fragment_shader);
+        Vk_Graphics_Pipeline_State state = get_default_graphics_pipeline_state();
+
+        // VkVertexInputBindingDescription
+        state.vertex_bindings[0].binding = 0;
+        state.vertex_bindings[0].stride = sizeof(Vertex);
+        state.vertex_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        state.vertex_binding_count = 1;
+
+        // VkVertexInputAttributeDescription
+        state.vertex_attributes[0].location = 0; // vertex
+        state.vertex_attributes[0].binding = 0;
+        state.vertex_attributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        state.vertex_attributes[0].offset = 0;
+
+        state.vertex_attributes[1].location = 1; // normal
+        state.vertex_attributes[1].binding = 0;
+        state.vertex_attributes[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        state.vertex_attributes[1].offset = 12;
+
+        state.vertex_attributes[2].location = 2; // uv
+        state.vertex_attributes[2].binding = 0;
+        state.vertex_attributes[2].format = VK_FORMAT_R32G32_SFLOAT;
+        state.vertex_attributes[2].offset = 24;
+        state.vertex_attribute_count = 3;
+
+        pipeline = vk_create_graphics_pipeline(state, pipeline_layout, render_pass, vertex_shader, fragment_shader);
 
         vkDestroyShaderModule(vk.device, vertex_shader, nullptr);
         vkDestroyShaderModule(vk.device, fragment_shader, nullptr);

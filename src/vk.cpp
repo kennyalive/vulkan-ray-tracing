@@ -3,8 +3,6 @@
 #define VMA_IMPLEMENTATION
 #include "vk.h"
 
-#include "utils.h"
-
 #include <algorithm>
 #include <cassert>
 #include <functional>
@@ -837,14 +835,10 @@ Vk_Graphics_Pipeline_State get_default_graphics_pipeline_state() {
     Vk_Graphics_Pipeline_State state;
 
     // VkVertexInputBindingDescription
-    auto bindings = Vertex::get_bindings();
-    memcpy(state.vertex_bindings, bindings.data(), bindings.size() * sizeof(VkVertexInputBindingDescription));
-    state.vertex_binding_count = (uint32_t)bindings.size();
+    state.vertex_binding_count = 0;
 
     // VkVertexInputAttributeDescription
-    auto attribs = Vertex::get_attributes();
-    memcpy(state.vertex_attributes, attribs.data(), attribs.size() * sizeof(VkVertexInputAttributeDescription));
-    state.vertex_attribute_count = (uint32_t)attribs.size();
+    state.vertex_attribute_count = 0;
 
     // VkPipelineInputAssemblyStateCreateInfo
     auto& input_assembly_state = state.input_assembly_state;
