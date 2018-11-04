@@ -260,13 +260,13 @@ void Vk_Demo::run_frame() {
     last_frame_time = current_time;
 
     model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(30.0f));
-    view_transform = look_at_transform(camera_pos, Vector(0), Vector(0, 1, 0));
+    view_transform = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
     raster.update(model_transform, view_transform);
 
     Matrix3x4 camera_to_world_transform;
-    camera_to_world_transform.set_column(0, Vector(view_transform.get_row(0)));
-    camera_to_world_transform.set_column(1, Vector(view_transform.get_row(1)));
-    camera_to_world_transform.set_column(2, Vector(view_transform.get_row(2)));
+    camera_to_world_transform.set_column(0, Vector3(view_transform.get_row(0)));
+    camera_to_world_transform.set_column(1, Vector3(view_transform.get_row(1)));
+    camera_to_world_transform.set_column(2, Vector3(view_transform.get_row(2)));
     camera_to_world_transform.set_column(3, camera_pos);
 
     if (vk.raytracing_supported)

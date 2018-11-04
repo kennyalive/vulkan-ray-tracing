@@ -32,8 +32,8 @@ Mesh load_obj_mesh(const std::string& path) {
         error("failed to load obj model: " + path);
 
     std::unordered_map<Vertex, std::size_t> unique_vertices;
-    Vector mesh_min(Infinity);
-    Vector mesh_max(-Infinity);
+    Vector3 mesh_min(Infinity);
+    Vector3 mesh_max(-Infinity);
 
     Mesh mesh;
 
@@ -55,7 +55,7 @@ Mesh load_obj_mesh(const std::string& path) {
                     attrib.normals[3 * index.normal_index + 2],
                 };
             } else {
-                vertex.normal = Vector::zero;
+                vertex.normal = Vector3::zero;
             }
 
             if (!attrib.texcoords.empty()) {
@@ -87,11 +87,11 @@ Mesh load_obj_mesh(const std::string& path) {
         compute_normals(&mesh.vertices[0].pos, (int)mesh.vertices.size(), (int)sizeof(Vertex), mesh.indices.data(), (int)mesh.indices.size(), &mesh.vertices[0].normal);
 
     // scale and center the mesh
-    Vector diag = mesh_max - mesh_min;
+    Vector3 diag = mesh_max - mesh_min;
     float max_size = std::max(diag.x, std::max(diag.y, diag.z));
     float scale = 2.f / max_size;
 
-    Vector center = (mesh_min + mesh_max) * 0.5f;
+    Vector3 center = (mesh_min + mesh_max) * 0.5f;
     for (auto& v : mesh.vertices) {
         v.pos -= center;
         v.pos *= scale;
@@ -99,39 +99,39 @@ Mesh load_obj_mesh(const std::string& path) {
     return mesh;
 }
 
-void compute_normals(const Vector* vertex_positions, uint32_t vertex_count, uint32_t vertex_stride, const uint32_t* indices, uint32_t index_count, Vector* normals) {
-    std::unordered_map<Vector, std::vector<uint32_t>> duplicated_vertices; // due to different texture coordinates
+void compute_normals(const Vector3* vertex_positions, uint32_t vertex_count, uint32_t vertex_stride, const uint32_t* indices, uint32_t index_count, Vector3* normals) {
+    std::unordered_map<Vector3, std::vector<uint32_t>> duplicated_vertices; // due to different texture coordinates
     for (uint32_t i = 0; i < vertex_count; i++) {
-        const Vector& pos = index_array_with_stride(vertex_positions, vertex_stride, i);
+        const Vector3& pos = index_array_with_stride(vertex_positions, vertex_stride, i);
         duplicated_vertices[pos].push_back(i);
     }
 
     std::vector<bool> has_duplicates(vertex_count);
     for (uint32_t i = 0; i < vertex_count; i++) {
-        const Vector& pos = index_array_with_stride(vertex_positions, vertex_stride, i);
+        const Vector3& pos = index_array_with_stride(vertex_positions, vertex_stride, i);
         uint32_t vertex_count = (uint32_t)duplicated_vertices[pos].size();
         assert(vertex_count > 0);
         has_duplicates[i] = vertex_count > 1;
     }
 
     for (uint32_t i = 0; i < vertex_count; i++)
-        index_array_with_stride(normals, vertex_stride, i) = Vector::zero;
+        index_array_with_stride(normals, vertex_stride, i) = Vector3::zero;
 
     for (uint32_t i = 0; i < index_count; i += 3) {
         uint32_t i0 = indices[i + 0];
         uint32_t i1 = indices[i + 1];
         uint32_t i2 = indices[i + 2];
 
-        Vector a = index_array_with_stride(vertex_positions, vertex_stride, i0);
-        Vector b = index_array_with_stride(vertex_positions, vertex_stride, i1);
-        Vector c = index_array_with_stride(vertex_positions, vertex_stride, i2);
+        Vector3 a = index_array_with_stride(vertex_positions, vertex_stride, i0);
+        Vector3 b = index_array_with_stride(vertex_positions, vertex_stride, i1);
+        Vector3 c = index_array_with_stride(vertex_positions, vertex_stride, i2);
 
-        Vector d1 = b - a;
+        Vector3 d1 = b - a;
         assert(d1.length() > 1e-6f);
-        Vector d2 = c - a;
+        Vector3 d2 = c - a;
         assert(d2.length() > 1e-6f);
 
-        Vector n = cross(d1, d2).normalized();
+        Vector3 n = cross(d1, d2).normalized();
 
         if (has_duplicates[i0]) {
             for (uint32_t vi : duplicated_vertices[a])
@@ -156,7 +156,7 @@ void compute_normals(const Vector* vertex_positions, uint32_t vertex_count, uint
     }
 
     for (uint32_t i = 0; i < vertex_count; i++) {
-        Vector& n = index_array_with_stride(normals, vertex_stride, i);
+        Vector3& n = index_array_with_stride(normals, vertex_stride, i);
         assert(n.length() > 1e-6f);
         n.normalize();
     }

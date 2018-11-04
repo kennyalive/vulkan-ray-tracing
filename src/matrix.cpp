@@ -1,7 +1,7 @@
 #include "matrix.h"
 #include <cassert>
 
-const Vector Vector::zero = Vector(0);
+const Vector3 Vector3::zero = Vector3(0);
 const Vector2 Vector2::zero = Vector2(0);
 
 const Matrix3x4 Matrix3x4::identity = [] {
@@ -16,7 +16,7 @@ const Matrix4x4 Matrix4x4::identity = [] {
     return m;
 }();
 
-void Matrix3x4::set_column(int column_index, Vector c) {
+void Matrix3x4::set_column(int column_index, Vector3 c) {
     assert(column_index >= 0 && column_index < 4);
     a[0][column_index] = c.x;
     a[1][column_index] = c.y;
@@ -145,10 +145,10 @@ Matrix3x4 rotate_z(const Matrix3x4& m, float angle) {
     return m2;
 }
 
-Matrix3x4 look_at_transform(Vector from, Vector to, Vector up) {
+Matrix3x4 look_at_transform(Vector3 from, Vector3 to, Vector3 up) {
     assert(up.is_normalized());
 
-    Vector f = to - from;
+    Vector3 f = to - from;
     float d = f.length();
 
     // degenerated cases, just return matrix with identity orientation
@@ -159,8 +159,8 @@ Matrix3x4 look_at_transform(Vector from, Vector to, Vector up) {
     }
 
     f /= d;
-    Vector r = cross(f, up).normalized();
-    Vector u = cross(r, f);
+    Vector3 r = cross(f, up).normalized();
+    Vector3 u = cross(r, f);
 
     Matrix3x4 m;
     m.set_row(0, Vector4(r, -dot(from, r)));
@@ -182,16 +182,16 @@ Matrix4x4 perspective_transform_opengl_z01(float fovy_radians, float aspect_rati
     return proj;
 }
 
-Vector transform_point(const Matrix3x4& m, Vector p) {
-    Vector p2;
+Vector3 transform_point(const Matrix3x4& m, Vector3 p) {
+    Vector3 p2;
     p2.x = m.a[0][0]*p.x + m.a[0][1]*p.y + m.a[0][2]*p.z + m.a[0][3];
     p2.y = m.a[1][0]*p.x + m.a[1][1]*p.y + m.a[1][2]*p.z + m.a[1][3];
     p2.z = m.a[2][0]*p.x + m.a[2][1]*p.y + m.a[2][2]*p.z + m.a[2][3];
     return p2;
 }
 
-Vector transform_vector(const Matrix3x4& m, Vector v) {
-    Vector v2;
+Vector3 transform_vector(const Matrix3x4& m, Vector3 v) {
+    Vector3 v2;
     v2.x = m.a[0][0]*v.x + m.a[0][1]*v.y + m.a[0][2]*v.z;
     v2.y = m.a[1][0]*v.x + m.a[1][1]*v.y + m.a[1][2]*v.z;
     v2.z = m.a[2][0]*v.x + m.a[2][1]*v.y + m.a[2][2]*v.z;

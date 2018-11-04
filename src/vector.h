@@ -6,31 +6,31 @@
 
 struct Vector4;
 
-struct Vector {
+struct Vector3 {
     float x, y, z;
 
-    static const Vector zero;
+    static const Vector3 zero;
 
-    Vector() {}
+    Vector3() {}
     
-    explicit Vector(float v)
+    explicit Vector3(float v)
         : x(v), y(v), z(v) {}
 
-    explicit Vector(Vector4 v);
+    explicit Vector3(Vector4 v);
 
-    Vector(float x, float y, float z)
+    Vector3(float x, float y, float z)
         : x(x), y(y), z(z) {}
 
-    bool operator==(Vector v) const {
+    bool operator==(Vector3 v) const {
         return x == v.x && y == v.y && z == v.z;
     }
 
-    bool operator!=(Vector v) const {
+    bool operator!=(Vector3 v) const {
         return !(*this == v);
     }
 
-    Vector operator-() const {
-        return Vector(-x, -y, -z);
+    Vector3 operator-() const {
+        return Vector3(-x, -y, -z);
     }
 
     float operator[](int index) const {
@@ -41,43 +41,43 @@ struct Vector {
         return (&x)[index];
     }
 
-    Vector& operator+=(const Vector& v) {
+    Vector3& operator+=(const Vector3& v) {
         x += v.x;
         y += v.y;
         z += v.z;
         return *this;
     }
 
-    Vector& operator-=(const Vector& v) {
+    Vector3& operator-=(const Vector3& v) {
         x -= v.x;
         y -= v.y;
         z -= v.z;
         return *this;
     }
 
-    Vector& operator*=(const Vector& v) {
+    Vector3& operator*=(const Vector3& v) {
         x *= v.x;
         y *= v.y;
         z *= v.z;
         return *this;
     }
 
-    Vector& operator*=(float t) {
+    Vector3& operator*=(float t) {
         x *= t;
         y *= t;
         z *= t;
         return *this;
     }
 
-    Vector& operator/=(float t) {
+    Vector3& operator/=(float t) {
         x /= t;
         y /= t;
         z /= t;
         return *this;
     }
 
-    Vector operator/(float t) const {
-        return Vector(x/t, y/t, z/t);
+    Vector3 operator/(float t) const {
+        return Vector3(x/t, y/t, z/t);
     }
 
     float length() const {
@@ -88,7 +88,7 @@ struct Vector {
         return x*x + y*y + z*z;
     }
 
-    Vector normalized() const {
+    Vector3 normalized() const {
         return *this / length();
     }
 
@@ -138,7 +138,7 @@ struct Vector4 {
     Vector4(float x, float y, float z, float w)
         : x(x), y(y), z(z), w(w) {}
 
-    Vector4(Vector xyz, float w)
+    Vector4(Vector3 xyz, float w)
         : x(xyz.x), y(xyz.y), z(xyz.z), w(w) {}
 
     bool operator==(Vector4 v) const {
@@ -158,44 +158,44 @@ struct Vector4 {
     }
 };
 
-inline Vector::Vector(Vector4 v)
+inline Vector3::Vector3(Vector4 v)
     : x(v.x), y(v.y), z(v.z) 
 {}
 
-inline Vector operator+(const Vector& v1, const Vector& v2) {
-    return Vector(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z);
+inline Vector3 operator+(const Vector3& v1, const Vector3& v2) {
+    return Vector3(v1.x + v2.x, v1.y + v2.y, v1.z + v2.z);
 }
 
-inline Vector operator-(const Vector& v1, const Vector& v2) {
-    return Vector(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z);
+inline Vector3 operator-(const Vector3& v1, const Vector3& v2) {
+    return Vector3(v1.x - v2.x, v1.y - v2.y, v1.z - v2.z);
 }
 
-inline Vector operator*(const Vector& v1, const Vector& v2) {
-    return Vector(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z);
+inline Vector3 operator*(const Vector3& v1, const Vector3& v2) {
+    return Vector3(v1.x * v2.x, v1.y * v2.y, v1.z * v2.z);
 }
 
-inline Vector operator*(const Vector& v, float t) {
-    return Vector(v.x * t, v.y * t, v.z * t);
+inline Vector3 operator*(const Vector3& v, float t) {
+    return Vector3(v.x * t, v.y * t, v.z * t);
 }
 
-inline Vector operator*(float t, const Vector& v) {
+inline Vector3 operator*(float t, const Vector3& v) {
     return v * t;
 }
 
-inline float dot(const Vector& v1, const Vector& v2) {
+inline float dot(const Vector3& v1, const Vector3& v2) {
     return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
 }
 
-inline Vector cross(const Vector& v1, const Vector& v2) {
-    return Vector(
+inline Vector3 cross(const Vector3& v1, const Vector3& v2) {
+    return Vector3(
         v1.y*v2.z - v1.z*v2.y,
         v1.z*v2.x - v1.x*v2.z,
         v1.x*v2.y - v1.y*v2.x);
 }
 
 namespace std {
-template<> struct hash<Vector> {
-    size_t operator()(Vector v) const {
+template<> struct hash<Vector3> {
+    size_t operator()(Vector3 v) const {
         size_t hash = 0;
         hash_combine(hash, v.x);
         hash_combine(hash, v.y);

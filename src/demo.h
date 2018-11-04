@@ -61,7 +61,7 @@ private:
     Vk_Image                    texture;
     VkSampler                   sampler;
 
-    Vector                      camera_pos = Vector(0, 0.5, 3.0);
+    Vector3                      camera_pos = Vector3(0, 0.5, 3.0);
     Matrix3x4                   model_transform;
     Matrix3x4                   view_transform;
 
