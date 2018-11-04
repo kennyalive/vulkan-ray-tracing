@@ -1,9 +1,6 @@
 #include "matrix.h"
 #include <cassert>
 
-const Vector3 Vector3::zero = Vector3(0);
-const Vector2 Vector2::zero = Vector2(0);
-
 const Matrix3x4 Matrix3x4::identity = [] {
     Matrix3x4 m{};
     m.a[0][0] = m.a[1][1] = m.a[2][2] = 1.f;

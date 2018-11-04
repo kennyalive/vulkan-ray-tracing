@@ -55,7 +55,7 @@ Mesh load_obj_mesh(const std::string& path) {
                     attrib.normals[3 * index.normal_index + 2],
                 };
             } else {
-                vertex.normal = Vector3::zero;
+                vertex.normal = Vector3_Zero;
             }
 
             if (!attrib.texcoords.empty()) {
@@ -64,7 +64,7 @@ Mesh load_obj_mesh(const std::string& path) {
                     1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
                 };
             } else {
-                vertex.uv = Vector2::zero;
+                vertex.uv = Vector2_Zero;
             }
 
             if (unique_vertices.count(vertex) == 0) {
@@ -115,7 +115,7 @@ void compute_normals(const Vector3* vertex_positions, uint32_t vertex_count, uin
     }
 
     for (uint32_t i = 0; i < vertex_count; i++)
-        index_array_with_stride(normals, vertex_stride, i) = Vector3::zero;
+        index_array_with_stride(normals, vertex_stride, i) = Vector3_Zero;
 
     for (uint32_t i = 0; i < index_count; i += 3) {
         uint32_t i0 = indices[i + 0];

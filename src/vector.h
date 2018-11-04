@@ -9,11 +9,9 @@ struct Vector4;
 struct Vector3 {
     float x, y, z;
 
-    static const Vector3 zero;
-
     Vector3() {}
     
-    explicit Vector3(float v)
+    constexpr explicit Vector3(float v)
         : x(v), y(v), z(v) {}
 
     explicit Vector3(Vector4 v);
@@ -101,12 +99,14 @@ struct Vector3 {
     }
 };
 
+constexpr Vector3 Vector3_Zero = Vector3(0.f);
+
 struct Vector2 {
     float x, y;
 
-    static const Vector2 zero;
+    Vector2() {}
 
-    explicit Vector2(float v = 0.f)
+    constexpr explicit Vector2(float v)
         : x(v), y(v) {}
 
     Vector2(float x, float y)
@@ -129,10 +129,14 @@ struct Vector2 {
     }
 };
 
+constexpr Vector2 Vector2_Zero = Vector2(0.f);
+
 struct Vector4 {
     float x, y, z, w;
 
-    explicit Vector4(float v = 0.f)
+    Vector4() {}
+
+    constexpr explicit Vector4(float v)
         : x(v), y(v), z(v), w(v) {}
 
     Vector4(float x, float y, float z, float w)
@@ -157,6 +161,8 @@ struct Vector4 {
         return (&x)[index];
     }
 };
+
+constexpr Vector4 Vector4_Zero = Vector4(0.f);
 
 inline Vector3::Vector3(Vector4 v)
     : x(v.x), y(v.y), z(v.z) 
