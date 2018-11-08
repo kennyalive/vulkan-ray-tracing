@@ -3,6 +3,8 @@
 #include "matrix.h"
 #include "vk.h"
 
+struct Rt_Uniform_Buffer;
+
 // Use this definition while waiting for update to official headers.
 struct VkInstanceNVX {
     Matrix3x4   transform;
@@ -38,7 +40,7 @@ struct Raytracing_Resources {
     Vk_Buffer                   shader_binding_table;
 
     Vk_Buffer                   uniform_buffer;
-    void*                       mapped_uniform_buffer;
+    Rt_Uniform_Buffer*          mapped_uniform_buffer;
 
     void create(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler);
     void destroy();

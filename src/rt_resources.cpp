@@ -5,15 +5,14 @@
 #include <algorithm>
 #include <cassert>
 
-namespace {
-struct Uniform_Buffer {
+struct Rt_Uniform_Buffer {
     Matrix3x4 camera_to_world;
+    Matrix3x4 model_transform;
 };
-}
 
 void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler) {
-    uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "rt_uniform_buffer");
+    uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Rt_Uniform_Buffer)),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &(void*&)mapped_uniform_buffer, "rt_uniform_buffer");
 
     // Instance buffer.
     {
@@ -74,7 +73,9 @@ void Raytracing_Resources::update(const Matrix3x4& model_transform, const Matrix
     instance.flags                                      = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NVX;
     instance.acceleration_structure_handle              = bottom_level_accel_handle;
 
-    static_cast<Uniform_Buffer*>(mapped_uniform_buffer)->camera_to_world = camera_to_world_transform;
+    Rt_Uniform_Buffer& uniform_buffer = *mapped_uniform_buffer;
+    uniform_buffer.camera_to_world = camera_to_world_transform;
+    uniform_buffer.model_transform = model_transform;
 }
 
 void Raytracing_Resources::create_acceleration_structure(const VkGeometryTrianglesNVX& triangles) {
@@ -215,7 +216,7 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
     descriptor_set_layout = Descriptor_Set_Layout()
         .storage_image  (0, VK_SHADER_STAGE_RAYGEN_BIT_NVX)
         .accelerator    (1, VK_SHADER_STAGE_RAYGEN_BIT_NVX)
-        .uniform_buffer (2, VK_SHADER_STAGE_RAYGEN_BIT_NVX)
+        .uniform_buffer (2, VK_SHADER_STAGE_RAYGEN_BIT_NVX | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
         .storage_buffer (3, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
         .storage_buffer (4, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
         .sampled_image  (5, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
@@ -277,7 +278,7 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
 
         Descriptor_Writes(descriptor_set)
             .accelerator(1, top_level_accel)
-            .uniform_buffer(2, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
+            .uniform_buffer(2, uniform_buffer.handle, 0, sizeof(Rt_Uniform_Buffer))
             .storage_buffer(3, model_triangles.indexData,
                                model_triangles.indexOffset,
                                model_triangles.indexCount * (model_triangles.indexType == VK_INDEX_TYPE_UINT16 ? 2 : 4))

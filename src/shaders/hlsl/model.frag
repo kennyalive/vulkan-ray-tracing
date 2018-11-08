@@ -18,6 +18,12 @@ float srgb_encode(float c) {
 }
 
 float4 main(PS_In input) : SV_TARGET {
+    // float2 uvdx = abs(ddx(input.uv));
+    // float2 uvdy = abs(ddy(input.uv));
+    // float filter_width = 2.0 * max(max(uvdx[0], uvdx[1]), max(uvdy[0], uvdy[1]));
+    // float f = 150.0 * (filter_width - 0.0015);
+    // return float4(srgb_encode(f), srgb_encode(f), srgb_encode(f), 1.0);
+
     float4 color = texture.Sample(texture_sampler, input.uv);
     return float4(srgb_encode(color.r), srgb_encode(color.g), srgb_encode(color.b), color.a);
 }
