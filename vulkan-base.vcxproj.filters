@@ -78,30 +78,30 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="src\shaders\glsl\shared.glsl">
+    <None Include="src\shaders\shared.glsl">
       <Filter>shaders</Filter>
     </None>
-    <None Include="src\shaders\glsl\utils.glsl">
+    <None Include="src\shaders\utils.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="src\shaders\glsl\simple.rmiss.glsl">
+    <CustomBuild Include="src\shaders\copy_to_swapchain.comp.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\glsl\simple.rchit.glsl">
+    <CustomBuild Include="src\shaders\model.frag.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\glsl\simple.rgen.glsl">
+    <CustomBuild Include="src\shaders\model.vert.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\glsl\model.vert.glsl">
+    <CustomBuild Include="src\shaders\simple.rchit.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\glsl\model.frag.glsl">
+    <CustomBuild Include="src\shaders\simple.rgen.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\glsl\copy_to_swapchain.comp.glsl">
+    <CustomBuild Include="src\shaders\simple.rmiss.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
   </ItemGroup>

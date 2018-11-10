@@ -74,7 +74,7 @@
     <CustomBuild>
       <Command>$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V --target-env vulkan1.1 -o $(ProjectDir)data\spirv\%(Filename).spv &amp;&amp; $(VULKAN_SDK)\Bin\spirv-opt $(ProjectDir)data\spirv\%(Filename).spv -O --strip-debug -o $(ProjectDir)data\spirv\%(Filename).spv</Command>
       <Outputs>$(ProjectDir)data\spirv\%(Filename).spv</Outputs>
-      <AdditionalInputs>$(ProjectDir)src\shaders\glsl\utils.glsl;$(ProjectDir)src\shaders\glsl\shared.glsl</AdditionalInputs>
+      <AdditionalInputs>$(ProjectDir)src\shaders\utils.glsl;$(ProjectDir)src\shaders\shared.glsl</AdditionalInputs>
       <LinkObjects>false</LinkObjects>
       <Message>
       </Message>
@@ -105,7 +105,7 @@
     <CustomBuild>
       <Command>$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V --target-env vulkan1.1 -o $(ProjectDir)data\spirv\%(Filename).spv &amp;&amp; $(VULKAN_SDK)\Bin\spirv-opt $(ProjectDir)data\spirv\%(Filename).spv -O --strip-debug -o $(ProjectDir)data\spirv\%(Filename).spv</Command>
       <Outputs>$(ProjectDir)data\spirv\%(Filename).spv</Outputs>
-      <AdditionalInputs>$(ProjectDir)src\shaders\glsl\utils.glsl;$(ProjectDir)src\shaders\glsl\shared.glsl</AdditionalInputs>
+      <AdditionalInputs>$(ProjectDir)src\shaders\utils.glsl;$(ProjectDir)src\shaders\shared.glsl</AdditionalInputs>
       <LinkObjects>false</LinkObjects>
       <Message>
       </Message>
@@ -151,28 +151,28 @@
     <ClInclude Include="third_party\imgui\impl\imgui_impl_vulkan.h" />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="src\shaders\glsl\model.frag.glsl">
+    <CustomBuild Include="src\shaders\model.frag.glsl">
       <FileType>Document</FileType>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\glsl\model.vert.glsl">
+    <CustomBuild Include="src\shaders\model.vert.glsl">
       <FileType>Document</FileType>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\glsl\copy_to_swapchain.comp.glsl">
+    <CustomBuild Include="src\shaders\copy_to_swapchain.comp.glsl">
       <FileType>Document</FileType>
     </CustomBuild>
-    <None Include="src\shaders\glsl\shared.glsl" />
-    <CustomBuild Include="src\shaders\glsl\simple.rchit.glsl">
+    <None Include="src\shaders\shared.glsl" />
+    <CustomBuild Include="src\shaders\simple.rchit.glsl">
       <FileType>Document</FileType>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\glsl\simple.rgen.glsl">
+    <CustomBuild Include="src\shaders\simple.rgen.glsl">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V -o $(ProjectDir)data/spirv/%(Filename).spv</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V -o $(ProjectDir)data/spirv/%(Filename).spv</Command>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\glsl\simple.rmiss.glsl">
+    <CustomBuild Include="src\shaders\simple.rmiss.glsl">
       <FileType>Document</FileType>
     </CustomBuild>
-    <None Include="src\shaders\glsl\utils.glsl">
+    <None Include="src\shaders\utils.glsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
