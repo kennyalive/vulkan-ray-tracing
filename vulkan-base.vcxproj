@@ -71,6 +71,14 @@
     <Manifest>
       <AdditionalManifestFiles>DeclareDPIAware.manifest</AdditionalManifestFiles>
     </Manifest>
+    <CustomBuild>
+      <Command>$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V --target-env vulkan1.1 -o $(ProjectDir)data\spirv\%(Filename).spv &amp;&amp; $(VULKAN_SDK)\Bin\spirv-opt $(ProjectDir)data\spirv\%(Filename).spv -O --strip-debug -o $(ProjectDir)data\spirv\%(Filename).spv</Command>
+      <Outputs>$(ProjectDir)data\spirv\%(Filename).spv</Outputs>
+      <AdditionalInputs>$(ProjectDir)src\shaders\glsl\utils.glsl;$(ProjectDir)src\shaders\glsl\shared.glsl</AdditionalInputs>
+      <LinkObjects>false</LinkObjects>
+      <Message>
+      </Message>
+    </CustomBuild>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -94,6 +102,14 @@
     <Manifest>
       <AdditionalManifestFiles>DeclareDPIAware.manifest</AdditionalManifestFiles>
     </Manifest>
+    <CustomBuild>
+      <Command>$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V --target-env vulkan1.1 -o $(ProjectDir)data\spirv\%(Filename).spv &amp;&amp; $(VULKAN_SDK)\Bin\spirv-opt $(ProjectDir)data\spirv\%(Filename).spv -O --strip-debug -o $(ProjectDir)data\spirv\%(Filename).spv</Command>
+      <Outputs>$(ProjectDir)data\spirv\%(Filename).spv</Outputs>
+      <AdditionalInputs>$(ProjectDir)src\shaders\glsl\utils.glsl;$(ProjectDir)src\shaders\glsl\shared.glsl</AdditionalInputs>
+      <LinkObjects>false</LinkObjects>
+      <Message>
+      </Message>
+    </CustomBuild>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\common.cpp" />
@@ -133,6 +149,23 @@
     <ClInclude Include="third_party\imgui\imgui_internal.h" />
     <ClInclude Include="third_party\imgui\impl\imgui_impl_sdl.h" />
     <ClInclude Include="third_party\imgui\impl\imgui_impl_vulkan.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\shaders\glsl\shared.glsl" />
+    <CustomBuild Include="src\shaders\glsl\simple.rchit.glsl">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="src\shaders\glsl\simple.rgen.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V -o $(ProjectDir)data/spirv/%(Filename).spv</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V -o $(ProjectDir)data/spirv/%(Filename).spv</Command>
+    </CustomBuild>
+    <CustomBuild Include="src\shaders\glsl\simple.rmiss.glsl">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <None Include="src\shaders\glsl\utils.glsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,10 +1,8 @@
 .vs/
-build/Debug/intermediate/
-*.ilk
-*.pdb
-*.exe
-build/Release/intermediate/
-*.ipdb
-*.iobj
+build/
+
 third_party/dxc/
 imgui.ini
+
+data/*
+!data/iron-man

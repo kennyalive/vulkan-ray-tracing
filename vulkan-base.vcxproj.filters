@@ -73,5 +73,27 @@
     <Filter Include="3rdparty\imgui\impl">
       <UniqueIdentifier>{67862dcc-703c-4c08-bae0-104bca677a76}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{b2adfe0c-dc5d-4ce0-82d6-649c4b8744e3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\shaders\glsl\shared.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="src\shaders\glsl\utils.glsl">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="src\shaders\glsl\simple.rmiss.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="src\shaders\glsl\simple.rchit.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="src\shaders\glsl\simple.rgen.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

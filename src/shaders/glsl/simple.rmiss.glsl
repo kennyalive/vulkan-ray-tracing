@@ -1,4 +1,5 @@
 #version 460
+#extension GL_GOOGLE_include_directive : require
 #extension GL_NVX_raytracing : require
 
 #include "shared.glsl"

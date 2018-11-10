@@ -1,7 +1,7 @@
 #version 460
+#extension GL_GOOGLE_include_directive : require
 #extension GL_NVX_raytracing : require
 
-layout(row_major) uniform;
 #include "shared.glsl"
 #include "utils.glsl"
 
