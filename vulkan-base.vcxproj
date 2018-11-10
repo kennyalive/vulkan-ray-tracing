@@ -151,6 +151,15 @@
     <ClInclude Include="third_party\imgui\impl\imgui_impl_vulkan.h" />
   </ItemGroup>
   <ItemGroup>
+    <CustomBuild Include="src\shaders\glsl\model.frag.glsl">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="src\shaders\glsl\model.vert.glsl">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="src\shaders\glsl\copy_to_swapchain.comp.glsl">
+      <FileType>Document</FileType>
+    </CustomBuild>
     <None Include="src\shaders\glsl\shared.glsl" />
     <CustomBuild Include="src\shaders\glsl\simple.rchit.glsl">
       <FileType>Document</FileType>

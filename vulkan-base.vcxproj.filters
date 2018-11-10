@@ -95,5 +95,14 @@
     <CustomBuild Include="src\shaders\glsl\simple.rgen.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="src\shaders\glsl\model.vert.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="src\shaders\glsl\model.frag.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="src\shaders\glsl\copy_to_swapchain.comp.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

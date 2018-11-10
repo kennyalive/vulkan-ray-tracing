@@ -27,17 +27,6 @@ Ray generate_ray(mat4x3 camera_to_world, vec2 film_position) {
     return ray;
 }
 
-float srgb_encode(float c) {
-    if (c <= 0.0031308f)
-        return 12.92f * c;
-    else
-        return 1.055f * pow(c, 1.f/2.4f) - 0.055f;
-}
-
-vec3 srgb_encode(vec3 c) {
-    return vec3(srgb_encode(c.r), srgb_encode(c.g), srgb_encode(c.b));
-}
-
 void solve_2x2_helper(float a, float b, float c, float d, out vec2 c1, out vec2 c2) {
     // |a b| |x1|  |b1|
     // |c d| |x2|  |b2|

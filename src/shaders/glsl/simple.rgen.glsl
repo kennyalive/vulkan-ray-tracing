@@ -8,7 +8,7 @@
 layout(binding = 0, rgba8) uniform image2D image;
 layout(binding = 1) uniform accelerationStructureNVX accel;
 
-layout(binding=2) uniform Uniform_Block {
+layout(std140, binding=2) uniform Uniform_Block {
     mat4x3 camera_to_world;
     mat4x3 model_transform;
 };
