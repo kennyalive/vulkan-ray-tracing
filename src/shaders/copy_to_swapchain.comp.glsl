@@ -1,7 +1,7 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 
-#include "shared.glsl"
+#include "common.glsl"
 
 layout(local_size_x = 32, local_size_y = 32) in;
 

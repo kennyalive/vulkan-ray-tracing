@@ -74,7 +74,7 @@
     <CustomBuild>
       <Command>$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V --target-env vulkan1.1 -o $(ProjectDir)data\spirv\%(Filename).spv &amp;&amp; $(VULKAN_SDK)\Bin\spirv-opt $(ProjectDir)data\spirv\%(Filename).spv -O --strip-debug -o $(ProjectDir)data\spirv\%(Filename).spv</Command>
       <Outputs>$(ProjectDir)data\spirv\%(Filename).spv</Outputs>
-      <AdditionalInputs>$(ProjectDir)src\shaders\utils.glsl;$(ProjectDir)src\shaders\shared.glsl</AdditionalInputs>
+      <AdditionalInputs>$(ProjectDir)src\shaders\rt_utils.glsl;$(ProjectDir)src\shaders\common.glsl</AdditionalInputs>
       <LinkObjects>false</LinkObjects>
       <Message>
       </Message>
@@ -105,7 +105,7 @@
     <CustomBuild>
       <Command>$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V --target-env vulkan1.1 -o $(ProjectDir)data\spirv\%(Filename).spv &amp;&amp; $(VULKAN_SDK)\Bin\spirv-opt $(ProjectDir)data\spirv\%(Filename).spv -O --strip-debug -o $(ProjectDir)data\spirv\%(Filename).spv</Command>
       <Outputs>$(ProjectDir)data\spirv\%(Filename).spv</Outputs>
-      <AdditionalInputs>$(ProjectDir)src\shaders\utils.glsl;$(ProjectDir)src\shaders\shared.glsl</AdditionalInputs>
+      <AdditionalInputs>$(ProjectDir)src\shaders\rt_utils.glsl;$(ProjectDir)src\shaders\common.glsl</AdditionalInputs>
       <LinkObjects>false</LinkObjects>
       <Message>
       </Message>
@@ -160,7 +160,7 @@
     <CustomBuild Include="src\shaders\copy_to_swapchain.comp.glsl">
       <FileType>Document</FileType>
     </CustomBuild>
-    <None Include="src\shaders\shared.glsl" />
+    <None Include="src\shaders\common.glsl" />
     <CustomBuild Include="src\shaders\rt_mesh.rchit.glsl">
       <FileType>Document</FileType>
     </CustomBuild>
@@ -172,7 +172,7 @@
     <CustomBuild Include="src\shaders\rt_mesh.rmiss.glsl">
       <FileType>Document</FileType>
     </CustomBuild>
-    <None Include="src\shaders\utils.glsl">
+    <None Include="src\shaders\rt_utils.glsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

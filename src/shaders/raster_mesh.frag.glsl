@@ -1,6 +1,7 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
-#include "shared.glsl"
+
+#include "common.glsl"
 
 layout(location=0) in Frag_In frag_in;
 layout(location = 0) out vec4 color_attachment0;

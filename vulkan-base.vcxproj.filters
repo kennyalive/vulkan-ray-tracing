@@ -78,10 +78,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="src\shaders\shared.glsl">
+    <None Include="src\shaders\rt_utils.glsl">
       <Filter>shaders</Filter>
     </None>
-    <None Include="src\shaders\utils.glsl">
+    <None Include="src\shaders\common.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>
