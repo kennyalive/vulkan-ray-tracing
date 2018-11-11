@@ -103,10 +103,13 @@ void main() {
         dvdy = c2.x*dpdy[dim0] + c2.y*dpdy[dim1];
     }
 
-    // float filter_width = 2.0 * max(max(abs(dudx), abs(dvdx)), max(abs(dudy), abs(dvdy)));
-    // float f = 150.0 * (filter_width - 0.0015);
-    // payload.color = vec3(srgb_encode(f));
-
     vec2 uv = fract(barycentric_interpolate(attribs.x, attribs.y, vec2(u0, v0), vec2(u1, v1), vec2(u2, v2)));
-    payload.color = srgb_encode(texture(sampler2D(image, image_sampler), uv).rgb);
+
+    // To satisfy Nyquist limit the filter width should be twice as large as below and it is
+    // achieved implicitly by using bilinear filtering to sample mip levels.
+    float filter_width = max(max(abs(dudx), abs(dvdx)), max(abs(dudy), abs(dvdy)));
+
+    float lod = textureQueryLevels(sampler2D(image, image_sampler)) - 1 + log2(filter_width);
+
+    payload.color = srgb_encode(textureLod(sampler2D(image, image_sampler), uv, lod).rgb);
 }
