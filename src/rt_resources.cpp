@@ -233,9 +233,9 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
 
     // pipeline
     {
-        VkShaderModule rgen_shader = vk_load_spirv("spirv/simple.rgen.spv");
-        VkShaderModule miss_shader = vk_load_spirv("spirv/simple.rmiss.spv");
-        VkShaderModule chit_shader = vk_load_spirv("spirv/simple.rchit.spv");
+        VkShaderModule rgen_shader = vk_load_spirv("spirv/rt_mesh.rgen.spv");
+        VkShaderModule miss_shader = vk_load_spirv("spirv/rt_mesh.rmiss.spv");
+        VkShaderModule chit_shader = vk_load_spirv("spirv/rt_mesh.rchit.spv");
 
         VkPipelineShaderStageCreateInfo stage_infos[3] {};
         stage_infos[0].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

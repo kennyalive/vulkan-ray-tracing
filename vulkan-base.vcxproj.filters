@@ -89,19 +89,19 @@
     <CustomBuild Include="src\shaders\copy_to_swapchain.comp.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\model.frag.glsl">
+    <CustomBuild Include="src\shaders\raster_mesh.frag.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\model.vert.glsl">
+    <CustomBuild Include="src\shaders\raster_mesh.vert.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\simple.rchit.glsl">
+    <CustomBuild Include="src\shaders\rt_mesh.rchit.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\simple.rgen.glsl">
+    <CustomBuild Include="src\shaders\rt_mesh.rgen.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="src\shaders\simple.rmiss.glsl">
+    <CustomBuild Include="src\shaders\rt_mesh.rmiss.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
   </ItemGroup>

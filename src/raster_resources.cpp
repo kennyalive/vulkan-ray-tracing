@@ -77,8 +77,8 @@ void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler
 
     // Pipeline.
     {
-        VkShaderModule vertex_shader = vk_load_spirv("spirv/model.vert.spv");
-        VkShaderModule fragment_shader = vk_load_spirv("spirv/model.frag.spv");
+        VkShaderModule vertex_shader = vk_load_spirv("spirv/raster_mesh.vert.spv");
+        VkShaderModule fragment_shader = vk_load_spirv("spirv/raster_mesh.frag.spv");
 
         Vk_Graphics_Pipeline_State state = get_default_graphics_pipeline_state();
 
