@@ -3,13 +3,17 @@
 #extension GL_NVX_raytracing : require
 
 #include "common.glsl"
+
+#define HIT_SHADER
 #include "rt_utils.glsl"
 
-struct Vertex {
+struct Buffer_Vertex {
     float x, y, z;
     float nx, ny, nz;
     float u, v;
 };
+
+layout(constant_id=0) const bool show_texture_lods = false;
 
 layout (location=0) rayPayloadInNVX Payload payload;
 layout (location=1) hitAttributeNVX vec3 attribs;
@@ -24,92 +28,42 @@ layout(std430, binding=3) readonly buffer Indices {
 };
 
 layout(std430, binding=4) readonly buffer Vertices {
-    Vertex vertex_buffer[];
+    Buffer_Vertex vertex_buffer[];
 };
 
 layout(binding=5) uniform texture2D image;
 layout(binding=6) uniform sampler image_sampler;
 
+Vertex fetch_vertex(int vertex_index) {
+    uint i = index_buffer[vertex_index];
+    Buffer_Vertex bv = vertex_buffer[i];
+
+    Vertex v;
+    v.p = vec3(bv.x, bv.y, bv.z);
+    v.n = vec3(bv.nx, bv.ny, bv.nz);
+    v.uv = fract(vec2(bv.u, bv.v));
+    return v;
+}
+
 void main() {
-    // fetch vertex data
-    uint i0 = index_buffer[gl_PrimitiveID*3 + 0];
-    uint i1 = index_buffer[gl_PrimitiveID*3 + 1];
-    uint i2 = index_buffer[gl_PrimitiveID*3 + 2];
+    Vertex v0 = fetch_vertex(gl_PrimitiveID*3 + 0);
+    Vertex v1 = fetch_vertex(gl_PrimitiveID*3 + 1);
+    Vertex v2 = fetch_vertex(gl_PrimitiveID*3 + 2);
 
-    Vertex V0 = vertex_buffer[i0];
-    Vertex V1 = vertex_buffer[i1];
-    Vertex V2 = vertex_buffer[i2];
+    v0.p = model_transform * vec4(v0.p, 1);
+    v1.p = model_transform * vec4(v1.p, 1);
+    v2.p = model_transform * vec4(v2.p, 1);
 
-    vec3 p0 = model_transform * vec4(V0.x, V0.y, V0.z, 1.0);
-    vec3 p1 = model_transform * vec4(V1.x, V1.y, V1.z, 1.0);
-    vec3 p2 = model_transform * vec4(V2.x, V2.y, V2.z, 1.0);
+    int mip_levels = textureQueryLevels(sampler2D(image, image_sampler));
+    float lod = compute_texture_lod(v0, v1, v2, payload.rx_dir, payload.ry_dir, mip_levels);
 
-    float u0 = fract(V0.u);
-    float v0 = fract(V0.v);
-    float u1 = fract(V1.u);
-    float v1 = fract(V1.v);
-    float u2 = fract(V2.u);
-    float v2 = fract(V2.v);
-
-    vec3 face_normal = normalize(cross(p1 - p0, p2 - p0));
-
-    // compute dp/vu, dp/dv (PBRT, 3.6.2)
-    vec3 dpdu, dpdv;
-    {
-        vec3 p10 = p1 - p0;
-        vec3 p20 = p2 - p0;
-        vec2 c1, c2;
-        solve_2x2_helper(u1 - u0, v1 - v0, u2 - u0, v2 - v0, c1, c2);
-        dpdu = c1.x*p10 + c1.y*p20;
-        dpdv = c2.x*p10 + c2.y*p20;
+    vec3 color;
+    if (show_texture_lods) {
+        color = color_encode_lod(lod);
+    } else {
+        vec2 uv = fract(barycentric_interpolate(attribs.x, attribs.y, v0.uv, v1.uv, v2.uv));
+        color = textureLod(sampler2D(image, image_sampler), uv, lod).rgb;
     }
 
-    // compute offsets from main intersection point to approximated intersections of auxilary rays
-    vec3 dpdx, dpdy;
-    {
-        vec3 p = gl_WorldRayOriginNVX + gl_WorldRayDirectionNVX * gl_HitTNVX;
-        float plane_d = -dot(face_normal, p);
-
-        float tx = ray_plane_intersection(gl_WorldRayOriginNVX, payload.rx_dir, face_normal, plane_d);
-        float ty = ray_plane_intersection(gl_WorldRayOriginNVX, payload.ry_dir, face_normal, plane_d);
-
-        vec3 px = gl_WorldRayOriginNVX + payload.rx_dir * tx;
-        vec3 py = gl_WorldRayOriginNVX + payload.ry_dir * ty;
-
-        dpdx = px - p;
-        dpdy = py - p;
-    }
-
-    // compute du/dx, dv/dx, du/dy, dv/dy (PBRT, 10.1.1)
-    float dudx, dvdx, dudy, dvdy;
-    {
-        uint dim0 = 0, dim1 = 1;
-        vec3 a = abs(face_normal);
-        if (a.x > a.y && a.x > a.z) {
-            dim0 = 1;
-            dim1 = 2;
-        } else if (a.y > a.z) {
-            dim0 = 0;
-            dim1 = 2;
-        }
-
-        vec2 c1, c2;
-        solve_2x2_helper(dpdu[dim0], dpdv[dim0], dpdu[dim1], dpdv[dim1], c1, c2);
-
-        dudx = c1.x*dpdx[dim0] + c1.y*dpdx[dim1];
-        dvdx = c2.x*dpdx[dim0] + c2.y*dpdx[dim1];
-
-        dudy = c1.x*dpdy[dim0] + c1.y*dpdy[dim1];
-        dvdy = c2.x*dpdy[dim0] + c2.y*dpdy[dim1];
-    }
-
-    vec2 uv = fract(barycentric_interpolate(attribs.x, attribs.y, vec2(u0, v0), vec2(u1, v1), vec2(u2, v2)));
-
-    // To satisfy Nyquist limit the filter width should be twice as large as below and it is
-    // achieved implicitly by using bilinear filtering to sample mip levels.
-    float filter_width = max(max(abs(dudx), abs(dvdx)), max(abs(dudy), abs(dvdy)));
-
-    float lod = textureQueryLevels(sampler2D(image, image_sampler)) - 1 + log2(filter_width);
-
-    payload.color = srgb_encode(textureLod(sampler2D(image, image_sampler), uv, lod).rgb);
+    payload.color = srgb_encode(color);
 }

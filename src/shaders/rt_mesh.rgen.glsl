@@ -3,6 +3,8 @@
 #extension GL_NVX_raytracing : require
 
 #include "common.glsl"
+
+#define RGEN_SHADER
 #include "rt_utils.glsl"
 
 layout(binding = 0, rgba8) uniform image2D image;
