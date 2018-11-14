@@ -19,6 +19,9 @@ struct Matrix4x4 {
 Matrix3x4 operator*(const Matrix3x4& m1, const Matrix3x4& m2);
 Matrix4x4 operator*(const Matrix4x4& m1, const Matrix3x4& m2);
 
+// assumption is that matrix contains only rotation and translation.
+Matrix3x4 get_inverse(const Matrix3x4& m);
+
 // rotate_[axis] functions premultiply a given matrix by corresponding rotation matrix.
 Matrix3x4 rotate_x(const Matrix3x4& m, float angle);
 Matrix3x4 rotate_y(const Matrix3x4& m, float angle);

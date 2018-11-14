@@ -76,6 +76,14 @@ Matrix4x4 operator*(const Matrix4x4& m1, const Matrix3x4& m2) {
     return m;
 }
 
+Matrix3x4 get_inverse(const Matrix3x4& m) {
+    Matrix3x4 m_inv;
+    m_inv.a[0][0] = m.a[0][0]; m_inv.a[0][1] = m.a[1][0]; m_inv.a[0][2] = m.a[2][0]; m_inv.a[0][3] = -m.a[0][3];
+    m_inv.a[1][0] = m.a[0][1]; m_inv.a[1][1] = m.a[1][1]; m_inv.a[1][2] = m.a[2][1]; m_inv.a[1][3] = -m.a[1][3];
+    m_inv.a[2][0] = m.a[0][2]; m_inv.a[2][1] = m.a[1][2]; m_inv.a[2][2] = m.a[2][2]; m_inv.a[2][3] = -m.a[2][3];
+    return m_inv;
+}
+
 Matrix3x4 rotate_x(const Matrix3x4& m, float angle) {
     float cs = std::cos(angle);
     float sn = std::sin(angle);

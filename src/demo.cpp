@@ -469,10 +469,10 @@ void Vk_Demo::do_imgui() {
         if (ImGui::IsKeyPressed(SDL_SCANCODE_F10)) {
             show_ui = !show_ui;
         }
-        if (ImGui::IsKeyPressed(SDL_SCANCODE_W)) {
+        if (ImGui::IsKeyPressed(SDL_SCANCODE_W) || ImGui::IsKeyPressed(SDL_SCANCODE_UP)) {
             camera_pos.z -= 0.2f;
         }
-        if (ImGui::IsKeyPressed(SDL_SCANCODE_S)) {
+        if (ImGui::IsKeyPressed(SDL_SCANCODE_S) || ImGui::IsKeyPressed(SDL_SCANCODE_DOWN)) {
             camera_pos.z += 0.2f;
         }
     }
