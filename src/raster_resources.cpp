@@ -22,9 +22,16 @@ void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler
 
     // Pipeline layout.
     {
+        VkPushConstantRange push_constant_range; // show_texture_lods value
+        push_constant_range.stageFlags  = VK_SHADER_STAGE_FRAGMENT_BIT;
+        push_constant_range.offset      = 0;
+        push_constant_range.size        = 4;
+
         VkPipelineLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        create_info.setLayoutCount = 1;
-        create_info.pSetLayouts = &descriptor_set_layout;
+        create_info.setLayoutCount          = 1;
+        create_info.pSetLayouts             = &descriptor_set_layout;
+        create_info.pushConstantRangeCount  = 1;
+        create_info.pPushConstantRanges     = &push_constant_range;
 
         VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
         vk_set_debug_name(pipeline_layout, "raster_pipeline_layout");

@@ -3,7 +3,9 @@
 
 #include "common.glsl"
 
-layout(constant_id=0) const bool show_texture_lods = false;
+layout(push_constant) uniform Push_Constants {
+    uint show_texture_lods;
+};
 
 layout(location=0) in Frag_In frag_in;
 layout(location = 0) out vec4 color_attachment0;
@@ -14,7 +16,7 @@ layout(binding=2) uniform sampler image_sampler;
 void main() {
     vec3 color;
 
-    if (show_texture_lods) {
+    if (show_texture_lods != 0) {
         // The commented code below will give result very close to raytracing version.
         // The lod calculated by textureQueryLod gives a bit different result and that's
         // fine since implementations are not restricted to some fixed algorithm.

@@ -43,6 +43,7 @@ private:
     bool                        vsync                   = true;
     bool                        animate                 = false;
     bool                        raytracing              = false;
+    bool                        show_texture_lod        = false;
 
     Time                        last_frame_time;
     double                      sim_time;

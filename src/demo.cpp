@@ -333,6 +333,8 @@ void Vk_Demo::draw_rasterized_image() {
     vkCmdBindIndexBuffer(vk.command_buffer, index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
     vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline_layout, 0, 1, &raster.descriptor_set, 0, nullptr);
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline);
+    uint32_t show_texture_lod_uint = show_texture_lod;
+    vkCmdPushConstants(vk.command_buffer, raster.pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &show_texture_lod_uint);
     vkCmdDrawIndexed(vk.command_buffer, model_index_count, 1, 0, 0, 0);
     vkCmdEndRenderPass(vk.command_buffer);
 }
@@ -360,6 +362,9 @@ void Vk_Demo::draw_raytraced_image() {
 
     vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, rt.pipeline_layout, 0, 1, &rt.descriptor_set, 0, nullptr);
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, rt.pipeline);
+
+    uint32_t show_texture_lod_uint = show_texture_lod;
+    vkCmdPushConstants(vk.command_buffer, rt.pipeline_layout, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX, 0, 4, &show_texture_lod_uint);
 
     vkCmdTraceRaysNVX(vk.command_buffer,
         sbt, 0, // raygen shader
@@ -509,6 +514,8 @@ void Vk_Demo::do_imgui() {
                 ImGui::PopItemFlag();
                 ImGui::PopStyleVar();
             }
+
+            ImGui::Checkbox("Show texture lod", &show_texture_lod);
 
             if (ImGui::BeginPopupContextWindow()) {
                 if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;

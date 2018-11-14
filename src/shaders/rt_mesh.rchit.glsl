@@ -13,7 +13,9 @@ struct Buffer_Vertex {
     float u, v;
 };
 
-layout(constant_id=0) const bool show_texture_lods = false;
+layout(push_constant) uniform Push_Constants {
+    uint show_texture_lods;
+};
 
 layout (location=0) rayPayloadInNVX Payload payload;
 layout (location=1) hitAttributeNVX vec3 attribs;
@@ -58,7 +60,7 @@ void main() {
     float lod = compute_texture_lod(v0, v1, v2, payload.rx_dir, payload.ry_dir, mip_levels);
 
     vec3 color;
-    if (show_texture_lods) {
+    if (show_texture_lods != 0) {
         color = color_encode_lod(lod);
     } else {
         vec2 uv = fract(barycentric_interpolate(attribs.x, attribs.y, v0.uv, v1.uv, v2.uv));
