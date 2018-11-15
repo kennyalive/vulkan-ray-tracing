@@ -43,23 +43,16 @@ Ray generate_ray(mat4x3 camera_to_world, vec2 film_position) {
 
 #ifdef HIT_SHADER
 float compute_texture_lod(Vertex v0, Vertex v1, Vertex v2, vec3 rx_dir, vec3 ry_dir, int mip_levels) {
-    const vec3 p0 = v0.p;
-    const vec3 p1 = v1.p;
-    const vec3 p2 = v2.p;
-    const vec2 uv0 = v0.uv;
-    const vec2 uv1 = v1.uv;
-    const vec2 uv2 = v2.uv;
-
-    vec3 face_normal = normalize(cross(p1 - p0, p2 - p0));
+    vec3 face_normal = normalize(cross(v1.p - v0.p, v2.p - v0.p));
 
     // compute dp/vu, dp/dv (PBRT, 3.6.2)
     vec3 dpdu, dpdv;
     {
-        vec3 p10 = p1 - p0;
-        vec3 p20 = p2 - p0;
+        vec3 p10 = v1.p - v0.p;
+        vec3 p20 = v2.p - v0.p;
 
-        float a00 = uv1.x - uv0.x; float a01 = uv1.y - uv0.y;
-        float a10 = uv2.x - uv0.x; float a11 = uv2.y - uv0.y;
+        float a00 = v1.uv.x - v0.uv.x; float a01 = v1.uv.y - v0.uv.y;
+        float a10 = v2.uv.x - v0.uv.x; float a11 = v2.uv.y - v0.uv.y;
 
         float det = a00*a11 - a01*a10;
         if (abs(det) < 1e-10) {
@@ -121,6 +114,6 @@ float compute_texture_lod(Vertex v0, Vertex v1, Vertex v2, vec3 rx_dir, vec3 ry_
     //float filter_width = max(max(abs(dudx), abs(dvdx)), max(abs(dudy), abs(dvdy)));
     float filter_width = max(length(vec2(dudx, dvdx)), length(vec2(dudy, dvdy)));
 
-    return max(0, mip_levels - 1 + log2(clamp(filter_width, 1e-6, 1.0)));
+    return mip_levels - 1 + log2(clamp(filter_width, 1e-6, 1.0));
 }
 #endif // HIT_SHADER
