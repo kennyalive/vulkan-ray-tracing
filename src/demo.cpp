@@ -48,7 +48,7 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
 
     // Geometry buffers.
     {
-        Mesh mesh = load_obj_mesh(get_resource_path("iron-man/model.obj"));
+        Mesh mesh = load_obj_mesh(get_resource_path("model/mesh.obj"), 1.25f);
 
         model_vertex_count = static_cast<uint32_t>(mesh.vertices.size());
         model_index_count = static_cast<uint32_t>(mesh.indices.size());
@@ -84,7 +84,7 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
 
     // Texture.
     {
-        texture = load_texture("iron-man/model.jpg");
+        texture = load_texture("model/diffuse.jpg");
 
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
         create_info.magFilter           = VK_FILTER_LINEAR;

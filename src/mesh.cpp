@@ -22,7 +22,7 @@ static inline bool operator==(const Vertex& v1, const Vertex& v2) {
     return v1.pos == v2.pos && v1.normal == v2.normal && v1.uv == v2.uv;
 }
 
-Mesh load_obj_mesh(const std::string& path) {
+Mesh load_obj_mesh(const std::string& path, float additional_scale) {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -89,7 +89,7 @@ Mesh load_obj_mesh(const std::string& path) {
     // scale and center the mesh
     Vector3 diag = mesh_max - mesh_min;
     float max_size = std::max(diag.x, std::max(diag.y, diag.z));
-    float scale = 2.f / max_size;
+    float scale = (2.f / max_size) * additional_scale;
 
     Vector3 center = (mesh_min + mesh_max) * 0.5f;
     for (auto& v : mesh.vertices) {

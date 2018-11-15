@@ -5,4 +5,4 @@ third_party/dxc/
 imgui.ini
 
 data/*
-!data/iron-man
+!data/model
