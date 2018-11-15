@@ -14,10 +14,10 @@ struct Buffer_Vertex {
 };
 
 layout(push_constant) uniform Push_Constants {
-    uint show_texture_lods;
+      layout(offset = 4) uint show_texture_lods;
 };
 
-layout (location=0) rayPayloadInNVX Payload payload;
+layout (location=0) rayPayloadInNVX Ray_Payload payload;
 layout (location=1) hitAttributeNVX vec3 attribs;
 
 layout(binding=2) uniform Uniform_Block {

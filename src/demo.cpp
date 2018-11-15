@@ -363,8 +363,9 @@ void Vk_Demo::draw_raytraced_image() {
     vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, rt.pipeline_layout, 0, 1, &rt.descriptor_set, 0, nullptr);
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, rt.pipeline);
 
-    uint32_t show_texture_lod_uint = show_texture_lod;
-    vkCmdPushConstants(vk.command_buffer, rt.pipeline_layout, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX, 0, 4, &show_texture_lod_uint);
+    uint32_t push_constants[2] = { spp4, show_texture_lod };
+    vkCmdPushConstants(vk.command_buffer, rt.pipeline_layout, VK_SHADER_STAGE_RAYGEN_BIT_NVX, 0, 4, &push_constants[0]);
+    vkCmdPushConstants(vk.command_buffer, rt.pipeline_layout, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX, 4, 4, &push_constants[1]);
 
     vkCmdTraceRaysNVX(vk.command_buffer,
         sbt, 0, // raygen shader
@@ -510,6 +511,7 @@ void Vk_Demo::do_imgui() {
                 ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
             }
             ui_result.raytracing_toggled = ImGui::Checkbox("Raytracing", &raytracing);
+            ImGui::Checkbox("4 rays per pixel", &spp4);
             if (!vk.raytracing_supported) {
                 ImGui::PopItemFlag();
                 ImGui::PopStyleVar();

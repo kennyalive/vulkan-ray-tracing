@@ -225,16 +225,19 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
 
     // pipeline layout
     {
-        VkPushConstantRange push_constant_range; // show_texture_lods value
-        push_constant_range.stageFlags  = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
-        push_constant_range.offset      = 0;
-        push_constant_range.size        = 4;
+        VkPushConstantRange push_constant_ranges[2]; // show_texture_lods value
+        push_constant_ranges[0].stageFlags  = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+        push_constant_ranges[0].offset      = 0;
+        push_constant_ranges[0].size        = 4;
+        push_constant_ranges[1].stageFlags  = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+        push_constant_ranges[1].offset      = 4;
+        push_constant_ranges[1].size        = 4;
 
         VkPipelineLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
         create_info.setLayoutCount          = 1;
         create_info.pSetLayouts             = &descriptor_set_layout;
-        create_info.pushConstantRangeCount  = 1;
-        create_info.pPushConstantRanges     = &push_constant_range;
+        create_info.pushConstantRangeCount  = (uint32_t)std::size(push_constant_ranges);
+        create_info.pPushConstantRanges     = push_constant_ranges;
 
         VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
     }
