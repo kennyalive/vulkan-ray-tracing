@@ -57,10 +57,18 @@ float compute_texture_lod(Vertex v0, Vertex v1, Vertex v2, vec3 rx_dir, vec3 ry_
     {
         vec3 p10 = p1 - p0;
         vec3 p20 = p2 - p0;
-        vec2 c1, c2;
-        solve_2x2_helper(uv1.x - uv0.x, uv1.y - uv0.y, uv2.x - uv0.x, uv2.y - uv0.y, c1, c2);
-        dpdu = c1.x*p10 + c1.y*p20;
-        dpdv = c2.x*p10 + c2.y*p20;
+
+        float a00 = uv1.x - uv0.x; float a01 = uv1.y - uv0.y;
+        float a10 = uv2.x - uv0.x; float a11 = uv2.y - uv0.y;
+
+        float det = a00*a11 - a01*a10;
+        if (abs(det) < 1e-10) {
+            coordinate_system_from_vector(face_normal, dpdu, dpdv);
+        } else {
+            float inv_det = 1.0/det;
+            dpdu = ( a11*p10 - a01*p20) * inv_det;
+            dpdv = (-a10*p10 + a00*p20) * inv_det;
+        }
     }
 
     // compute offsets from main intersection point to approximated intersections of auxilary rays
@@ -92,21 +100,27 @@ float compute_texture_lod(Vertex v0, Vertex v1, Vertex v2, vec3 rx_dir, vec3 ry_
             dim1 = 2;
         }
 
-        vec2 c1, c2;
-        solve_2x2_helper(dpdu[dim0], dpdv[dim0], dpdu[dim1], dpdv[dim1], c1, c2);
+        float a00 = dpdu[dim0]; float a01 = dpdv[dim0];
+        float a10 = dpdu[dim1]; float a11 = dpdv[dim1];
 
-        dudx = c1.x*dpdx[dim0] + c1.y*dpdx[dim1];
-        dvdx = c2.x*dpdx[dim0] + c2.y*dpdx[dim1];
+        float det = a00*a11 - a01*a10;
+        if (abs(det) < 1e-10)
+            dudx = dvdx = dudy = dvdy = 0;
+        else {
+            float inv_det = 1.0/det;
+            dudx = ( a11*dpdx[dim0] - a01*dpdx[dim1]) * inv_det;
+            dvdx = (-a10*dpdx[dim0] - a00*dpdx[dim1]) * inv_det;
 
-        dudy = c1.x*dpdy[dim0] + c1.y*dpdy[dim1];
-        dvdy = c2.x*dpdy[dim0] + c2.y*dpdy[dim1];
+            dudy = ( a11*dpdy[dim0] - a01*dpdy[dim1]) * inv_det;
+            dvdy = (-a10*dpdy[dim0] - a00*dpdy[dim1]) * inv_det;
+        }
     }
 
     // To satisfy Nyquist limit the filter width should be twice as large as below and it is
     // achieved implicitly by using bilinear filtering to sample mip levels.
     //float filter_width = max(max(abs(dudx), abs(dvdx)), max(abs(dudy), abs(dvdy)));
-    float filter_width = max(length(vec2(abs(dudx), abs(dvdx))), length(vec2(abs(dudy), abs(dvdy))));
+    float filter_width = max(length(vec2(dudx, dvdx)), length(vec2(dudy, dvdy)));
 
-    return mip_levels - 1 + log2(filter_width);
+    return max(0, mip_levels - 1 + log2(clamp(filter_width, 1e-6, 1.0)));
 }
 #endif // HIT_SHADER

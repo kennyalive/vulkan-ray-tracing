@@ -259,7 +259,7 @@ void Vk_Demo::run_frame() {
     }
     last_frame_time = current_time;
 
-    model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(30.0f));
+    model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(20.0f));
     view_transform = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
     raster.update(model_transform, view_transform);
 
