@@ -7,8 +7,8 @@
 * Command line options:
   - _--validation-layers_ - enables VK_LAYER_LUNARG_standard_validation layer. VulkanSDK should be installed in order to use this option.
   - _--debug-names_ - enables debug naming of vulkan objects.
-  
-Prerequisites: VulkanSDK should be installed in the system.
+
+Prerequisites: VulkanSDK is required to build the solution.
 
 ![demo](https://user-images.githubusercontent.com/4964024/48589368-7defa600-e93b-11e8-8a49-741b7d212ddc.png)
 

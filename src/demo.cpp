@@ -505,6 +505,7 @@ void Vk_Demo::do_imgui() {
             ImGui::Spacing();
             ImGui::Checkbox("Vertical sync", &vsync);
             ImGui::Checkbox("Animate", &animate);
+            ImGui::Checkbox("Show texture lod", &show_texture_lod);
 
             if (!vk.raytracing_supported) {
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
@@ -516,8 +517,6 @@ void Vk_Demo::do_imgui() {
                 ImGui::PopItemFlag();
                 ImGui::PopStyleVar();
             }
-
-            ImGui::Checkbox("Show texture lod", &show_texture_lod);
 
             if (ImGui::BeginPopupContextWindow()) {
                 if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;
