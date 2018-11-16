@@ -10,5 +10,4 @@
 
 Prerequisites: VulkanSDK is required to build the solution.
 
-![demo](https://user-images.githubusercontent.com/4964024/48589368-7defa600-e93b-11e8-8a49-741b7d212ddc.png)
-
+![demo](https://user-images.githubusercontent.com/4964024/48605463-26722a00-e97d-11e8-9548-65de42d50c21.png)
