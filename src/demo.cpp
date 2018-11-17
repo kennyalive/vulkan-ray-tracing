@@ -84,7 +84,7 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
 
     // Texture.
     {
-        texture = load_texture("model/diffuse.jpg");
+        texture = vk_load_texture("model/diffuse.jpg");
 
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
         create_info.magFilter           = VK_FILTER_LINEAR;

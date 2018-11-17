@@ -5,8 +5,6 @@
 
 #include <vector>
 
-Vk_Image load_texture(const std::string& texture_file);
-
 struct Descriptor_Writes {
     static constexpr uint32_t max_writes = 32;
 
