@@ -17,7 +17,7 @@ static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
     {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,              16},
     {VK_DESCRIPTOR_TYPE_SAMPLER,                    16},
     {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,              16},
-    {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, 16},
+    {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV,  16},
 };
 
 constexpr uint32_t max_descriptor_sets = 64;
@@ -246,8 +246,8 @@ static void create_device() {
             if (!is_extension_supported(required_extension))
                 error("Vulkan: required device extension is not available: " + std::string(required_extension));
         }
-        if (is_extension_supported(VK_NVX_RAYTRACING_EXTENSION_NAME)) {
-            device_extensions.push_back(VK_NVX_RAYTRACING_EXTENSION_NAME);
+        if (is_extension_supported(VK_NV_RAY_TRACING_EXTENSION_NAME)) {
+            device_extensions.push_back(VK_NV_RAY_TRACING_EXTENSION_NAME);
             vk.raytracing_supported = true;
         }
 
@@ -350,10 +350,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_utils_messenger_callback(
     const VkDebugUtilsMessengerCallbackDataEXT*     callback_data,
     void*                                           user_data)
 {
-    if (strstr(callback_data->pMessage, "Device Extension VK_NVX_raytracing is not supported by this layer.") != 0 ||
-        strstr(callback_data->pMessage, "pProperties->pNext chain includes a structure with unknown VkStructureType"))
-        return VK_FALSE;
-
 #ifdef _WIN32
     printf("%s\n", callback_data->pMessage);
     OutputDebugStringA(callback_data->pMessage);
@@ -471,7 +467,7 @@ void vk_initialize(const Vk_Create_Info& create_info) {
     {
         std::vector<VkDescriptorPoolSize> pool_sizes;
         for (size_t i = 0; i < std::size(descriptor_pool_sizes); i++) {
-            if (descriptor_pool_sizes[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX && !vk.raytracing_supported)
+            if (descriptor_pool_sizes[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV && !vk.raytracing_supported)
                 continue;
 
             pool_sizes.push_back(descriptor_pool_sizes[i]);

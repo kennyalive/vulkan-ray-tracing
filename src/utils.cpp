@@ -89,13 +89,13 @@ Descriptor_Writes& Descriptor_Writes::storage_buffer(uint32_t binding, VkBuffer 
     return *this;
 }
 
-Descriptor_Writes& Descriptor_Writes::accelerator(uint32_t binding, VkAccelerationStructureNVX acceleration_structure) {
+Descriptor_Writes& Descriptor_Writes::accelerator(uint32_t binding, VkAccelerationStructureNV acceleration_structure) {
     assert(write_count < max_writes);
     Accel_Info& accel_info = resource_infos[write_count].accel_info;
     accel_info.handle = acceleration_structure;
 
-    VkDescriptorAccelerationStructureInfoNVX& accel = accel_info.accel;
-    accel = VkDescriptorAccelerationStructureInfoNVX { VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
+    VkWriteDescriptorSetAccelerationStructureNV& accel = accel_info.accel;
+    accel = VkWriteDescriptorSetAccelerationStructureNV { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV };
     accel.accelerationStructureCount = 1;
     accel.pAccelerationStructures = &accel_info.handle;
 
@@ -105,7 +105,7 @@ Descriptor_Writes& Descriptor_Writes::accelerator(uint32_t binding, VkAccelerati
     write.dstSet             = descriptor_set;
     write.dstBinding         = binding;
     write.descriptorCount    = 1;
-    write.descriptorType     = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+    write.descriptorType     = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
     return *this;
 }
 
@@ -161,7 +161,7 @@ Descriptor_Set_Layout& Descriptor_Set_Layout::storage_buffer(uint32_t binding, V
 
 Descriptor_Set_Layout& Descriptor_Set_Layout::accelerator(uint32_t binding, VkShaderStageFlags stage_flags) {
     assert(binding_count < max_bindings);
-    bindings[binding_count++] = get_set_layout_binding(binding, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, stage_flags);
+    bindings[binding_count++] = get_set_layout_binding(binding, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV, stage_flags);
     return *this;
 }
 

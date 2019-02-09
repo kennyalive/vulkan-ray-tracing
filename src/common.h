@@ -57,6 +57,10 @@ inline float srgb_encode(float f) {
         return 1.055f * std::pow(f, 1.f/2.4f) - 0.055f;
 }
 
+inline uint32_t round_up(uint32_t k, uint32_t alignment) {
+    return (k + alignment - 1) & ~(alignment - 1);
+}
+
 #if 0
 #define START_TIMER { Timestamp t;
 #define STOP_TIMER(message) \

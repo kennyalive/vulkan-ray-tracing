@@ -10,15 +10,15 @@ struct Rt_Uniform_Buffer {
     Matrix3x4 model_transform;
 };
 
-void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler) {
+void Raytracing_Resources::create(const VkGeometryTrianglesNV& model_triangles, VkImageView texture_view, VkSampler sampler) {
     uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Rt_Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &(void*&)mapped_uniform_buffer, "rt_uniform_buffer");
 
     // Instance buffer.
     {
         VkBufferCreateInfo buffer_create_info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-        buffer_create_info.size = sizeof(VkInstanceNVX);
-        buffer_create_info.usage = VK_BUFFER_USAGE_RAYTRACING_BIT_NVX;
+        buffer_create_info.size = sizeof(VkGeometryInstanceNV);
+        buffer_create_info.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
 
         VmaAllocationCreateInfo alloc_create_info{};
         alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
@@ -26,7 +26,7 @@ void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles,
 
         VmaAllocationInfo alloc_info;
         VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &instance_buffer, &instance_buffer_allocation, &alloc_info));
-        mapped_instance_buffer = (VkInstanceNVX*)alloc_info.pMappedData;
+        mapped_instance_buffer = (VkGeometryInstanceNV*)alloc_info.pMappedData;
     }
 
     create_acceleration_structure(model_triangles);
@@ -34,11 +34,22 @@ void Raytracing_Resources::create(const VkGeometryTrianglesNVX& model_triangles,
 
     // Shader binding table.
     {
-        constexpr uint32_t group_count = 3;
-        VkDeviceSize sbt_size = group_count * shader_header_size;
+        uint32_t miss_offset = round_up(properties.shaderGroupHandleSize /* raygen slot*/, properties.shaderGroupBaseAlignment);
+        uint32_t hit_offset = round_up(miss_offset + properties.shaderGroupHandleSize /* miss slot */, properties.shaderGroupBaseAlignment);
+
+        uint32_t sbt_buffer_size = hit_offset + properties.shaderGroupHandleSize;
+
         void* mapped_memory;
-        shader_binding_table = vk_create_host_visible_buffer(sbt_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, &mapped_memory, "shader_binding_table");
-        VK_CHECK(vkGetRaytracingShaderHandlesNVX(vk.device, pipeline, 0, group_count, sbt_size, mapped_memory));
+        shader_binding_table = vk_create_host_visible_buffer(sbt_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, &mapped_memory, "shader_binding_table");
+
+        // raygen slot
+        VK_CHECK(vkGetRayTracingShaderGroupHandlesNV(vk.device, pipeline, 0, 1, properties.shaderGroupHandleSize, mapped_memory));
+
+        // miss slot
+        VK_CHECK(vkGetRayTracingShaderGroupHandlesNV(vk.device, pipeline, 1, 1, properties.shaderGroupHandleSize, (uint8_t*)mapped_memory + miss_offset));
+
+        // hit slot
+        VK_CHECK(vkGetRayTracingShaderGroupHandlesNV(vk.device, pipeline, 2, 1, properties.shaderGroupHandleSize, (uint8_t*)mapped_memory + hit_offset));
     }
 }
 
@@ -46,10 +57,10 @@ void Raytracing_Resources::destroy() {
     uniform_buffer.destroy();
     shader_binding_table.destroy();
 
-    vkDestroyAccelerationStructureNVX(vk.device, bottom_level_accel, nullptr);
+    vkDestroyAccelerationStructureNV(vk.device, bottom_level_accel, nullptr);
     vmaFreeMemory(vk.allocator, bottom_level_accel_allocation);
 
-    vkDestroyAccelerationStructureNVX(vk.device, top_level_accel, nullptr);
+    vkDestroyAccelerationStructureNV(vk.device, top_level_accel, nullptr);
     vmaFreeMemory(vk.allocator, top_level_accel_allocation);
 
     vmaDestroyBuffer(vk.allocator, scratch_buffer, scratch_buffer_allocation);
@@ -65,33 +76,33 @@ void Raytracing_Resources::update_output_image_descriptor(VkImageView output_ima
 }
 
 void Raytracing_Resources::update(const Matrix3x4& model_transform, const Matrix3x4& camera_to_world_transform) {
-    VkInstanceNVX& instance = *mapped_instance_buffer;
+    VkGeometryInstanceNV& instance = *mapped_instance_buffer;
     instance.transform                                  = model_transform;
-    instance.instance_id                                = 0;
-    instance.instance_mask                              = 0xff;
-    instance.instance_contribution_to_hit_group_index   = 0;
-    instance.flags                                      = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NVX;
-    instance.acceleration_structure_handle              = bottom_level_accel_handle;
+    instance.instanceCustomIndex                        = 0;
+    instance.mask                                       = 0xff;
+    instance.instanceOffset                             = 0;
+    instance.flags                                      = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
+    instance.accelerationStructureHandle                = bottom_level_accel_handle;
 
     Rt_Uniform_Buffer& uniform_buffer = *mapped_uniform_buffer;
     uniform_buffer.camera_to_world = camera_to_world_transform;
     uniform_buffer.model_transform = model_transform;
 }
 
-void Raytracing_Resources::create_acceleration_structure(const VkGeometryTrianglesNVX& triangles) {
-    VkGeometryNVX geometry { VK_STRUCTURE_TYPE_GEOMETRY_NVX };
-    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NVX;
+void Raytracing_Resources::create_acceleration_structure(const VkGeometryTrianglesNV& triangles) {
+    VkGeometryNV geometry { VK_STRUCTURE_TYPE_GEOMETRY_NV };
+    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NV;
     geometry.geometry.triangles = triangles;
-    geometry.geometry.aabbs = VkGeometryAABBNVX { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NVX };
+    geometry.geometry.aabbs = VkGeometryAABBNV { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV };
 
     // Create acceleration structures and allocate/bind memory.
     {
-        auto allocate_acceleration_structure_memory = [](VkAccelerationStructureNVX acceleration_structutre, VmaAllocation* allocation) {
-            VkAccelerationStructureMemoryRequirementsInfoNVX accel_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX };
+        auto allocate_acceleration_structure_memory = [](VkAccelerationStructureNV acceleration_structutre, VmaAllocation* allocation) {
+            VkAccelerationStructureMemoryRequirementsInfoNV accel_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
             accel_info.accelerationStructure = acceleration_structutre;
 
             VkMemoryRequirements2 reqs_holder { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2 };
-            vkGetAccelerationStructureMemoryRequirementsNVX(vk.device, &accel_info, &reqs_holder);
+            vkGetAccelerationStructureMemoryRequirementsNV(vk.device, &accel_info, &reqs_holder);
 
             VmaAllocationCreateInfo alloc_create_info{};
             alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -99,36 +110,42 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
             VmaAllocationInfo alloc_info;
             VK_CHECK(vmaAllocateMemory(vk.allocator, &reqs_holder.memoryRequirements, &alloc_create_info, allocation, &alloc_info));
 
-            VkBindAccelerationStructureMemoryInfoNVX bind_info { VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NVX };
+            VkBindAccelerationStructureMemoryInfoNV bind_info { VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NV };
             bind_info.accelerationStructure = acceleration_structutre;
             bind_info.memory = alloc_info.deviceMemory;
             bind_info.memoryOffset = alloc_info.offset;
-            VK_CHECK(vkBindAccelerationStructureMemoryNVX(vk.device, 1, &bind_info));
+            VK_CHECK(vkBindAccelerationStructureMemoryNV(vk.device, 1, &bind_info));
         };
 
         // Bottom level.
         {
-            VkAccelerationStructureCreateInfoNVX create_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NVX };
-            create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX;
-            create_info.geometryCount = 1;
-            create_info.pGeometries = &geometry;
+            VkAccelerationStructureInfoNV accel_info{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+            accel_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
+            accel_info.geometryCount = 1;
+            accel_info.pGeometries = &geometry;
 
-            VK_CHECK(vkCreateAccelerationStructureNVX(vk.device, &create_info, nullptr, &bottom_level_accel));
+            VkAccelerationStructureCreateInfoNV create_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NV };
+            create_info.info = accel_info;
+
+            VK_CHECK(vkCreateAccelerationStructureNV(vk.device, &create_info, nullptr, &bottom_level_accel));
             allocate_acceleration_structure_memory(bottom_level_accel, &bottom_level_accel_allocation);
             vk_set_debug_name(bottom_level_accel, "bottom_level_accel");
 
-            VK_CHECK(vkGetAccelerationStructureHandleNVX(vk.device, bottom_level_accel, sizeof(uint64_t), &bottom_level_accel_handle));
+            VK_CHECK(vkGetAccelerationStructureHandleNV(vk.device, bottom_level_accel, sizeof(uint64_t), &bottom_level_accel_handle));
             update(Matrix3x4::identity, Matrix3x4::identity);
         }
 
         // Top level.
         {
-            VkAccelerationStructureCreateInfoNVX create_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NVX };
-            create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX;
-            create_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NVX;
-            create_info.instanceCount = 1;
+            VkAccelerationStructureInfoNV accel_info{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+            accel_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+            accel_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV;
+            accel_info.instanceCount = 1;
 
-            VK_CHECK(vkCreateAccelerationStructureNVX(vk.device, &create_info, nullptr, &top_level_accel));
+            VkAccelerationStructureCreateInfoNV create_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NV };
+            create_info.info = accel_info;
+
+            VK_CHECK(vkCreateAccelerationStructureNV(vk.device, &create_info, nullptr, &top_level_accel));
             allocate_acceleration_structure_memory(top_level_accel, &top_level_accel_allocation);
             vk_set_debug_name(top_level_accel, "top_level_accel");
         }
@@ -138,20 +155,19 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
     {
         VkMemoryRequirements scratch_memory_requirements;
         {
-            VkAccelerationStructureMemoryRequirementsInfoNVX accel_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX };
+            VkAccelerationStructureMemoryRequirementsInfoNV reqs_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
+            reqs_info.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
+            
+
             VkMemoryRequirements2 reqs_holder { VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2 };
 
-            accel_info.accelerationStructure = bottom_level_accel;
-            vkGetAccelerationStructureScratchMemoryRequirementsNVX(vk.device, &accel_info, &reqs_holder);
+            reqs_info.accelerationStructure = bottom_level_accel;
+            vkGetAccelerationStructureMemoryRequirementsNV(vk.device, &reqs_info, &reqs_holder);
             VkMemoryRequirements reqs_a = reqs_holder.memoryRequirements;
 
-            accel_info.accelerationStructure = top_level_accel;
-            vkGetAccelerationStructureScratchMemoryRequirementsNVX(vk.device, &accel_info, &reqs_holder);
+            reqs_info.accelerationStructure = top_level_accel;
+            vkGetAccelerationStructureMemoryRequirementsNV(vk.device, &reqs_info, &reqs_holder);
             VkMemoryRequirements reqs_b = reqs_holder.memoryRequirements;
-
-            // NOTE: do we really need vkGetAccelerationStructureScratchMemoryRequirementsNVX function in the API?
-            // It should be possible to use vkGetBufferMemoryRequirements2 without introducing new API function
-            // and without modifying standard way to query memory requirements for the resource.
 
             // Right now the spec does not provide additional guarantees related to scratch
             // buffer allocations, so the following asserts could fail.
@@ -168,12 +184,12 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
         alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
         // NOTE: do not use vmaCreateBuffer since it does not allow to specify 'alignment'
-        // returned from vkGetAccelerationStructureScratchMemoryRequirementsNVX.
+        // returned from vkGetAccelerationStructureScratchMemoryRequirementsNV.
         VK_CHECK(vmaAllocateMemory(vk.allocator, &scratch_memory_requirements, &alloc_create_info, &scratch_buffer_allocation, nullptr));
 
         VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
         buffer_create_info.size = scratch_memory_requirements.size;
-        buffer_create_info.usage = VK_BUFFER_USAGE_RAYTRACING_BIT_NVX;
+        buffer_create_info.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
 
         VK_CHECK(vkCreateBuffer(vk.device, &buffer_create_info, nullptr, &scratch_buffer));
         vkGetBufferMemoryRequirements(vk.device, scratch_buffer, &VkMemoryRequirements()); // shut up validation layers
@@ -186,50 +202,68 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
     vk_execute(vk.command_pool, vk.queue,
         [this, &geometry](VkCommandBuffer command_buffer)
     {
-        vkCmdBuildAccelerationStructureNVX(command_buffer,
-            VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX,
-            0, VK_NULL_HANDLE, 0,
-            1, &geometry,
-            VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX, VK_FALSE, bottom_level_accel, VK_NULL_HANDLE,
-            scratch_buffer, 0);
+        VkAccelerationStructureInfoNV bottom_accel_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+        bottom_accel_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
+        bottom_accel_info.geometryCount = 1;
+        bottom_accel_info.pGeometries = &geometry;
+
+        vkCmdBuildAccelerationStructureNV(command_buffer,
+            &bottom_accel_info,
+            VK_NULL_HANDLE, // instanceData
+            0, // instanceOffset
+            VK_FALSE, // update
+            bottom_level_accel, // dst
+            VK_NULL_HANDLE, // src
+            scratch_buffer, 
+            0 // scratch_offset
+        );
 
         VkMemoryBarrier barrier { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-        barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX;
-        barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX;
+        barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NV | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NV;
+        barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NV | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NV;
 
-        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX,
+        vkCmdPipelineBarrier(command_buffer,
+            VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_NV,
+            VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_NV | VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_NV,
             0, 1, &barrier, 0, nullptr, 0, nullptr);
 
-        vkCmdBuildAccelerationStructureNVX(command_buffer,
-            VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX,
-            1, instance_buffer, 0,
-            0, nullptr,
-            VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NVX,
-            VK_FALSE, top_level_accel, VK_NULL_HANDLE,
-            scratch_buffer, 0);
+        VkAccelerationStructureInfoNV top_accel_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+        top_accel_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+        top_accel_info.instanceCount = 1;
+
+        vkCmdBuildAccelerationStructureNV(command_buffer,
+            &top_accel_info,
+            instance_buffer, // instanceData
+            0, // instanceOffset
+            VK_FALSE, // update
+            top_level_accel, // dst
+            VK_NULL_HANDLE, // src
+            scratch_buffer, 
+            0 // scratch_offset
+        );
     });
     printf("\nAcceleration structures build time = %lld microseconds\n", elapsed_microseconds(t));
 }
 
-void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_triangles, VkImageView texture_view, VkSampler sampler) {
+void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNV& model_triangles, VkImageView texture_view, VkSampler sampler) {
 
     descriptor_set_layout = Descriptor_Set_Layout()
-        .storage_image  (0, VK_SHADER_STAGE_RAYGEN_BIT_NVX)
-        .accelerator    (1, VK_SHADER_STAGE_RAYGEN_BIT_NVX)
-        .uniform_buffer (2, VK_SHADER_STAGE_RAYGEN_BIT_NVX | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
-        .storage_buffer (3, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
-        .storage_buffer (4, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
-        .sampled_image  (5, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
-        .sampler        (6, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX)
+        .storage_image  (0, VK_SHADER_STAGE_RAYGEN_BIT_NV)
+        .accelerator    (1, VK_SHADER_STAGE_RAYGEN_BIT_NV)
+        .uniform_buffer (2, VK_SHADER_STAGE_RAYGEN_BIT_NV | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV)
+        .storage_buffer (3, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV)
+        .storage_buffer (4, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV)
+        .sampled_image  (5, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV)
+        .sampler        (6, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV)
         .create         ("rt_set_layout");
 
     // pipeline layout
     {
         VkPushConstantRange push_constant_ranges[2]; // show_texture_lods value
-        push_constant_ranges[0].stageFlags  = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+        push_constant_ranges[0].stageFlags  = VK_SHADER_STAGE_RAYGEN_BIT_NV;
         push_constant_ranges[0].offset      = 0;
         push_constant_ranges[0].size        = 4;
-        push_constant_ranges[1].stageFlags  = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+        push_constant_ranges[1].stageFlags  = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
         push_constant_ranges[1].offset      = 4;
         push_constant_ranges[1].size        = 4;
 
@@ -250,29 +284,58 @@ void Raytracing_Resources::create_pipeline(const VkGeometryTrianglesNVX& model_t
 
         VkPipelineShaderStageCreateInfo stage_infos[3] {};
         stage_infos[0].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stage_infos[0].stage    = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+        stage_infos[0].stage    = VK_SHADER_STAGE_RAYGEN_BIT_NV;
         stage_infos[0].module   = rgen_shader;
         stage_infos[0].pName    = "main";
 
         stage_infos[1].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stage_infos[1].stage    = VK_SHADER_STAGE_MISS_BIT_NVX;
+        stage_infos[1].stage    = VK_SHADER_STAGE_MISS_BIT_NV;
         stage_infos[1].module   = miss_shader;
         stage_infos[1].pName    = "main";
 
         stage_infos[2].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stage_infos[2].stage    = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+        stage_infos[2].stage    = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
         stage_infos[2].module   = chit_shader;
         stage_infos[2].pName    = "main";
 
-        uint32_t group_numbers[3] = { 0, 1, 2}; // [raygen] [miss] [chit]
+        VkRayTracingShaderGroupCreateInfoNV shader_groups[3];
 
-        VkRaytracingPipelineCreateInfoNVX create_info { VK_STRUCTURE_TYPE_RAYTRACING_PIPELINE_CREATE_INFO_NVX };
+        {
+            auto& group = shader_groups[0];
+            group = VkRayTracingShaderGroupCreateInfoNV { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV };
+            group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
+            group.generalShader = 0;
+            group.closestHitShader = VK_SHADER_UNUSED_NV;
+            group.anyHitShader = VK_SHADER_UNUSED_NV;
+            group.intersectionShader = VK_SHADER_UNUSED_NV;
+        }
+        {
+            auto& group = shader_groups[1];
+            group = VkRayTracingShaderGroupCreateInfoNV { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV };
+            group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
+            group.generalShader = 1;
+            group.closestHitShader = VK_SHADER_UNUSED_NV;
+            group.anyHitShader = VK_SHADER_UNUSED_NV;
+            group.intersectionShader = VK_SHADER_UNUSED_NV;
+        }
+        {
+            auto& group = shader_groups[2];
+            group = VkRayTracingShaderGroupCreateInfoNV { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV };
+            group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_NV;
+            group.generalShader = VK_SHADER_UNUSED_NV;
+            group.closestHitShader = 2;
+            group.anyHitShader = VK_SHADER_UNUSED_NV;
+            group.intersectionShader = VK_SHADER_UNUSED_NV;
+        }
+
+        VkRayTracingPipelineCreateInfoNV create_info { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV };
         create_info.stageCount          = (uint32_t)std::size(stage_infos);
         create_info.pStages             = stage_infos;
-        create_info.pGroupNumbers       = group_numbers;
+        create_info.groupCount          = (uint32_t)std::size(shader_groups);
+        create_info.pGroups             = shader_groups;
         create_info.maxRecursionDepth   = 1;
         create_info.layout              = pipeline_layout;
-        VK_CHECK(vkCreateRaytracingPipelinesNVX(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
+        VK_CHECK(vkCreateRayTracingPipelinesNV(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
 
         vkDestroyShaderModule(vk.device, rgen_shader, nullptr);
         vkDestroyShaderModule(vk.device, miss_shader, nullptr);

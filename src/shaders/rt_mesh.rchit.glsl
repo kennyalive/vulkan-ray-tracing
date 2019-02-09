@@ -1,11 +1,13 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
-#extension GL_NVX_raytracing : require
+#extension GL_NV_ray_tracing : require
 
 #include "common.glsl"
 
 #define HIT_SHADER
 #include "rt_utils.glsl"
+
+hitAttributeNV vec2 attribs;
 
 struct Buffer_Vertex {
     float x, y, z;
@@ -17,8 +19,7 @@ layout(push_constant) uniform Push_Constants {
       layout(offset = 4) uint show_texture_lods;
 };
 
-layout (location=0) rayPayloadInNVX Ray_Payload payload;
-layout (location=1) hitAttributeNVX vec3 attribs;
+layout (location=0) rayPayloadInNV Ray_Payload payload;
 
 layout(binding=2) uniform Uniform_Block {
     mat4x3 camera_to_world;
