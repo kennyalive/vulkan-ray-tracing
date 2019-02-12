@@ -5,19 +5,17 @@
 #include "vk.h"
 #include "utils.h"
 
+#include "glfw/glfw3.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_internal.h"
 #include "imgui/impl/imgui_impl_vulkan.h"
-#include "imgui/impl/imgui_impl_sdl.h"
-
-#include "sdl/SDL_scancode.h"
+#include "imgui/impl/imgui_impl_glfw.h"
 
 #include <cinttypes>
 #include <chrono>
 
-void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) {
-    this->sdl_window = sdl_window;
-    vk_initialize(vk_create_info);
+void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
+    vk_initialize(window, enable_validation_layers);
 
     // Device properties.
     {
@@ -160,7 +158,7 @@ void Vk_Demo::initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window) 
     // ImGui setup.
     {
         ImGui::CreateContext();
-        ImGui_ImplSDL2_InitForVulkan(sdl_window);
+        ImGui_ImplGlfw_InitForVulkan(window, true);
 
         ImGui_ImplVulkan_InitInfo init_info{};
         init_info.Instance          = vk.instance;
@@ -190,7 +188,7 @@ void Vk_Demo::shutdown() {
     VK_CHECK(vkDeviceWaitIdle(vk.device));
 
     ImGui_ImplVulkan_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
     vertex_buffer.destroy();
@@ -478,17 +476,17 @@ void Vk_Demo::do_imgui() {
     ImGuiIO& io = ImGui::GetIO();
 
     ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame(sdl_window);
+    ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
     if (!io.WantCaptureKeyboard) {
-        if (ImGui::IsKeyPressed(SDL_SCANCODE_F10)) {
+        if (ImGui::IsKeyPressed(GLFW_KEY_F10)) {
             show_ui = !show_ui;
         }
-        if (ImGui::IsKeyPressed(SDL_SCANCODE_W) || ImGui::IsKeyPressed(SDL_SCANCODE_UP)) {
+        if (ImGui::IsKeyPressed(GLFW_KEY_W) || ImGui::IsKeyPressed(GLFW_KEY_UP)) {
             camera_pos.z -= 0.2f;
         }
-        if (ImGui::IsKeyPressed(SDL_SCANCODE_S) || ImGui::IsKeyPressed(SDL_SCANCODE_DOWN)) {
+        if (ImGui::IsKeyPressed(GLFW_KEY_S) || ImGui::IsKeyPressed(GLFW_KEY_DOWN)) {
             camera_pos.z += 0.2f;
         }
     }

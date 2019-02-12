@@ -3,6 +3,8 @@
 #define VMA_IMPLEMENTATION
 #include "vk.h"
 
+#include "platform.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -122,7 +124,7 @@ static void destroy_swapchain() {
     vk.swapchain_info = Swapchain_Info{};
 }
 
-static void create_instance() {
+static void create_instance(bool enable_validation_layers) {
     const char* instance_extensions[] = {
         VK_KHR_SURFACE_EXTENSION_NAME,
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
@@ -154,7 +156,7 @@ static void create_instance() {
     desc.enabledExtensionCount   = sizeof(instance_extensions)/sizeof(instance_extensions[0]);
     desc.ppEnabledExtensionNames = instance_extensions;
 
-    if (vk.create_info.enable_validation_layers) {
+    if (enable_validation_layers) {
         static const char* layer_names[] = {
             "VK_LAYER_LUNARG_standard_validation"
         };
@@ -165,7 +167,7 @@ static void create_instance() {
     VK_CHECK(vkCreateInstance(&desc, nullptr, &vk.instance));
 }
 
-static void create_device() {
+static void create_device(GLFWwindow* window) {
     // select physical device
     {
         uint32_t count;
@@ -195,10 +197,7 @@ static void create_device() {
             error("Failed to find physical device that supports requested Vulkan API version");
     }
 
-    VkWin32SurfaceCreateInfoKHR desc { VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR };
-    desc.hinstance  = ::GetModuleHandle(nullptr);
-    desc.hwnd       = vk.create_info.windowing_system_info.info.win.window;
-    VK_CHECK(vkCreateWin32SurfaceKHR(vk.instance, &desc, nullptr, &vk.surface));
+    vk.surface = platform::create_surface(vk.instance, window);
 
     // select queue family
     {
@@ -372,9 +371,7 @@ void Vk_Buffer::destroy() {
     *this = Vk_Buffer{};
 }
 
-void vk_initialize(const Vk_Create_Info& create_info) {
-    vk.create_info = create_info;
-
+void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     VK_CHECK(volkInitialize());
     uint32_t instance_version = volkGetInstanceVersion();
 
@@ -388,7 +385,7 @@ void vk_initialize(const Vk_Create_Info& create_info) {
     // If Vulkan loader reports it supports Vulkan version that is > X it does not guarantee that X is supported.
     // Only when we successfully create VkInstance by setting VkApplicationInfo::apiVersion to X
     // we will know that X is supported.
-    create_instance();
+    create_instance(enable_validation_layers);
     volkLoadInstance(vk.instance);
 
     // Create debug messenger as early as possible (even before VkDevice is created).
@@ -406,7 +403,7 @@ void vk_initialize(const Vk_Create_Info& create_info) {
         VK_CHECK(vkCreateDebugUtilsMessengerEXT(vk.instance, &desc, nullptr, &vk.debug_utils_messenger));
     }
 
-    create_device();
+    create_device(window);
     volkLoadDevice(vk.device);
 
     vkGetDeviceQueue(vk.device, vk.queue_family_index, 0, &vk.queue);

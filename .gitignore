@@ -1,7 +1,5 @@
 .vs/
 build/
-
-third_party/dxc/
 imgui.ini
 
 data/*

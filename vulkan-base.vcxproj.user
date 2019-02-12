@@ -7,6 +7,6 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>--validation-layers --debug-names</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>--validation-layers</LocalDebuggerCommandArguments>
   </PropertyGroup>
 </Project>

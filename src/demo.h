@@ -7,12 +7,13 @@
 #include "utils.h"
 #include "vk.h"
 
-#include "sdl/SDL_syswm.h"
 #include <vector>
+
+struct GLFWwindow;
 
 class Vk_Demo {
 public:
-    void initialize(Vk_Create_Info vk_create_info, SDL_Window* sdl_window);
+    void initialize(GLFWwindow* glfw_window, bool enable_validation_layers);
     void shutdown();
 
     void release_resolution_dependent_resources();
@@ -36,8 +37,6 @@ private:
 
     using Clock = std::chrono::high_resolution_clock;
     using Time  = std::chrono::time_point<Clock>;
-
-    SDL_Window*                 sdl_window;
 
     bool                        show_ui                 = true;
     bool                        vsync                   = true;

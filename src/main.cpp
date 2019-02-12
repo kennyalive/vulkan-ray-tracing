@@ -1,22 +1,21 @@
 #include "demo.h"
+#include "platform.h"
 
-#include "sdl/SDL.h"
-#include "sdl/SDL_syswm.h"
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include "glfw/glfw3.h"
+#include "glfw/glfw3native.h"
 
-#include "imgui/imgui.h"
-#include "imgui/impl/imgui_impl_sdl.h"
+#include <cassert>
 
-static bool toogle_fullscreen   = false;
-static bool handle_resize       = false;
+struct Command_Line_Options {
+    bool enable_validation_layers;
+};
 
-static bool parse_command_line(int argc, char** argv, Vk_Create_Info& vk_create_info) {
+static bool parse_command_line(int argc, char** argv, Command_Line_Options& options) {
     bool found_unknown_option = false;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--validation-layers") == 0) {
-            vk_create_info.enable_validation_layers = true;
-        }
-        else if (strcmp(argv[i], "--debug-names") == 0) {
-            vk_create_info.use_debug_names = true;
+            options.enable_validation_layers = true;
         }
         else if (strcmp(argv[i], "--data-dir") == 0) {
             if (i == argc-1) {
@@ -42,96 +41,96 @@ static bool parse_command_line(int argc, char** argv, Vk_Create_Info& vk_create_
     return true;
 }
 
-static bool process_events() {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        ImGui_ImplSDL2_ProcessEvent(&event);
+static int window_width = 720;
+static int window_height = 720;
 
-        if (event.type == SDL_QUIT)
-            return false;
+static void glfw_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (action == GLFW_PRESS) {
+        if (key == GLFW_KEY_ESCAPE) {
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+        } else if (key == GLFW_KEY_F11 || key == GLFW_KEY_ENTER && mods == GLFW_MOD_ALT) {
+            static int last_window_xpos, last_window_ypos;
+            static int last_window_width, last_window_height;
 
-        if (event.type == SDL_KEYDOWN) {
-            SDL_Scancode scancode = event.key.keysym.scancode;
+            VK_CHECK(vkDeviceWaitIdle(vk.device));
+            GLFWmonitor* monitor = glfwGetWindowMonitor(window);
+            if (monitor == nullptr) {
+                glfwGetWindowPos(window, &last_window_xpos, &last_window_ypos);
+                last_window_width = window_width;
+                last_window_height = window_height;
 
-            if (scancode == SDL_SCANCODE_ESCAPE)
-                return false;
-
-            if (scancode == SDL_SCANCODE_F11 || scancode == SDL_SCANCODE_RETURN && (SDL_GetModState() & KMOD_LALT) != 0)
-                toogle_fullscreen = true;
+                monitor = glfwGetPrimaryMonitor();
+                const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+                glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+            } else {
+                glfwSetWindowMonitor(window, nullptr, last_window_xpos, last_window_ypos, last_window_width, last_window_height, 0);
+            }
         }
-
-        if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED)
-            handle_resize = true;
     }
-    return true;
+}
+
+void glfw_error_callback(int error, const char* description) {
+    fprintf(stderr, "GLFW error: %s\n", description);
 }
 
 int main(int argc, char** argv) {
-    Vk_Create_Info vk_create_info{};
-    if (!parse_command_line(argc, argv, vk_create_info))
+    Command_Line_Options options{};
+
+    if (!parse_command_line(argc, argv, options))
         return 0;
 
-    if (SDL_Init(SDL_INIT_VIDEO) != 0)
-        error("SDL_Init error");
+    glfwSetErrorCallback(glfw_error_callback);
+    if (!glfwInit())
+        error("glfwInit failed");
 
-    struct On_Exit {~On_Exit() { SDL_Quit(); }} exit_action;
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    GLFWwindow* glfw_window = glfwCreateWindow(window_width, window_height, "Vulkan demo", nullptr, nullptr);
+    assert(glfw_window != nullptr);
+    glfwSetKeyCallback(glfw_window, glfw_key_callback);
 
-    // Create window.
-    SDL_Window* the_window = SDL_CreateWindow("Vulkan demo",
-        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 720, 720,
-        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
-    if (the_window == nullptr)
-        error("failed to create SDL window");
-
-    SDL_VERSION(&vk_create_info.windowing_system_info.version);
-    if (SDL_GetWindowWMInfo(the_window, &vk_create_info.windowing_system_info) == SDL_FALSE)
-        error("failed to get platform specific window information");
-
-    // Initialize demo.
     Vk_Demo demo{};
-    demo.initialize(vk_create_info, the_window);
+    demo.initialize(glfw_window, options.enable_validation_layers);
 
     bool prev_vsync = demo.vsync_enabled();
-    bool handle_vsync_toggle = false;
 
-    // Run main loop.
-    while (process_events()) {
-        if (toogle_fullscreen) {
-            if (SDL_GetWindowFlags(the_window) & SDL_WINDOW_FULLSCREEN_DESKTOP)
-                SDL_SetWindowFullscreen(the_window, 0);
-            else
-                SDL_SetWindowFullscreen(the_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+    bool window_active = true;
 
-            process_events();
-            toogle_fullscreen = false;
-        }
-
-        if (handle_resize || handle_vsync_toggle) {
-            if (vk.swapchain_info.handle != VK_NULL_HANDLE) {
-                VK_CHECK(vkDeviceWaitIdle(vk.device));
-                demo.release_resolution_dependent_resources();
-                vk_release_resolution_dependent_resources();
-            }
-            handle_resize = false;
-            handle_vsync_toggle = false;
-        }
-
-        if ((SDL_GetWindowFlags(the_window) & SDL_WINDOW_MINIMIZED) == 0) {
-            if (vk.swapchain_info.handle == VK_NULL_HANDLE) {
-                vk_restore_resolution_dependent_resources(demo.vsync_enabled());
-                demo.restore_resolution_dependent_resources();
-            }
-
+    while (!glfwWindowShouldClose(glfw_window)) {
+        if (window_active)
             demo.run_frame();
 
-            if (prev_vsync != demo.vsync_enabled()) {
-                prev_vsync = demo.vsync_enabled();
-                handle_vsync_toggle = true;
-            }
+        glfwPollEvents();
+
+        int width, height;
+        glfwGetWindowSize(glfw_window, &width, &height);
+
+        bool recreate_swapchain = false;
+        if (prev_vsync != demo.vsync_enabled()) {
+            prev_vsync = demo.vsync_enabled();
+            recreate_swapchain = true;
+        } else if (width != window_width || height != window_height) {
+            window_width = width;
+            window_height = height;
+            recreate_swapchain = true;
         }
-        SDL_Delay(1);
+
+        window_active = (width != 0 && height != 0);
+
+        if (!window_active)
+            continue; 
+
+        if (recreate_swapchain) {
+            VK_CHECK(vkDeviceWaitIdle(vk.device));
+            demo.release_resolution_dependent_resources();
+            vk_release_resolution_dependent_resources();
+            vk_restore_resolution_dependent_resources(demo.vsync_enabled());
+            demo.restore_resolution_dependent_resources();
+            recreate_swapchain = false;
+        }
+        platform::sleep(1);
     }
 
     demo.shutdown();
+    glfwTerminate();
     return 0;
 }

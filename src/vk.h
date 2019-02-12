@@ -10,21 +10,12 @@
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #include "vk_mem_alloc.h"
 
-#include "sdl/SDL_syswm.h"
-
 #include <functional>
 #include <string>
 #include <vector>
 
 #define VK_CHECK_RESULT(result) if (result < 0) error(std::string("Error: ") + string_VkResult(result));
 #define VK_CHECK(function_call) { VkResult result = function_call;  VK_CHECK_RESULT(result); }
-
-struct Vk_Create_Info {
-    SDL_SysWMinfo               windowing_system_info;
-
-    bool                        enable_validation_layers;
-    bool                        use_debug_names;
-};
 
 struct Vk_Image {
     VkImage         handle;
@@ -55,9 +46,11 @@ struct Vk_Graphics_Pipeline_State {
     uint32_t                                dynamic_state_count;
 };
 
+struct GLFWwindow;
+
 // Initializes VK_Instance structure.
 // After calling this function we get fully functional vulkan subsystem.
-void vk_initialize(const Vk_Create_Info& create_info);
+void vk_initialize(GLFWwindow* window, bool enable_validation_layers);
 
 // Shutdown vulkan subsystem by releasing resources acquired by Vk_Instance.
 void vk_shutdown();
@@ -109,9 +102,6 @@ uint32_t vk_allocate_timestamp_queries(uint32_t count);
 
 template <typename Vk_Object_Type>
 void vk_set_debug_name(Vk_Object_Type object, const char* name) {
-    if (!vk.create_info.use_debug_names)
-        return;
-
     VkDebugUtilsObjectNameInfoEXT name_info { VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT };
     /*char buf[128];
     snprintf(buf, sizeof(buf), "%s 0x%llx", name, (uint64_t)object);*/
@@ -173,8 +163,6 @@ struct Depth_Buffer_Info {
 // Vk_Instance contains vulkan resources that do not depend on applicaton logic.
 // This structure is initialized/deinitialized by vk_initialize/vk_shutdown functions correspondingly.
 struct Vk_Instance {
-    Vk_Create_Info                  create_info;
-
     VkInstance                      instance;
     VkPhysicalDevice                physical_device;
     uint32_t                        queue_family_index;
