@@ -21,11 +21,6 @@ layout(push_constant) uniform Push_Constants {
 
 layout (location=0) rayPayloadInNV Ray_Payload payload;
 
-layout(binding=2) uniform Uniform_Block {
-    mat4x3 camera_to_world;
-    mat4x3 model_transform;
-};
-
 layout(std430, binding=3) readonly buffer Indices {
     uint index_buffer[];
 };
@@ -53,9 +48,9 @@ void main() {
     Vertex v1 = fetch_vertex(gl_PrimitiveID*3 + 1);
     Vertex v2 = fetch_vertex(gl_PrimitiveID*3 + 2);
 
-    v0.p = model_transform * vec4(v0.p, 1);
-    v1.p = model_transform * vec4(v1.p, 1);
-    v2.p = model_transform * vec4(v2.p, 1);
+    v0.p = gl_ObjectToWorldNV * vec4(v0.p, 1);
+    v1.p = gl_ObjectToWorldNV * vec4(v1.p, 1);
+    v2.p = gl_ObjectToWorldNV * vec4(v2.p, 1);
 
     int mip_levels = textureQueryLevels(sampler2D(image, image_sampler));
     float lod = compute_texture_lod(v0, v1, v2, payload.rx_dir, payload.ry_dir, mip_levels);

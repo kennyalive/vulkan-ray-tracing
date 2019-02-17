@@ -16,7 +16,6 @@ layout(set=0, binding = 1) uniform accelerationStructureNV accel;
 
 layout(std140, binding=2) uniform Uniform_Block {
     mat4x3 camera_to_world;
-    mat4x3 model_transform;
 };
 
 layout(location = 0) rayPayloadNV Ray_Payload payload;

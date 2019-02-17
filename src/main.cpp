@@ -1,9 +1,7 @@
 #include "demo.h"
 #include "platform.h"
 
-#define GLFW_EXPOSE_NATIVE_WIN32
 #include "glfw/glfw3.h"
-#include "glfw/glfw3native.h"
 
 #include <cassert>
 
@@ -69,7 +67,7 @@ static void glfw_key_callback(GLFWwindow* window, int key, int scancode, int act
     }
 }
 
-void glfw_error_callback(int error, const char* description) {
+static void glfw_error_callback(int error, const char* description) {
     fprintf(stderr, "GLFW error: %s\n", description);
 }
 

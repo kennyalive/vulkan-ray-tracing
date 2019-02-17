@@ -7,7 +7,6 @@
 
 struct Rt_Uniform_Buffer {
     Matrix3x4 camera_to_world;
-    Matrix3x4 model_transform;
 };
 
 void Raytracing_Resources::create(const VkGeometryTrianglesNV& model_triangles, VkImageView texture_view, VkSampler sampler) {
@@ -86,7 +85,6 @@ void Raytracing_Resources::update(const Matrix3x4& model_transform, const Matrix
 
     Rt_Uniform_Buffer& uniform_buffer = *mapped_uniform_buffer;
     uniform_buffer.camera_to_world = camera_to_world_transform;
-    uniform_buffer.model_transform = model_transform;
 }
 
 void Raytracing_Resources::create_acceleration_structure(const VkGeometryTrianglesNV& triangles) {
