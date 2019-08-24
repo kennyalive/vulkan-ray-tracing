@@ -203,17 +203,18 @@ void GPU_Time_Keeper::initialize_time_intervals() {
 }
 
 void GPU_Time_Keeper::next_frame() {
-    uint64_t timestamps[2*max_time_intervals];
+    uint64_t query_results[2/*query_result + availability*/ * 2/*start + end*/ * max_time_intervals];
     const uint32_t query_count = 2 * time_interval_count;
-    VkResult result = vkGetQueryPoolResults(vk.device, vk.timestamp_query_pool, 0, query_count, query_count * sizeof(uint64_t), timestamps, 0, VK_QUERY_RESULT_64_BIT);
+    VkResult result = vkGetQueryPoolResults(vk.device, vk.timestamp_query_pool, 0, query_count,
+        query_count * 2*sizeof(uint64_t), query_results, 2*sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
     VK_CHECK_RESULT(result);
     assert(result != VK_NOT_READY);
 
     const float influence = 0.25f;
 
     for (uint32_t i = 0; i < time_interval_count; i++) {
-        assert(timestamps[2*i + 1] >= timestamps[2*i]);
-        time_intervals[i].length_ms = (1.f-influence) * time_intervals[i].length_ms + influence * float(double(timestamps[2*i + 1] - timestamps[2*i]) * vk.timestamp_period_ms);
+        assert(query_results[4*i + 2] >= query_results[4*i]);
+        time_intervals[i].length_ms = (1.f-influence) * time_intervals[i].length_ms + influence * float(double(query_results[4*i + 2] - query_results[4*i]) * vk.timestamp_period_ms);
     }
 
     vkCmdResetQueryPool(vk.command_buffer, vk.timestamp_query_pool, 0, query_count);

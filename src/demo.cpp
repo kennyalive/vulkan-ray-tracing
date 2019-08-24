@@ -345,6 +345,7 @@ void Vk_Demo::draw_raytraced_image() {
 
     VkAccelerationStructureInfoNV accel_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
     accel_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+    accel_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV;
     accel_info.instanceCount = 1;
 
     vkCmdBuildAccelerationStructureNV(vk.command_buffer,

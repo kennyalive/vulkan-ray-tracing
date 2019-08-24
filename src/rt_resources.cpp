@@ -227,6 +227,7 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
 
         VkAccelerationStructureInfoNV top_accel_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
         top_accel_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+        top_accel_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV;
         top_accel_info.instanceCount = 1;
 
         vkCmdBuildAccelerationStructureNV(command_buffer,
