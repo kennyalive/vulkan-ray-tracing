@@ -180,16 +180,19 @@ struct Vk_Instance {
 
     uint32_t                        swapchain_image_index = -1; // current swapchain image
 
-    VkCommandPool                   command_pool;
-    VkCommandBuffer                 command_buffer;
+    VkCommandPool                   command_pools[2];
+    VkCommandBuffer                 command_buffers[2];
+    VkCommandBuffer                 command_buffer; // command_buffers[frame_index]
+    int                             frame_index;
 
     VkDescriptorPool                descriptor_pool;
 
-    VkSemaphore                     image_acquired;
-    VkSemaphore                     rendering_finished;
-    VkFence                         rendering_finished_fence;
+    VkSemaphore                     image_acquired_semaphore[2];
+    VkSemaphore                     rendering_finished_semaphore[2];
+    VkFence                         frame_fence[2];
 
-    VkQueryPool                     timestamp_query_pool;
+    VkQueryPool                     timestamp_query_pools[2];
+    VkQueryPool                     timestamp_query_pool; // timestamp_query_pool[frame_index]
     uint32_t                        timestamp_query_count;
 
     // Host visible memory used to copy image data to device local memory.

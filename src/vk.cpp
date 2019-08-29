@@ -329,7 +329,7 @@ static void create_depth_buffer() {
     subresource_range.levelCount = 1;
     subresource_range.layerCount = 1;
 
-    vk_execute(vk.command_pool, vk.queue, [&subresource_range](VkCommandBuffer command_buffer) {
+    vk_execute(vk.command_pools[0], vk.queue, [&subresource_range](VkCommandBuffer command_buffer) {
         vk_cmd_image_barrier_for_subresource(command_buffer, vk.depth_info.image, subresource_range,
             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
             0, 0,
@@ -435,29 +435,35 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     // Sync primitives.
     {
         VkSemaphoreCreateInfo desc { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-        VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.image_acquired));
-        VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.rendering_finished));
+        VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.image_acquired_semaphore[0]));
+        VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.image_acquired_semaphore[1]));
+        VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.rendering_finished_semaphore[0]));
+        VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.rendering_finished_semaphore[1]));
 
         VkFenceCreateInfo fence_desc { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         fence_desc.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-        VK_CHECK(vkCreateFence(vk.device, &fence_desc, nullptr, &vk.rendering_finished_fence));
+        VK_CHECK(vkCreateFence(vk.device, &fence_desc, nullptr, &vk.frame_fence[0]));
+        VK_CHECK(vkCreateFence(vk.device, &fence_desc, nullptr, &vk.frame_fence[1]));
     }
 
     // Command pool.
     {
         VkCommandPoolCreateInfo desc { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-        desc.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        desc.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
         desc.queueFamilyIndex = vk.queue_family_index;
-        VK_CHECK(vkCreateCommandPool(vk.device, &desc, nullptr, &vk.command_pool));
+        VK_CHECK(vkCreateCommandPool(vk.device, &desc, nullptr, &vk.command_pools[0]));
+        VK_CHECK(vkCreateCommandPool(vk.device, &desc, nullptr, &vk.command_pools[1]));
     }
 
     // Command buffer.
     {
         VkCommandBufferAllocateInfo alloc_info { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-        alloc_info.commandPool        = vk.command_pool;
-        alloc_info.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         alloc_info.commandBufferCount = 1;
-        VK_CHECK(vkAllocateCommandBuffers(vk.device, &alloc_info, &vk.command_buffer));
+        alloc_info.commandPool = vk.command_pools[0];
+        VK_CHECK(vkAllocateCommandBuffers(vk.device, &alloc_info, &vk.command_buffers[0]));
+        alloc_info.commandPool = vk.command_pools[1];
+        VK_CHECK(vkAllocateCommandBuffers(vk.device, &alloc_info, &vk.command_buffers[1]));
     }
 
     // Descriptor pool.
@@ -520,8 +526,8 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
         VkQueryPoolCreateInfo create_info { VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
         create_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
         create_info.queryCount = max_timestamp_queries;
-        VK_CHECK(vkCreateQueryPool(vk.device, &create_info, nullptr, &vk.timestamp_query_pool));
-
+        VK_CHECK(vkCreateQueryPool(vk.device, &create_info, nullptr, &vk.timestamp_query_pools[0]));
+        VK_CHECK(vkCreateQueryPool(vk.device, &create_info, nullptr, &vk.timestamp_query_pools[1]));
     }
 }
 
@@ -532,12 +538,17 @@ void vk_shutdown() {
         vmaDestroyBuffer(vk.allocator, vk.staging_buffer, vk.staging_buffer_allocation);
     }
 
-    vkDestroyCommandPool(vk.device, vk.command_pool, nullptr);
+    vkDestroyCommandPool(vk.device, vk.command_pools[0], nullptr);
+    vkDestroyCommandPool(vk.device, vk.command_pools[1], nullptr);
     vkDestroyDescriptorPool(vk.device, vk.descriptor_pool, nullptr);
-    vkDestroySemaphore(vk.device, vk.image_acquired, nullptr);
-    vkDestroySemaphore(vk.device, vk.rendering_finished, nullptr);
-    vkDestroyFence(vk.device, vk.rendering_finished_fence, nullptr);
-    vkDestroyQueryPool(vk.device, vk.timestamp_query_pool, nullptr);
+    vkDestroySemaphore(vk.device, vk.image_acquired_semaphore[0], nullptr);
+    vkDestroySemaphore(vk.device, vk.image_acquired_semaphore[1], nullptr);
+    vkDestroySemaphore(vk.device, vk.rendering_finished_semaphore[0], nullptr);
+    vkDestroySemaphore(vk.device, vk.rendering_finished_semaphore[1], nullptr);
+    vkDestroyFence(vk.device, vk.frame_fence[0], nullptr);
+    vkDestroyFence(vk.device, vk.frame_fence[1], nullptr);
+    vkDestroyQueryPool(vk.device, vk.timestamp_query_pools[0], nullptr);
+    vkDestroyQueryPool(vk.device, vk.timestamp_query_pools[1], nullptr);
     destroy_swapchain();
     destroy_depth_buffer();
     vmaDestroyAllocator(vk.allocator);
@@ -691,7 +702,7 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
         subresource_range.levelCount = 1;
         subresource_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
-        vk_execute(vk.command_pool, vk.queue,
+        vk_execute(vk.command_pools[0], vk.queue,
             [&image, &region, &subresource_range, width, height, mip_levels](VkCommandBuffer command_buffer) {
 
             subresource_range.baseMipLevel = 0;
@@ -971,12 +982,15 @@ VkPipeline vk_create_graphics_pipeline(
 }
 
 void vk_begin_frame() {
-    START_TIMER
-    VK_CHECK(vkAcquireNextImageKHR(vk.device, vk.swapchain_info.handle, UINT64_MAX, vk.image_acquired, VK_NULL_HANDLE, &vk.swapchain_image_index));
-    STOP_TIMER("vkAcquireNextImageKHR")
+    VK_CHECK(vkWaitForFences(vk.device, 1, &vk.frame_fence[vk.frame_index], VK_FALSE, std::numeric_limits<uint64_t>::max()));
+    VK_CHECK(vkResetFences(vk.device, 1, &vk.frame_fence[vk.frame_index]));
+    vkResetCommandPool(vk.device, vk.command_pools[vk.frame_index], 0);
+    vk.command_buffer = vk.command_buffers[vk.frame_index];
+    vk.timestamp_query_pool = vk.timestamp_query_pools[vk.frame_index];
 
-    VK_CHECK(vkWaitForFences(vk.device, 1, &vk.rendering_finished_fence, VK_FALSE, std::numeric_limits<uint64_t>::max()));
-    VK_CHECK(vkResetFences(vk.device, 1, &vk.rendering_finished_fence));
+    START_TIMER
+    VK_CHECK(vkAcquireNextImageKHR(vk.device, vk.swapchain_info.handle, UINT64_MAX, vk.image_acquired_semaphore[vk.frame_index], VK_NULL_HANDLE, &vk.swapchain_image_index));
+    STOP_TIMER("vkAcquireNextImageKHR")
 
     VkCommandBufferBeginInfo begin_info { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -990,20 +1004,20 @@ void vk_end_frame() {
 
     VkSubmitInfo submit_info { VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submit_info.waitSemaphoreCount   = 1;
-    submit_info.pWaitSemaphores      = &vk.image_acquired;
+    submit_info.pWaitSemaphores      = &vk.image_acquired_semaphore[vk.frame_index];
     submit_info.pWaitDstStageMask    = &wait_dst_stage_mask;
     submit_info.commandBufferCount   = 1;
     submit_info.pCommandBuffers      = &vk.command_buffer;
     submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores    = &vk.rendering_finished;
+    submit_info.pSignalSemaphores    = &vk.rendering_finished_semaphore[vk.frame_index];
 
     START_TIMER
-    VK_CHECK(vkQueueSubmit(vk.queue, 1, &submit_info, vk.rendering_finished_fence));
+    VK_CHECK(vkQueueSubmit(vk.queue, 1, &submit_info, vk.frame_fence[vk.frame_index]));
     STOP_TIMER("vkQueueSubmit")
 
     VkPresentInfoKHR present_info { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores    = &vk.rendering_finished;
+    present_info.pWaitSemaphores    = &vk.rendering_finished_semaphore[vk.frame_index];
     present_info.swapchainCount     = 1;
     present_info.pSwapchains        = &vk.swapchain_info.handle;
     present_info.pImageIndices      = &vk.swapchain_image_index;
@@ -1011,6 +1025,8 @@ void vk_end_frame() {
     START_TIMER
     VK_CHECK(vkQueuePresentKHR(vk.queue, &present_info));
     STOP_TIMER("vkQueuePresentKHR")
+
+    vk.frame_index = 1 - vk.frame_index;
 }
 
 void vk_execute(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder) {

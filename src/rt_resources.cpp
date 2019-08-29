@@ -197,7 +197,7 @@ void Raytracing_Resources::create_acceleration_structure(const VkGeometryTriangl
     // Build acceleration structures.
     Timestamp t;
 
-    vk_execute(vk.command_pool, vk.queue,
+    vk_execute(vk.command_pools[0], vk.queue,
         [this, &geometry](VkCommandBuffer command_buffer)
     {
         VkAccelerationStructureInfoNV bottom_accel_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };

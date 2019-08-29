@@ -61,8 +61,8 @@ struct Descriptor_Set_Layout {
 };
 
 struct GPU_Time_Interval {
-    uint32_t    start_query; // end query == (start_query + 1)
-    float       length_ms;
+    uint32_t start_query[2]; // end query == (start_query[frame_index] + 1)
+    float length_ms;
 
     void begin();
     void end();

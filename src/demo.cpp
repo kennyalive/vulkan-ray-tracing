@@ -59,7 +59,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
             vk_ensure_staging_buffer_allocation(size);
             memcpy(vk.staging_buffer_ptr, mesh.vertices.data(), size);
 
-            vk_execute(vk.command_pool, vk.queue, [&size, this](VkCommandBuffer command_buffer) {
+            vk_execute(vk.command_pools[0], vk.queue, [&size, this](VkCommandBuffer command_buffer) {
                 VkBufferCopy region;
                 region.srcOffset = 0;
                 region.dstOffset = 0;
@@ -73,7 +73,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
             vk_ensure_staging_buffer_allocation(size);
             memcpy(vk.staging_buffer_ptr, mesh.indices.data(), size);
 
-            vk_execute(vk.command_pool, vk.queue, [&size, this](VkCommandBuffer command_buffer) {
+            vk_execute(vk.command_pools[0], vk.queue, [&size, this](VkCommandBuffer command_buffer) {
                 VkBufferCopy region;
                 region.srcOffset = 0;
                 region.dstOffset = 0;
@@ -171,7 +171,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         ImGui_ImplVulkan_Init(&init_info, ui_render_pass);
         ImGui::StyleColorsDark();
 
-        vk_execute(vk.command_pool, vk.queue, [](VkCommandBuffer cb) {
+        vk_execute(vk.command_pools[0], vk.queue, [](VkCommandBuffer cb) {
             ImGui_ImplVulkan_CreateFontsTexture(cb);
         });
         ImGui_ImplVulkan_InvalidateFontUploadObjects();
@@ -221,7 +221,7 @@ void Vk_Demo::restore_resolution_dependent_resources() {
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, "output_image");
 
         if (raytracing) {
-            vk_execute(vk.command_pool, vk.queue, [this](VkCommandBuffer command_buffer) {
+            vk_execute(vk.command_pools[0], vk.queue, [this](VkCommandBuffer command_buffer) {
                 vk_cmd_image_barrier(command_buffer, output_image.handle,
                     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                     0,                                  0,
