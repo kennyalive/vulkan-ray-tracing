@@ -173,6 +173,8 @@
     <ClInclude Include="third_party\imgui\imgui_internal.h" />
     <ClInclude Include="third_party\imgui\impl\imgui_impl_glfw.h" />
     <ClInclude Include="third_party\imgui\impl\imgui_impl_vulkan.h" />
+    <ClInclude Include="third_party\vma\vk_mem_alloc.h" />
+    <ClInclude Include="third_party\volk\volk.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="src\shaders\raster_mesh.frag.glsl">

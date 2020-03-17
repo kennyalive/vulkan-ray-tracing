@@ -133,6 +133,12 @@
     <ClInclude Include="third_party\glfw\win32_platform.h">
       <Filter>3rdparty\glfw</Filter>
     </ClInclude>
+    <ClInclude Include="third_party\volk\volk.h">
+      <Filter>3rdparty\volk</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\vma\vk_mem_alloc.h">
+      <Filter>3rdparty\vma</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="3rdparty">
@@ -152,6 +158,9 @@
     </Filter>
     <Filter Include="3rdparty\glfw">
       <UniqueIdentifier>{91a535d5-9f33-420e-a196-0e3e133284f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdparty\vma">
+      <UniqueIdentifier>{03384505-17ef-43f0-bb7e-abbec6639a07}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

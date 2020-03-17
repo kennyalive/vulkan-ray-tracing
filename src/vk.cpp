@@ -415,6 +415,8 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     alloc_funcs.vkFreeMemory                        = vkFreeMemory;
     alloc_funcs.vkMapMemory                         = vkMapMemory;
     alloc_funcs.vkUnmapMemory                       = vkUnmapMemory;
+    alloc_funcs.vkFlushMappedMemoryRanges           = vkFlushMappedMemoryRanges;
+    alloc_funcs.vkInvalidateMappedMemoryRanges      = vkInvalidateMappedMemoryRanges;
     alloc_funcs.vkBindBufferMemory                  = vkBindBufferMemory;
     alloc_funcs.vkBindImageMemory                   = vkBindImageMemory;
     alloc_funcs.vkGetBufferMemoryRequirements       = vkGetBufferMemoryRequirements;
@@ -423,6 +425,7 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     alloc_funcs.vkDestroyBuffer                     = vkDestroyBuffer;
     alloc_funcs.vkCreateImage                       = vkCreateImage;
     alloc_funcs.vkDestroyImage                      = vkDestroyImage;
+    alloc_funcs.vkCmdCopyBuffer                     = vkCmdCopyBuffer;
     alloc_funcs.vkGetBufferMemoryRequirements2KHR   = vkGetBufferMemoryRequirements2KHR;
     alloc_funcs.vkGetImageMemoryRequirements2KHR    = vkGetImageMemoryRequirements2KHR;
 

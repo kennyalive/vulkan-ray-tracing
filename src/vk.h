@@ -8,7 +8,7 @@
 #include "vk_enum_string_helper.h"
 
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
-#include "vk_mem_alloc.h"
+#include "vma/vk_mem_alloc.h"
 
 #include <functional>
 #include <string>
