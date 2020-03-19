@@ -11,6 +11,20 @@
 
 struct GLFWwindow;
 
+struct GPU_Mesh {
+    Vk_Buffer vertex_buffer;
+    Vk_Buffer index_buffer;
+    uint32_t vertex_count = 0;
+    uint32_t index_count = 0;
+
+    void destroy() {
+        vertex_buffer.destroy();
+        index_buffer.destroy();
+        vertex_count = 0;
+        index_count = 0;
+    }
+};
+
 class Vk_Demo {
 public:
     void initialize(GLFWwindow* glfw_window, bool enable_validation_layers);
@@ -54,15 +68,11 @@ private:
     VkFramebuffer               ui_framebuffer;
     Vk_Image                    output_image;
     Copy_To_Swapchain           copy_to_swapchain;
-
-    Vk_Buffer                   vertex_buffer;
-    Vk_Buffer                   index_buffer;
-    uint32_t                    model_vertex_count;
-    uint32_t                    model_index_count;
+    GPU_Mesh                    gpu_mesh;
     Vk_Image                    texture;
     VkSampler                   sampler;
 
-    Vector3                      camera_pos = Vector3(0, 0.5, 3.0);
+    Vector3                     camera_pos = Vector3(0, 0.5, 3.0);
     Matrix3x4                   model_transform;
     Matrix3x4                   view_transform;
 
