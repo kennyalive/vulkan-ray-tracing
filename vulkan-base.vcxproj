@@ -110,10 +110,11 @@
     </CustomBuild>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\acceleration_structure.cpp" />
     <ClCompile Include="src\common.cpp" />
     <ClCompile Include="src\copy_to_swapchain.cpp" />
     <ClCompile Include="src\mesh.cpp" />
-    <ClCompile Include="src\utils.cpp" />
+    <ClCompile Include="src\vk_utils.cpp" />
     <ClCompile Include="src\matrix.cpp" />
     <ClCompile Include="src\raster_resources.cpp" />
     <ClCompile Include="src\rt_resources.cpp" />
@@ -148,11 +149,12 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\acceleration_structure.h" />
     <ClInclude Include="src\common.h" />
     <ClInclude Include="src\copy_to_swapchain.h" />
     <ClInclude Include="src\mesh.h" />
     <ClInclude Include="src\platform.h" />
-    <ClInclude Include="src\utils.h" />
+    <ClInclude Include="src\vk_utils.h" />
     <ClInclude Include="src\matrix.h" />
     <ClInclude Include="src\raster_resources.h" />
     <ClInclude Include="src\rt_resources.h" />

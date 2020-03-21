@@ -4,26 +4,12 @@
 #include "matrix.h"
 #include "raster_resources.h"
 #include "rt_resources.h"
-#include "utils.h"
+#include "vk_utils.h"
 #include "vk.h"
 
 #include <vector>
 
 struct GLFWwindow;
-
-struct GPU_Mesh {
-    Vk_Buffer vertex_buffer;
-    Vk_Buffer index_buffer;
-    uint32_t vertex_count = 0;
-    uint32_t index_count = 0;
-
-    void destroy() {
-        vertex_buffer.destroy();
-        index_buffer.destroy();
-        vertex_count = 0;
-        index_count = 0;
-    }
-};
 
 class Vk_Demo {
 public:

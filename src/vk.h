@@ -18,15 +18,15 @@
 #define VK_CHECK(function_call) { VkResult result = function_call;  VK_CHECK_RESULT(result); }
 
 struct Vk_Image {
-    VkImage         handle;
-    VkImageView     view;
-    VmaAllocation   allocation;
+    VkImage handle = VK_NULL_HANDLE;
+    VkImageView view = VK_NULL_HANDLE;
+    VmaAllocation allocation = VK_NULL_HANDLE;
     void destroy();
 };
 
 struct Vk_Buffer {
-    VkBuffer        handle;
-    VmaAllocation   allocation;
+    VkBuffer handle = VK_NULL_HANDLE;
+    VmaAllocation allocation = VK_NULL_HANDLE;
     void destroy();
 };
 
@@ -59,8 +59,8 @@ void vk_release_resolution_dependent_resources();
 void vk_restore_resolution_dependent_resources(bool vsync);
 
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size);
-Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name);
-Vk_Buffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name);
+Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data = nullptr, const char* name = nullptr);
+Vk_Buffer vk_create_mapped_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name = nullptr);
 Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate_mipmaps, const uint8_t* pixels, int bytes_per_pixel, const char*  name);
 Vk_Image vk_create_image(int width, int height, VkFormat format, VkImageCreateFlags usage_flags, const char* name);
 Vk_Image vk_load_texture(const std::string& texture_file);

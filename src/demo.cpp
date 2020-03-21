@@ -3,7 +3,7 @@
 #include "matrix.h"
 #include "mesh.h"
 #include "vk.h"
-#include "utils.h"
+#include "vk_utils.h"
 
 #include "glfw/glfw3.h"
 #include "imgui/imgui.h"
@@ -136,20 +136,8 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
 
     raster.create(texture.view, sampler);
 
-    if (vk.raytracing_supported) {
-        VkGeometryTrianglesNV model_triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV };
-        model_triangles.vertexData    = gpu_mesh.vertex_buffer.handle;
-        model_triangles.vertexOffset  = 0;
-        model_triangles.vertexCount   = gpu_mesh.vertex_count;
-        model_triangles.vertexStride  = sizeof(Vertex);
-        model_triangles.vertexFormat  = VK_FORMAT_R32G32B32_SFLOAT;
-        model_triangles.indexData     = gpu_mesh.index_buffer.handle;
-        model_triangles.indexOffset   = 0;
-        model_triangles.indexCount    = gpu_mesh.index_count;
-        model_triangles.indexType     = VK_INDEX_TYPE_UINT32;
-
-        rt.create(model_triangles, texture.view, sampler);
-    }
+    if (vk.raytracing_supported)
+        rt.create(gpu_mesh, texture.view, sampler);
 
     copy_to_swapchain.create();
     restore_resolution_dependent_resources();
@@ -346,12 +334,12 @@ void Vk_Demo::draw_raytraced_image() {
 
     vkCmdBuildAccelerationStructureNV(vk.command_buffer,
         &accel_info,
-        rt.instance_buffer, // instanceData
-        1, // instanceOffset
+        rt.accelerator.instance_buffer.handle, // instanceData
+        0, // instanceOffset
         VK_FALSE, // update
-        rt.top_level_accel, // dst
+        rt.accelerator.top_level_accel, // dst
         VK_NULL_HANDLE, // src
-        rt.scratch_buffer,
+        rt.accelerator.scratch_buffer.handle,
         0 // scratchOffset
     );
 

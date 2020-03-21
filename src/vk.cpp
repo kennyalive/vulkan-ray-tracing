@@ -594,10 +594,10 @@ void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
     vk.staging_buffer_size = size;
 }
 
-Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const char* name) {
+Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, const char* name) {
     VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-    buffer_create_info.size        = size;
-    buffer_create_info.usage       = usage;
+    buffer_create_info.size = size;
+    buffer_create_info.usage = usage;
     buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VmaAllocationCreateInfo alloc_create_info{};
@@ -606,28 +606,38 @@ Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const ch
     Vk_Buffer buffer;
     VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &buffer.handle, &buffer.allocation, nullptr));
     vk_set_debug_name(buffer.handle, name);
+
+    if (data != nullptr) {
+        vk_ensure_staging_buffer_allocation(size);
+        memcpy(vk.staging_buffer_ptr, data, size);
+
+        vk_execute(vk.command_pools[0], vk.queue, [size, &buffer](VkCommandBuffer command_buffer) {
+            VkBufferCopy region;
+            region.srcOffset = 0;
+            region.dstOffset = 0;
+            region.size = size;
+            vkCmdCopyBuffer(command_buffer, vk.staging_buffer, buffer.handle, 1, &region);
+        });
+    }
     return buffer;
 }
 
-Vk_Buffer vk_create_host_visible_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name) {
+Vk_Buffer vk_create_mapped_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name) {
     VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-    buffer_create_info.size         = size;
-    buffer_create_info.usage        = usage;
-    buffer_create_info.sharingMode  = VK_SHARING_MODE_EXCLUSIVE;
+    buffer_create_info.size = size;
+    buffer_create_info.usage = usage;
 
     VmaAllocationCreateInfo alloc_create_info{};
     alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
     alloc_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
     VmaAllocationInfo alloc_info;
-
     Vk_Buffer buffer;
     VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &buffer.handle, &buffer.allocation, &alloc_info));
     vk_set_debug_name(buffer.handle, name);
 
     if (buffer_ptr)
         *buffer_ptr = alloc_info.pMappedData;
-
     return buffer;
 }
 

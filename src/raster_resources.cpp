@@ -1,7 +1,7 @@
 #include "matrix.h"
 #include "mesh.h"
 #include "raster_resources.h"
-#include "utils.h"
+#include "vk_utils.h"
 
 namespace {
 struct Uniform_Buffer {
@@ -11,7 +11,7 @@ struct Uniform_Buffer {
 }
 
 void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler) {
-    uniform_buffer = vk_create_host_visible_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
+    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "raster_uniform_buffer");
 
     descriptor_set_layout = Descriptor_Set_Layout()
