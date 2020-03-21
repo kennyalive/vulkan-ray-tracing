@@ -149,7 +149,9 @@ static void create_instance(bool enable_validation_layers) {
     }
 
     VkApplicationInfo app_info { VK_STRUCTURE_TYPE_APPLICATION_INFO };
-    app_info.apiVersion = VK_API_VERSION_1_1;
+    // The highest version of instance-level, physical-device-level or
+    // device-level functionality we are going to use.
+    app_info.apiVersion = VK_API_VERSION_1_2;
 
     VkInstanceCreateInfo desc { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     desc.pApplicationInfo        = &app_info;
@@ -184,8 +186,8 @@ static void create_device(GLFWwindow* window) {
             VkPhysicalDeviceProperties props;
             vkGetPhysicalDeviceProperties(physical_device, &props);
 
-            // Check for Vulkan 1.1 ccompatibility.
-            if (VK_VERSION_MAJOR(props.apiVersion) == 1 && VK_VERSION_MINOR(props.apiVersion) >= 1)
+            // Check for device-level Vulkan 1.2 compatibility.
+            if (VK_VERSION_MAJOR(props.apiVersion) == 1 && VK_VERSION_MINOR(props.apiVersion) >= 2)
             {
                 vk.physical_device = physical_device;
                 vk.timestamp_period_ms = (double)props.limits.timestampPeriod * 1e-6;
@@ -375,16 +377,12 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     VK_CHECK(volkInitialize());
     uint32_t instance_version = volkGetInstanceVersion();
 
-    // Check the highest Vulkan instance version supported by the loader.
+    // Require version 1.1 or higher of instance-level functionality.
     bool loader_supports_version_higher_than_or_equal_to_1_1 =
         VK_VERSION_MAJOR(instance_version) > 1 || VK_VERSION_MINOR(instance_version) >= 1;
-
     if (!loader_supports_version_higher_than_or_equal_to_1_1)
         error("Vulkan loader does not support Vulkan API version 1.1");
 
-    // If Vulkan loader reports it supports Vulkan version that is > X it does not guarantee that X is supported.
-    // Only when we successfully create VkInstance by setting VkApplicationInfo::apiVersion to X
-    // we will know that X is supported.
     create_instance(enable_validation_layers);
     volkLoadInstance(vk.instance);
 
