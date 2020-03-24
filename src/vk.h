@@ -4,6 +4,10 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 #define NOMINMAX
 #endif
+
+// VK_KHR_ray_tracing
+#define VK_ENABLE_BETA_EXTENSIONS
+
 #include "volk/volk.h"
 #include "vk_enum_string_helper.h"
 
@@ -27,6 +31,7 @@ struct Vk_Image {
 struct Vk_Buffer {
     VkBuffer handle = VK_NULL_HANDLE;
     VmaAllocation allocation = VK_NULL_HANDLE;
+    VkDeviceAddress device_address = 0;
     void destroy();
 };
 
@@ -139,8 +144,8 @@ void vk_set_debug_name(Vk_Object_Type object, const char* name) {
     else IF_TYPE_THEN_ENUM(VkDescriptorUpdateTemplate,  VK_OBJECT_TYPE_DESCRIPTOR_UPDATE_TEMPLATE   )
     else IF_TYPE_THEN_ENUM(VkSurfaceKHR,                VK_OBJECT_TYPE_SURFACE_KHR                  )
     else IF_TYPE_THEN_ENUM(VkSwapchainKHR,              VK_OBJECT_TYPE_SWAPCHAIN_KHR                )
+    else IF_TYPE_THEN_ENUM(VkAccelerationStructureKHR,  VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR    )
     else IF_TYPE_THEN_ENUM(VkDebugUtilsMessengerEXT,    VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT    )
-    else IF_TYPE_THEN_ENUM(VkAccelerationStructureNV,   VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV    )
     else static_assert(false, "Unknown Vulkan object type");
 #undef IF_TYPE_THEN_ENUM
 

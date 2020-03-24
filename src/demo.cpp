@@ -21,7 +21,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
     {
         VkPhysicalDeviceProperties2 physical_device_properties { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
         if (vk.raytracing_supported) {
-            rt.properties = VkPhysicalDeviceRayTracingPropertiesNV { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PROPERTIES_NV };
+            rt.properties = VkPhysicalDeviceRayTracingPropertiesKHR { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PROPERTIES_KHR };
             physical_device_properties.pNext = &rt.properties;
         }
         vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
@@ -35,14 +35,14 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
 
         if (vk.raytracing_supported) {
             printf("\n");
-            printf("VkPhysicalDeviceRayTracingPropertiesNV:\n");
+            printf("VkPhysicalDeviceRayTracingPropertiesKHR:\n");
             printf("  shaderGroupHandleSize = %u\n", rt.properties.shaderGroupHandleSize);
             printf("  maxRecursionDepth = %u\n", rt.properties.maxRecursionDepth);
             printf("  maxShaderGroupStride = %u\n", rt.properties.maxShaderGroupStride);
             printf("  shaderGroupBaseAlignment = %u\n", rt.properties.shaderGroupBaseAlignment);
             printf("  maxGeometryCount = %" PRIu64 "\n", rt.properties.maxGeometryCount);
             printf("  maxInstanceCount = %" PRIu64 "\n", rt.properties.maxInstanceCount);
-            printf("  maxTriangleCount = %" PRIu64 "\n", rt.properties.maxTriangleCount);
+            printf("  maxTriangleCount = %" PRIu64 "\n", rt.properties.maxPrimitiveCount);
             printf("  maxDescriptorSetAccelerationStructures = %u\n", rt.properties.maxDescriptorSetAccelerationStructures);
         }
     }
@@ -327,48 +327,74 @@ void Vk_Demo::draw_rasterized_image() {
 void Vk_Demo::draw_raytraced_image() {
     GPU_TIME_SCOPE(gpu_times.draw);
 
-    VkAccelerationStructureInfoNV accel_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
-    accel_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
-    accel_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV;
-    accel_info.instanceCount = 1;
+    VkAccelerationStructureGeometryKHR geometry { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
+    geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+    geometry.geometry.instances = VkAccelerationStructureGeometryInstancesDataKHR { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR };
+    geometry.geometry.instances.arrayOfPointers = VK_FALSE;
+    geometry.geometry.instances.data.deviceAddress = rt.accelerator.instance_buffer.device_address;
 
-    vkCmdBuildAccelerationStructureNV(vk.command_buffer,
-        &accel_info,
-        rt.accelerator.instance_buffer.handle, // instanceData
-        0, // instanceOffset
-        VK_FALSE, // update
-        rt.accelerator.top_level_accel, // dst
-        VK_NULL_HANDLE, // src
-        rt.accelerator.scratch_buffer.handle,
-        0 // scratchOffset
-    );
+    const VkAccelerationStructureGeometryKHR* p_geometry[1] = { &geometry };
+
+    VkAccelerationStructureBuildGeometryInfoKHR geometry_info { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
+    geometry_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+    geometry_info.flags = 0;
+    geometry_info.update = VK_FALSE;
+    geometry_info.dstAccelerationStructure = rt.accelerator.top_level_accel;
+    geometry_info.geometryArrayOfPointers = VK_TRUE;
+    geometry_info.geometryCount = 1;
+    geometry_info.ppGeometries = p_geometry;
+    geometry_info.scratchData.deviceAddress = rt.accelerator.scratch_buffer.device_address;
+
+    VkAccelerationStructureBuildOffsetInfoKHR offset_info{};
+    offset_info.primitiveCount = 1;
+    offset_info.primitiveOffset = 0;
+
+    const VkAccelerationStructureBuildOffsetInfoKHR* p_offset_info[1] = { &offset_info };
+
+    vkCmdBuildAccelerationStructureKHR(vk.command_buffer, 1, &geometry_info, p_offset_info);
 
     VkMemoryBarrier barrier { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-    barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NV | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NV;
-    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NV;
+    barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
 
     vkCmdPipelineBarrier(vk.command_buffer,
-        VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_NV,
-        VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_NV,
+        VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+        VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
         0, 1, &barrier, 0, nullptr, 0, nullptr);
 
-    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, rt.pipeline_layout, 0, 1, &rt.descriptor_set, 0, nullptr);
-    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, rt.pipeline);
+    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt.pipeline_layout, 0, 1, &rt.descriptor_set, 0, nullptr);
+    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt.pipeline);
 
     uint32_t push_constants[2] = { spp4, show_texture_lod };
-    vkCmdPushConstants(vk.command_buffer, rt.pipeline_layout, VK_SHADER_STAGE_RAYGEN_BIT_NV, 0, 4, &push_constants[0]);
-    vkCmdPushConstants(vk.command_buffer, rt.pipeline_layout, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV, 4, 4, &push_constants[1]);
+    vkCmdPushConstants(vk.command_buffer, rt.pipeline_layout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, 4, &push_constants[0]);
+    vkCmdPushConstants(vk.command_buffer, rt.pipeline_layout, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 4, 4, &push_constants[1]);
 
     const VkBuffer sbt = rt.shader_binding_table.handle;
     const uint32_t sbt_slot_size = rt.properties.shaderGroupHandleSize;
     const uint32_t miss_offset = round_up(sbt_slot_size /* raygen slot*/, rt.properties.shaderGroupBaseAlignment);
     const uint32_t hit_offset = round_up(miss_offset + sbt_slot_size /* miss slot */, rt.properties.shaderGroupBaseAlignment);
 
-    vkCmdTraceRaysNV(vk.command_buffer,
-        sbt, 0, // raygen shader
-        sbt, miss_offset, sbt_slot_size, // miss shader
-        sbt, hit_offset, sbt_slot_size, // chit shader
-        VK_NULL_HANDLE, 0, 0,
+    VkStridedBufferRegionKHR raygen_sbt{};
+    raygen_sbt.buffer = rt.shader_binding_table.handle;
+    raygen_sbt.offset = 0;
+    raygen_sbt.stride = sbt_slot_size;
+    raygen_sbt.size = sbt_slot_size;
+
+    VkStridedBufferRegionKHR miss_sbt{};
+    miss_sbt.buffer = rt.shader_binding_table.handle;
+    miss_sbt.offset = miss_offset;
+    miss_sbt.stride = sbt_slot_size;
+    miss_sbt.size = sbt_slot_size;
+
+    VkStridedBufferRegionKHR chit_sbt{};
+    chit_sbt.buffer = rt.shader_binding_table.handle;
+    chit_sbt.offset = hit_offset;
+    chit_sbt.stride = sbt_slot_size;
+    chit_sbt.size = sbt_slot_size;
+
+    VkStridedBufferRegionKHR callable_sbt{};
+
+    vkCmdTraceRaysKHR(vk.command_buffer, &raygen_sbt, &miss_sbt, &chit_sbt, &callable_sbt,
         vk.surface_size.width, vk.surface_size.height, 1);
 }
 
@@ -379,7 +405,7 @@ void Vk_Demo::draw_imgui() {
 
     if (raytracing) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-            VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_NV,   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             VK_ACCESS_SHADER_WRITE_BIT,             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
             VK_IMAGE_LAYOUT_GENERAL,                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     } else {
@@ -422,7 +448,7 @@ void Vk_Demo::copy_output_image_to_swapchain() {
 
     if (raytracing) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-            VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_NV,   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_WRITE_BIT,             VK_ACCESS_SHADER_READ_BIT,
             VK_IMAGE_LAYOUT_GENERAL,                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
@@ -450,7 +476,7 @@ void Vk_Demo::copy_output_image_to_swapchain() {
 
     if (raytracing) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,   VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_NV,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,   VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
             VK_ACCESS_SHADER_READ_BIT,              VK_ACCESS_SHADER_WRITE_BIT,
             VK_IMAGE_LAYOUT_UNDEFINED,              VK_IMAGE_LAYOUT_GENERAL);
     }

@@ -19,7 +19,7 @@ static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
     {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,              16},
     {VK_DESCRIPTOR_TYPE_SAMPLER,                    16},
     {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,              16},
-    {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV,  16},
+    {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 16},
 };
 
 constexpr uint32_t max_descriptor_sets = 64;
@@ -247,28 +247,43 @@ static void create_device(GLFWwindow* window) {
             if (!is_extension_supported(required_extension))
                 error("Vulkan: required device extension is not available: " + std::string(required_extension));
         }
-        if (is_extension_supported(VK_NV_RAY_TRACING_EXTENSION_NAME)) {
-            device_extensions.push_back(VK_NV_RAY_TRACING_EXTENSION_NAME);
+        if (is_extension_supported(VK_KHR_RAY_TRACING_EXTENSION_NAME)) {
+            device_extensions.push_back(VK_KHR_RAY_TRACING_EXTENSION_NAME);
+            // According to Feature Requirements spec section if
+            // VK_KHR_ray_tracing extension is supported then rayTracing feature
+            // is guaranteed to be supported.
             vk.raytracing_supported = true;
         }
 
         const float priority = 1.0;
-        VkDeviceQueueCreateInfo queue_desc { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-        queue_desc.queueFamilyIndex = vk.queue_family_index;
-        queue_desc.queueCount       = 1;
-        queue_desc.pQueuePriorities = &priority;
+        VkDeviceQueueCreateInfo queue_create_info { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
+        queue_create_info.queueFamilyIndex = vk.queue_family_index;
+        queue_create_info.queueCount = 1;
+        queue_create_info.pQueuePriorities = &priority;
 
-        VkPhysicalDeviceFeatures features {};
-        features.vertexPipelineStoresAndAtomics = VK_TRUE; // to shut up improper validation warning (image store is in the raygen shader not in the vertex stage)
+        VkPhysicalDeviceVulkan12Features vulkan12_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+        vulkan12_features.bufferDeviceAddress = VK_TRUE;
 
-        VkDeviceCreateInfo device_desc { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
-        device_desc.queueCreateInfoCount    = 1;
-        device_desc.pQueueCreateInfos       = &queue_desc;
-        device_desc.enabledExtensionCount   = (uint32_t)device_extensions.size();
-        device_desc.ppEnabledExtensionNames = device_extensions.data();
-        device_desc.pEnabledFeatures = &features;
+        VkPhysicalDeviceRayTracingFeaturesKHR ray_tracing_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_FEATURES_KHR };
+        if (vk.raytracing_supported) {
+            ray_tracing_features.rayTracing = VK_TRUE;
+            vulkan12_features.pNext = &ray_tracing_features;
+        }
 
-        VK_CHECK(vkCreateDevice(vk.physical_device, &device_desc, nullptr, &vk.device));
+        VkPhysicalDeviceFeatures2 features2 { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+        features2.pNext = &vulkan12_features;
+        // to shut up improper validation warning (image store is in the raygen
+        // shader not in the vertex stage)
+        features2.features.vertexPipelineStoresAndAtomics = VK_TRUE;
+
+        VkDeviceCreateInfo device_create_info { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
+        device_create_info.pNext = &features2;
+        device_create_info.queueCreateInfoCount = 1;
+        device_create_info.pQueueCreateInfos = &queue_create_info;
+        device_create_info.enabledExtensionCount = (uint32_t)device_extensions.size();
+        device_create_info.ppEnabledExtensionNames = device_extensions.data();
+
+        VK_CHECK(vkCreateDevice(vk.physical_device, &device_create_info, nullptr, &vk.device));
     }
 }
 
@@ -427,9 +442,11 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     alloc_funcs.vkGetBufferMemoryRequirements2KHR   = vkGetBufferMemoryRequirements2KHR;
     alloc_funcs.vkGetImageMemoryRequirements2KHR    = vkGetImageMemoryRequirements2KHR;
 
-    VmaAllocatorCreateInfo allocator_info = {};
+    VmaAllocatorCreateInfo allocator_info {};
+    allocator_info.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     allocator_info.physicalDevice = vk.physical_device;
     allocator_info.device = vk.device;
+    allocator_info.instance = vk.instance;
     allocator_info.pVulkanFunctions = &alloc_funcs;
     VK_CHECK(vmaCreateAllocator(&allocator_info, &vk.allocator));
 
@@ -471,7 +488,7 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     {
         std::vector<VkDescriptorPoolSize> pool_sizes;
         for (size_t i = 0; i < std::size(descriptor_pool_sizes); i++) {
-            if (descriptor_pool_sizes[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV && !vk.raytracing_supported)
+            if (descriptor_pool_sizes[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR && !vk.raytracing_supported)
                 continue;
 
             pool_sizes.push_back(descriptor_pool_sizes[i]);
@@ -595,7 +612,7 @@ void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
 Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, const char* name) {
     VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     buffer_create_info.size = size;
-    buffer_create_info.usage = usage;
+    buffer_create_info.usage = usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VmaAllocationCreateInfo alloc_create_info{};
@@ -604,6 +621,10 @@ Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const vo
     Vk_Buffer buffer;
     VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &buffer.handle, &buffer.allocation, nullptr));
     vk_set_debug_name(buffer.handle, name);
+
+    VkBufferDeviceAddressInfo buffer_address_info { VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
+    buffer_address_info.buffer = buffer.handle;
+    buffer.device_address = vkGetBufferDeviceAddress(vk.device, &buffer_address_info);
 
     if (data != nullptr) {
         vk_ensure_staging_buffer_allocation(size);
@@ -623,7 +644,7 @@ Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const vo
 Vk_Buffer vk_create_mapped_buffer(VkDeviceSize size, VkBufferUsageFlags usage, void** buffer_ptr, const char* name) {
     VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     buffer_create_info.size = size;
-    buffer_create_info.usage = usage;
+    buffer_create_info.usage = usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
     VmaAllocationCreateInfo alloc_create_info{};
     alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
@@ -633,6 +654,10 @@ Vk_Buffer vk_create_mapped_buffer(VkDeviceSize size, VkBufferUsageFlags usage, v
     Vk_Buffer buffer;
     VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &buffer.handle, &buffer.allocation, &alloc_info));
     vk_set_debug_name(buffer.handle, name);
+
+    VkBufferDeviceAddressInfo buffer_address_info { VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
+    buffer_address_info.buffer = buffer.handle;
+    buffer.device_address = vkGetBufferDeviceAddress(vk.device, &buffer_address_info);
 
     if (buffer_ptr)
         *buffer_ptr = alloc_info.pMappedData;
