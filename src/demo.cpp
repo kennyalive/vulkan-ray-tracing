@@ -42,7 +42,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
             printf("  shaderGroupBaseAlignment = %u\n", rt.properties.shaderGroupBaseAlignment);
             printf("  maxGeometryCount = %" PRIu64 "\n", rt.properties.maxGeometryCount);
             printf("  maxInstanceCount = %" PRIu64 "\n", rt.properties.maxInstanceCount);
-            printf("  maxTriangleCount = %" PRIu64 "\n", rt.properties.maxPrimitiveCount);
+            printf("  maxPrimitiveCount = %" PRIu64 "\n", rt.properties.maxPrimitiveCount);
             printf("  maxDescriptorSetAccelerationStructures = %u\n", rt.properties.maxDescriptorSetAccelerationStructures);
         }
     }
@@ -50,35 +50,17 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
     // Geometry buffers.
     {
         Mesh mesh = load_obj_mesh(get_resource_path("model/mesh.obj"), 1.25f);
-        gpu_mesh.vertex_count = uint32_t(mesh.vertices.size());
-        gpu_mesh.index_count = uint32_t(mesh.indices.size());
         {
-            const VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
-            gpu_mesh.vertex_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, nullptr, "vertex_buffer");
-            vk_ensure_staging_buffer_allocation(size);
-            memcpy(vk.staging_buffer_ptr, mesh.vertices.data(), size);
-
-            vk_execute(vk.command_pools[0], vk.queue, [&size, this](VkCommandBuffer command_buffer) {
-                VkBufferCopy region;
-                region.srcOffset = 0;
-                region.dstOffset = 0;
-                region.size = size;
-                vkCmdCopyBuffer(command_buffer, vk.staging_buffer, gpu_mesh.vertex_buffer.handle, 1, &region);
-            });
+            VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
+            VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            gpu_mesh.vertex_buffer = vk_create_buffer(size, usage, mesh.vertices.data(), "vertex_buffer");
+            gpu_mesh.vertex_count = uint32_t(mesh.vertices.size());
         }
         {
-            const VkDeviceSize size = mesh.indices.size() * sizeof(mesh.indices[0]);
-            gpu_mesh.index_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, nullptr, "index_buffer");
-            vk_ensure_staging_buffer_allocation(size);
-            memcpy(vk.staging_buffer_ptr, mesh.indices.data(), size);
-
-            vk_execute(vk.command_pools[0], vk.queue, [&size, this](VkCommandBuffer command_buffer) {
-                VkBufferCopy region;
-                region.srcOffset = 0;
-                region.dstOffset = 0;
-                region.size = size;
-                vkCmdCopyBuffer(command_buffer, vk.staging_buffer, gpu_mesh.index_buffer.handle, 1, &region);
-            });
+            VkDeviceSize size = mesh.indices.size() * sizeof(mesh.indices[0]);
+            VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            gpu_mesh.index_buffer = vk_create_buffer(size, usage, mesh.indices.data(), "index_buffer");
+            gpu_mesh.index_count = uint32_t(mesh.indices.size());
         }
     }
 
