@@ -107,6 +107,9 @@ uint32_t vk_allocate_timestamp_queries(uint32_t count);
 
 template <typename Vk_Object_Type>
 void vk_set_debug_name(Vk_Object_Type object, const char* name) {
+    if (!name)
+        return;
+
     VkDebugUtilsObjectNameInfoEXT name_info { VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT };
     /*char buf[128];
     snprintf(buf, sizeof(buf), "%s 0x%llx", name, (uint64_t)object);*/

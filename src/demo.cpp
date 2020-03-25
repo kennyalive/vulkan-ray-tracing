@@ -54,7 +54,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         gpu_mesh.index_count = uint32_t(mesh.indices.size());
         {
             const VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
-            gpu_mesh.vertex_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, "vertex_buffer");
+            gpu_mesh.vertex_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, nullptr, "vertex_buffer");
             vk_ensure_staging_buffer_allocation(size);
             memcpy(vk.staging_buffer_ptr, mesh.vertices.data(), size);
 
@@ -68,7 +68,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         }
         {
             const VkDeviceSize size = mesh.indices.size() * sizeof(mesh.indices[0]);
-            gpu_mesh.index_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, "index_buffer");
+            gpu_mesh.index_buffer = vk_create_buffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, nullptr, "index_buffer");
             vk_ensure_staging_buffer_allocation(size);
             memcpy(vk.staging_buffer_ptr, mesh.indices.data(), size);
 

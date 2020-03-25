@@ -154,6 +154,7 @@ void Raytracing_Resources::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView
         create_info.groupCount          = (uint32_t)std::size(shader_groups);
         create_info.pGroups             = shader_groups;
         create_info.maxRecursionDepth   = 1;
+        create_info.libraries           = VkPipelineLibraryCreateInfoKHR { VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR };
         create_info.layout              = pipeline_layout;
         VK_CHECK(vkCreateRayTracingPipelinesKHR(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
 

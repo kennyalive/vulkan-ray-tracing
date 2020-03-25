@@ -160,7 +160,7 @@ static void create_instance(bool enable_validation_layers) {
 
     if (enable_validation_layers) {
         static const char* layer_names[] = {
-            "VK_LAYER_LUNARG_standard_validation"
+            "VK_LAYER_KHRONOS_validation"
         };
         desc.enabledLayerCount = (uint32_t)std::size(layer_names);
         desc.ppEnabledLayerNames = layer_names;
@@ -249,6 +249,16 @@ static void create_device(GLFWwindow* window) {
         }
         if (is_extension_supported(VK_KHR_RAY_TRACING_EXTENSION_NAME)) {
             device_extensions.push_back(VK_KHR_RAY_TRACING_EXTENSION_NAME);
+
+            // Also add extensions that VK_KHR_ray_tracing depends on
+            if (!is_extension_supported(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME))
+                error(std::string("Vulkan: required extension not supported: ") + VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+            device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+
+            if (!is_extension_supported(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME))
+                error(std::string("Vulkan: required extension is not supported: ") + VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+            device_extensions.push_back(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+
             // According to Feature Requirements spec section if
             // VK_KHR_ray_tracing extension is supported then rayTracing feature
             // is guaranteed to be supported.

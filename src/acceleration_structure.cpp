@@ -153,7 +153,7 @@ Vk_Intersection_Accelerator create_intersection_accelerator(const std::vector<GP
             reqs_info.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_KHR;
             reqs_info.buildType = VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR;
             reqs_info.accelerationStructure = accel;
-            VkMemoryRequirements2 reqs_holder;
+            VkMemoryRequirements2 reqs_holder{ VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2 };
             vkGetAccelerationStructureMemoryRequirementsKHR(vk.device, &reqs_info, &reqs_holder);
             // According to the spec, the alignment and memoryTypeBits returned
             // from vkGetAccelerationStructureMemoryRequirementsKHR for scratch
@@ -207,7 +207,7 @@ Vk_Intersection_Accelerator create_intersection_accelerator(const std::vector<GP
             offset_info.primitiveCount = gpu_meshes[i].index_count / 3;
             offset_info.primitiveOffset = 0;
 
-            vkCmdBuildAccelerationStructureKHR(vk.command_buffer, 1, &geometry_info, p_offset_info);
+            vkCmdBuildAccelerationStructureKHR(command_buffer, 1, &geometry_info, p_offset_info);
 
             // We need a barrier when building multiple bottom level AS because
             // signle scratch space is used for all builds.
@@ -246,7 +246,7 @@ Vk_Intersection_Accelerator create_intersection_accelerator(const std::vector<GP
         offset_info.primitiveCount = 1;
         offset_info.primitiveOffset = 0;
 
-        vkCmdBuildAccelerationStructureKHR(vk.command_buffer, 1, &geometry_info, p_offset_info);
+        vkCmdBuildAccelerationStructureKHR(command_buffer, 1, &geometry_info, p_offset_info);
 
         VkMemoryBarrier barrier { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
         barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
