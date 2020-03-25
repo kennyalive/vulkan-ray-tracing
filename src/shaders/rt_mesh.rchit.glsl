@@ -1,13 +1,13 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
-#extension GL_NV_ray_tracing : require
+#extension GL_EXT_ray_tracing : require
 
 #include "common.glsl"
 
 #define HIT_SHADER
 #include "rt_utils.glsl"
 
-hitAttributeNV vec2 attribs;
+hitAttributeEXT vec2 attribs;
 
 struct Buffer_Vertex {
     float x, y, z;
@@ -19,7 +19,7 @@ layout(push_constant) uniform Push_Constants {
       layout(offset = 4) uint show_texture_lods;
 };
 
-layout (location=0) rayPayloadInNV Ray_Payload payload;
+layout (location=0) rayPayloadInEXT Ray_Payload payload;
 
 layout(std430, binding=3) readonly buffer Indices {
     uint index_buffer[];
@@ -48,9 +48,9 @@ void main() {
     Vertex v1 = fetch_vertex(gl_PrimitiveID*3 + 1);
     Vertex v2 = fetch_vertex(gl_PrimitiveID*3 + 2);
 
-    v0.p = gl_ObjectToWorldNV * vec4(v0.p, 1);
-    v1.p = gl_ObjectToWorldNV * vec4(v1.p, 1);
-    v2.p = gl_ObjectToWorldNV * vec4(v2.p, 1);
+    v0.p = gl_ObjectToWorldEXT * vec4(v0.p, 1);
+    v1.p = gl_ObjectToWorldEXT * vec4(v1.p, 1);
+    v2.p = gl_ObjectToWorldEXT * vec4(v2.p, 1);
 
     int mip_levels = textureQueryLevels(sampler2D(image, image_sampler));
     float lod = compute_texture_lod(v0, v1, v2, payload.rx_dir, payload.ry_dir, mip_levels);
