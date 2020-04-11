@@ -43,7 +43,7 @@ Ray generate_ray(mat4x3 camera_to_world, vec2 film_position) {
 float compute_texture_lod(Vertex v0, Vertex v1, Vertex v2, vec3 rx_dir, vec3 ry_dir, int mip_levels) {
     vec3 face_normal = normalize(cross(v1.p - v0.p, v2.p - v0.p));
 
-    // compute dp/vu, dp/dv (PBRT, 3.6.2)
+    // compute dp/du, dp/dv (PBRT, 3.6.2)
     vec3 dpdu, dpdv;
     {
         vec3 p10 = v1.p - v0.p;
