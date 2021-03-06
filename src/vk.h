@@ -174,7 +174,6 @@ struct Vk_Instance {
     VkDevice                        device;
     VkQueue                         queue;
     double                          timestamp_period_ms;
-    bool                            raytracing_supported;
 
     VmaAllocator                    allocator;
 

@@ -20,10 +20,10 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
     // Device properties.
     {
         VkPhysicalDeviceProperties2 physical_device_properties { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-        if (vk.raytracing_supported) {
-            rt.properties = VkPhysicalDeviceRayTracingPipelinePropertiesKHR { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
-            physical_device_properties.pNext = &rt.properties;
-        }
+
+        raytracing.properties = VkPhysicalDeviceRayTracingPipelinePropertiesKHR { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
+        physical_device_properties.pNext = &raytracing.properties;
+
         vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
 
         printf("Device: %s\n", physical_device_properties.properties.deviceName);
@@ -33,17 +33,15 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
             VK_VERSION_PATCH(physical_device_properties.properties.apiVersion)
         );
 
-        if (vk.raytracing_supported) {
-            printf("\n");
-            printf("VkPhysicalDeviceRayTracingPropertiesKHR:\n");
-            printf("  shaderGroupHandleSize = %u\n", rt.properties.shaderGroupHandleSize);
-            printf("  maxRayRecursionDepth = %u\n", rt.properties.maxRayRecursionDepth);
-            printf("  maxShaderGroupStride = %u\n", rt.properties.maxShaderGroupStride);
-            printf("  shaderGroupBaseAlignment = %u\n", rt.properties.shaderGroupBaseAlignment);
-            printf("  maxRayDispatchInvocationCount = %u\n", rt.properties.maxRayDispatchInvocationCount);
-            printf("  shaderGroupHandleAlignment = %u\n", rt.properties.shaderGroupHandleAlignment);
-            printf("  maxRayHitAttributeSize = %u\n", rt.properties.maxRayHitAttributeSize);
-        }
+        printf("\n");
+        printf("VkPhysicalDeviceRayTracingPropertiesKHR:\n");
+        printf("  shaderGroupHandleSize = %u\n", raytracing.properties.shaderGroupHandleSize);
+        printf("  maxRayRecursionDepth = %u\n", raytracing.properties.maxRayRecursionDepth);
+        printf("  maxShaderGroupStride = %u\n", raytracing.properties.maxShaderGroupStride);
+        printf("  shaderGroupBaseAlignment = %u\n", raytracing.properties.shaderGroupBaseAlignment);
+        printf("  maxRayDispatchInvocationCount = %u\n", raytracing.properties.maxRayDispatchInvocationCount);
+        printf("  shaderGroupHandleAlignment = %u\n", raytracing.properties.shaderGroupHandleAlignment);
+        printf("  maxRayHitAttributeSize = %u\n", raytracing.properties.maxRayHitAttributeSize);
     }
 
     // Geometry buffers.
@@ -116,10 +114,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
     }
 
     raster.create(texture.view, sampler);
-
-    if (vk.raytracing_supported)
-        rt.create(gpu_mesh, texture.view, sampler);
-
+    raytracing.create(gpu_mesh, texture.view, sampler);
     copy_to_swapchain.create();
     restore_resolution_dependent_resources();
 
@@ -166,7 +161,7 @@ void Vk_Demo::shutdown() {
     vkDestroyRenderPass(vk.device, ui_render_pass, nullptr);
     release_resolution_dependent_resources();
     raster.destroy();
-    if (vk.raytracing_supported) rt.destroy();
+    raytracing.destroy();
     
     vk_shutdown();
 }
@@ -185,7 +180,7 @@ void Vk_Demo::restore_resolution_dependent_resources() {
         output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_R16G16B16A16_SFLOAT,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, "output_image");
 
-        if (raytracing) {
+        if (raytracing_active) {
             vk_execute(vk.command_pools[0], vk.queue, [this](VkCommandBuffer command_buffer) {
                 vk_cmd_image_barrier(command_buffer, output_image.handle,
                     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -209,9 +204,7 @@ void Vk_Demo::restore_resolution_dependent_resources() {
     }
 
     raster.create_framebuffer(output_image.view);
-
-    if (vk.raytracing_supported)
-        rt.update_output_image_descriptor(output_image.view);
+    raytracing.update_output_image_descriptor(output_image.view);
 
     copy_to_swapchain.update_resolution_dependent_descriptors(output_image.view);
     last_frame_time = Clock::now();
@@ -234,11 +227,10 @@ void Vk_Demo::run_frame() {
     camera_to_world_transform.set_column(1, Vector3(view_transform.get_row(1)));
     camera_to_world_transform.set_column(2, Vector3(view_transform.get_row(2)));
     camera_to_world_transform.set_column(3, camera_pos);
+    
+    raytracing.update(model_transform, camera_to_world_transform);
 
-    if (vk.raytracing_supported)
-        rt.update(model_transform, camera_to_world_transform);
-
-    bool old_raytracing = raytracing;
+    bool old_raytracing = raytracing_active;
     do_imgui();
     draw_frame();
 }
@@ -248,14 +240,14 @@ void Vk_Demo::draw_frame() {
     time_keeper.next_frame();
     gpu_times.frame->begin();
 
-    if (raytracing && ui_result.raytracing_toggled) {
+    if (raytracing_active && ui_result.raytracing_toggled) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             0, VK_ACCESS_SHADER_WRITE_BIT,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
     }
 
-    if (raytracing)
+    if (raytracing_active)
         draw_raytraced_image();
     else
         draw_rasterized_image();
@@ -308,32 +300,32 @@ void Vk_Demo::draw_rasterized_image() {
 void Vk_Demo::draw_raytraced_image() {
     GPU_TIME_SCOPE(gpu_times.draw);
 
-    rt.accelerator.rebuild_top_level_accel(vk.command_buffer);
+    raytracing.accelerator.rebuild_top_level_accel(vk.command_buffer);
 
-    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt.pipeline_layout, 0, 1, &rt.descriptor_set, 0, nullptr);
-    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt.pipeline);
+    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytracing.pipeline_layout, 0, 1, &raytracing.descriptor_set, 0, nullptr);
+    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytracing.pipeline);
 
     uint32_t push_constants[2] = { spp4, show_texture_lod };
-    vkCmdPushConstants(vk.command_buffer, rt.pipeline_layout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, 4, &push_constants[0]);
-    vkCmdPushConstants(vk.command_buffer, rt.pipeline_layout, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 4, 4, &push_constants[1]);
+    vkCmdPushConstants(vk.command_buffer, raytracing.pipeline_layout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, 4, &push_constants[0]);
+    vkCmdPushConstants(vk.command_buffer, raytracing.pipeline_layout, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 4, 4, &push_constants[1]);
 
-    const VkBuffer sbt = rt.shader_binding_table.handle;
-    const uint32_t sbt_slot_size = rt.properties.shaderGroupHandleSize;
-    const uint32_t miss_offset = round_up(sbt_slot_size /* raygen slot*/, rt.properties.shaderGroupBaseAlignment);
-    const uint32_t hit_offset = round_up(miss_offset + sbt_slot_size /* miss slot */, rt.properties.shaderGroupBaseAlignment);
+    const VkBuffer sbt = raytracing.shader_binding_table.handle;
+    const uint32_t sbt_slot_size = raytracing.properties.shaderGroupHandleSize;
+    const uint32_t miss_offset = round_up(sbt_slot_size /* raygen slot*/, raytracing.properties.shaderGroupBaseAlignment);
+    const uint32_t hit_offset = round_up(miss_offset + sbt_slot_size /* miss slot */, raytracing.properties.shaderGroupBaseAlignment);
 
     VkStridedDeviceAddressRegionKHR raygen_sbt{};
-    raygen_sbt.deviceAddress = rt.shader_binding_table.device_address + 0;
+    raygen_sbt.deviceAddress = raytracing.shader_binding_table.device_address + 0;
     raygen_sbt.stride = sbt_slot_size;
     raygen_sbt.size = sbt_slot_size;
 
     VkStridedDeviceAddressRegionKHR miss_sbt{};
-    miss_sbt.deviceAddress = rt.shader_binding_table.device_address + miss_offset;
+    miss_sbt.deviceAddress = raytracing.shader_binding_table.device_address + miss_offset;
     miss_sbt.stride = sbt_slot_size;
     miss_sbt.size = sbt_slot_size;
 
     VkStridedDeviceAddressRegionKHR chit_sbt{};
-    chit_sbt.deviceAddress = rt.shader_binding_table.device_address + hit_offset;
+    chit_sbt.deviceAddress = raytracing.shader_binding_table.device_address + hit_offset;
     chit_sbt.stride = sbt_slot_size;
     chit_sbt.size = sbt_slot_size;
 
@@ -348,7 +340,7 @@ void Vk_Demo::draw_imgui() {
 
     ImGui::Render();
 
-    if (raytracing) {
+    if (raytracing_active) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
             VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
             VK_ACCESS_SHADER_WRITE_BIT,             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
@@ -369,7 +361,7 @@ void Vk_Demo::draw_imgui() {
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
     vkCmdEndRenderPass(vk.command_buffer);
 
-    if (raytracing) {
+    if (raytracing_active) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,           VK_ACCESS_SHADER_READ_BIT,
@@ -391,7 +383,7 @@ void Vk_Demo::copy_output_image_to_swapchain() {
     uint32_t group_count_x = (vk.surface_size.width + group_size_x - 1) / group_size_x;
     uint32_t group_count_y = (vk.surface_size.height + group_size_y - 1) / group_size_y;
 
-    if (raytracing) {
+    if (raytracing_active) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
             VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
             VK_ACCESS_SHADER_WRITE_BIT,             VK_ACCESS_SHADER_READ_BIT,
@@ -419,7 +411,7 @@ void Vk_Demo::copy_output_image_to_swapchain() {
         VK_ACCESS_SHADER_WRITE_BIT,             0,
         VK_IMAGE_LAYOUT_GENERAL,                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-    if (raytracing) {
+    if (raytracing_active) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,   VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
             VK_ACCESS_SHADER_READ_BIT,              VK_ACCESS_SHADER_WRITE_BIT,
@@ -476,16 +468,8 @@ void Vk_Demo::do_imgui() {
             ImGui::Checkbox("Animate", &animate);
             ImGui::Checkbox("Show texture lod", &show_texture_lod);
 
-            if (!vk.raytracing_supported) {
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-                ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-            }
-            ui_result.raytracing_toggled = ImGui::Checkbox("Raytracing", &raytracing);
+            ui_result.raytracing_toggled = ImGui::Checkbox("Raytracing", &raytracing_active);
             ImGui::Checkbox("4 rays per pixel", &spp4);
-            if (!vk.raytracing_supported) {
-                ImGui::PopItemFlag();
-                ImGui::PopStyleVar();
-            }
 
             if (ImGui::BeginPopupContextWindow()) {
                 if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;

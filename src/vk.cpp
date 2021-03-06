@@ -258,17 +258,17 @@ static void create_device(GLFWwindow* window) {
             acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
 
             vkGetPhysicalDeviceFeatures2(vk.physical_device, &features2);
-            vk.raytracing_supported = acceleration_structure_features.accelerationStructure && ray_tracing_pipeline_features.rayTracingPipeline;
+            bool raytracing_supported = acceleration_structure_features.accelerationStructure && ray_tracing_pipeline_features.rayTracingPipeline;
+            if (!raytracing_supported)
+                error("This vulkan implementation does not support raytracing");
 
-            if (vk.raytracing_supported) {
-                assert(is_extension_supported(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
-                assert(is_extension_supported(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME));
-                assert(is_extension_supported(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME));
+            assert(is_extension_supported(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
+            assert(is_extension_supported(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME));
+            assert(is_extension_supported(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME));
 
-                device_extensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-                device_extensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-                device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-            }
+            device_extensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+            device_extensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+            device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
         }
 
         const float priority = 1.0;
@@ -281,13 +281,13 @@ static void create_device(GLFWwindow* window) {
         vulkan12_features.bufferDeviceAddress = VK_TRUE;
 
         VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+        acceleration_structure_features.accelerationStructure = VK_TRUE;
+
         VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
-        if (vk.raytracing_supported) {
-            vulkan12_features.pNext = &acceleration_structure_features;
-            acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
-            acceleration_structure_features.accelerationStructure = VK_TRUE;
-            ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
-        }
+        ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
+
+        vulkan12_features.pNext = &acceleration_structure_features;
+        acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
 
         VkPhysicalDeviceFeatures2 features2 { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
         features2.pNext = &vulkan12_features;
@@ -507,9 +507,6 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     {
         std::vector<VkDescriptorPoolSize> pool_sizes;
         for (size_t i = 0; i < std::size(descriptor_pool_sizes); i++) {
-            if (descriptor_pool_sizes[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR && !vk.raytracing_supported)
-                continue;
-
             pool_sizes.push_back(descriptor_pool_sizes[i]);
         }
         VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };

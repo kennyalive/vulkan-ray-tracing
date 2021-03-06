@@ -117,7 +117,7 @@
     <ClCompile Include="src\vk_utils.cpp" />
     <ClCompile Include="src\matrix.cpp" />
     <ClCompile Include="src\raster_resources.cpp" />
-    <ClCompile Include="src\rt_resources.cpp" />
+    <ClCompile Include="src\raytracing_resources.cpp" />
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\demo.cpp" />
@@ -157,7 +157,7 @@
     <ClInclude Include="src\vk_utils.h" />
     <ClInclude Include="src\matrix.h" />
     <ClInclude Include="src\raster_resources.h" />
-    <ClInclude Include="src\rt_resources.h" />
+    <ClInclude Include="src\raytracing_resources.h" />
     <ClInclude Include="src\vector.h" />
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\demo.h" />

@@ -25,7 +25,6 @@
     </ClCompile>
     <ClCompile Include="src\matrix.cpp" />
     <ClCompile Include="src\copy_to_swapchain.cpp" />
-    <ClCompile Include="src\rt_resources.cpp" />
     <ClCompile Include="src\raster_resources.cpp" />
     <ClCompile Include="src\mesh.cpp" />
     <ClCompile Include="third_party\imgui\impl\imgui_impl_glfw.cpp">
@@ -79,6 +78,7 @@
     </ClCompile>
     <ClCompile Include="src\acceleration_structure.cpp" />
     <ClCompile Include="src\vk_utils.cpp" />
+    <ClCompile Include="src\raytracing_resources.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\demo.h" />
@@ -99,7 +99,6 @@
     <ClInclude Include="src\matrix.h" />
     <ClInclude Include="src\vector.h" />
     <ClInclude Include="src\copy_to_swapchain.h" />
-    <ClInclude Include="src\rt_resources.h" />
     <ClInclude Include="src\raster_resources.h" />
     <ClInclude Include="src\mesh.h" />
     <ClInclude Include="third_party\imgui\impl\imgui_impl_glfw.h">
@@ -141,6 +140,7 @@
     </ClInclude>
     <ClInclude Include="src\acceleration_structure.h" />
     <ClInclude Include="src\vk_utils.h" />
+    <ClInclude Include="src\raytracing_resources.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="3rdparty">

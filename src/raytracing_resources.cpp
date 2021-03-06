@@ -1,5 +1,5 @@
 #include "mesh.h"
-#include "rt_resources.h"
+#include "raytracing_resources.h"
 #include "vk_utils.h"
 
 #include <algorithm>

@@ -3,7 +3,7 @@
 #include "copy_to_swapchain.h"
 #include "matrix.h"
 #include "raster_resources.h"
-#include "rt_resources.h"
+#include "raytracing_resources.h"
 #include "vk_utils.h"
 #include "vk.h"
 
@@ -41,7 +41,7 @@ private:
     bool                        show_ui                 = true;
     bool                        vsync                   = true;
     bool                        animate                 = false;
-    bool                        raytracing              = false;
+    bool                        raytracing_active       = false;
     bool                        show_texture_lod        = false;
     bool                        spp4                    = false;
 
@@ -63,7 +63,7 @@ private:
     Matrix3x4                   view_transform;
 
     Rasterization_Resources     raster;
-    Raytracing_Resources        rt;
+    Raytracing_Resources        raytracing;
 
     GPU_Time_Keeper             time_keeper;
     struct {
