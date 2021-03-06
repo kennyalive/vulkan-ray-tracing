@@ -13,27 +13,20 @@ void Raytracing_Resources::create(const GPU_Mesh& gpu_mesh, VkImageView texture_
     uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Rt_Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &(void*&)mapped_uniform_buffer, "rt_uniform_buffer");
 
-    accelerator = create_intersection_accelerator({gpu_mesh}, true);
+    accelerator = create_intersection_accelerator({gpu_mesh});
     create_pipeline(gpu_mesh, texture_view, sampler);
 
     // Shader binding table.
     {
         uint32_t miss_offset = round_up(properties.shaderGroupHandleSize /* raygen slot*/, properties.shaderGroupBaseAlignment);
         uint32_t hit_offset = round_up(miss_offset + properties.shaderGroupHandleSize /* miss slot */, properties.shaderGroupBaseAlignment);
-
         uint32_t sbt_buffer_size = hit_offset + properties.shaderGroupHandleSize;
 
-        void* mapped_memory;
-        shader_binding_table = vk_create_mapped_buffer(sbt_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, &mapped_memory, "shader_binding_table");
-
-        // raygen slot
-        VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(vk.device, pipeline, 0, 1, properties.shaderGroupHandleSize, mapped_memory));
-
-        // miss slot
-        VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(vk.device, pipeline, 1, 1, properties.shaderGroupHandleSize, (uint8_t*)mapped_memory + miss_offset));
-
-        // hit slot
-        VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(vk.device, pipeline, 2, 1, properties.shaderGroupHandleSize, (uint8_t*)mapped_memory + hit_offset));
+        std::vector<uint8_t> data(sbt_buffer_size);
+        VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(vk.device, pipeline, 0, 1, properties.shaderGroupHandleSize, data.data() + 0)); // raygen slot
+        VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(vk.device, pipeline, 1, 1, properties.shaderGroupHandleSize, data.data() + miss_offset)); // miss slot
+        VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(vk.device, pipeline, 2, 1, properties.shaderGroupHandleSize, data.data() + hit_offset)); // hit slot
+        shader_binding_table = vk_create_buffer(sbt_buffer_size, VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT, data.data(), "shader_binding_table");
     }
 }
 
@@ -56,11 +49,11 @@ void Raytracing_Resources::update(const Matrix3x4& model_transform, const Matrix
 
     VkAccelerationStructureInstanceKHR& instance = *accelerator.mapped_instance_buffer;
     memcpy(&instance.transform.matrix[0][0], &model_transform.a[0][0], 12 * sizeof(float));
-    instance.instanceCustomIndex                        = 0;
-    instance.mask                                       = 0xff;
-    instance.instanceShaderBindingTableRecordOffset     = 0;
-    instance.flags                                      = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-    instance.accelerationStructureReference             = accelerator.bottom_level_accel_device_addresses[0];
+    instance.instanceCustomIndex = 0;
+    instance.mask = 0xff;
+    instance.instanceShaderBindingTableRecordOffset = 0;
+    instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+    instance.accelerationStructureReference = accelerator.bottom_level_accels[0].device_address;
 
     Rt_Uniform_Buffer& uniform_buffer = *mapped_uniform_buffer;
     uniform_buffer.camera_to_world = camera_to_world_transform;
@@ -119,7 +112,6 @@ void Raytracing_Resources::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView
         stage_infos[2].pName    = "main";
 
         VkRayTracingShaderGroupCreateInfoKHR shader_groups[3];
-
         {
             auto& group = shader_groups[0];
             group = VkRayTracingShaderGroupCreateInfoKHR { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
@@ -149,14 +141,15 @@ void Raytracing_Resources::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView
         }
 
         VkRayTracingPipelineCreateInfoKHR create_info { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
-        create_info.stageCount          = (uint32_t)std::size(stage_infos);
-        create_info.pStages             = stage_infos;
-        create_info.groupCount          = (uint32_t)std::size(shader_groups);
-        create_info.pGroups             = shader_groups;
-        create_info.maxRecursionDepth   = 1;
-        create_info.libraries           = VkPipelineLibraryCreateInfoKHR { VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR };
-        create_info.layout              = pipeline_layout;
-        VK_CHECK(vkCreateRayTracingPipelinesKHR(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
+        create_info.flags = VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR |
+                            VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_MISS_SHADERS_BIT_KHR;
+        create_info.stageCount = (uint32_t)std::size(stage_infos);
+        create_info.pStages = stage_infos;
+        create_info.groupCount = (uint32_t)std::size(shader_groups);
+        create_info.pGroups = shader_groups;
+        create_info.maxPipelineRayRecursionDepth = 1;
+        create_info.layout = pipeline_layout;
+        VK_CHECK(vkCreateRayTracingPipelinesKHR(vk.device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
 
         vkDestroyShaderModule(vk.device, rgen_shader, nullptr);
         vkDestroyShaderModule(vk.device, miss_shader, nullptr);
@@ -172,7 +165,7 @@ void Raytracing_Resources::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
 
         Descriptor_Writes(descriptor_set)
-            .accelerator(1, accelerator.top_level_accel)
+            .accelerator(1, accelerator.top_level_accel.aceleration_structure)
             .uniform_buffer(2, uniform_buffer.handle, 0, sizeof(Rt_Uniform_Buffer))
 
             .storage_buffer(3,

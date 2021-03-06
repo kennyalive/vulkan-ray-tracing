@@ -247,22 +247,28 @@ static void create_device(GLFWwindow* window) {
             if (!is_extension_supported(required_extension))
                 error("Vulkan: required device extension is not available: " + std::string(required_extension));
         }
-        if (is_extension_supported(VK_KHR_RAY_TRACING_EXTENSION_NAME)) {
-            device_extensions.push_back(VK_KHR_RAY_TRACING_EXTENSION_NAME);
 
-            // Also add extensions that VK_KHR_ray_tracing depends on
-            if (!is_extension_supported(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME))
-                error(std::string("Vulkan: required extension not supported: ") + VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-            device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+        // Check for ray tracing support.
+        {
+            VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+            VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
 
-            if (!is_extension_supported(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME))
-                error(std::string("Vulkan: required extension is not supported: ") + VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
-            device_extensions.push_back(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+            VkPhysicalDeviceFeatures2 features2 { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+            features2.pNext = &acceleration_structure_features;
+            acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
 
-            // According to Feature Requirements spec section if
-            // VK_KHR_ray_tracing extension is supported then rayTracing feature
-            // is guaranteed to be supported.
-            vk.raytracing_supported = true;
+            vkGetPhysicalDeviceFeatures2(vk.physical_device, &features2);
+            vk.raytracing_supported = acceleration_structure_features.accelerationStructure && ray_tracing_pipeline_features.rayTracingPipeline;
+
+            if (vk.raytracing_supported) {
+                assert(is_extension_supported(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
+                assert(is_extension_supported(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME));
+                assert(is_extension_supported(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME));
+
+                device_extensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+                device_extensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+                device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+            }
         }
 
         const float priority = 1.0;
@@ -274,10 +280,13 @@ static void create_device(GLFWwindow* window) {
         VkPhysicalDeviceVulkan12Features vulkan12_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
         vulkan12_features.bufferDeviceAddress = VK_TRUE;
 
-        VkPhysicalDeviceRayTracingFeaturesKHR ray_tracing_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_FEATURES_KHR };
+        VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+        VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
         if (vk.raytracing_supported) {
-            ray_tracing_features.rayTracing = VK_TRUE;
-            vulkan12_features.pNext = &ray_tracing_features;
+            vulkan12_features.pNext = &acceleration_structure_features;
+            acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
+            acceleration_structure_features.accelerationStructure = VK_TRUE;
+            ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
         }
 
         VkPhysicalDeviceFeatures2 features2 { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };

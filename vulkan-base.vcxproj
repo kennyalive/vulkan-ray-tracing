@@ -71,7 +71,7 @@
       <AdditionalManifestFiles>DeclareDPIAware.manifest</AdditionalManifestFiles>
     </Manifest>
     <CustomBuild>
-      <Command>$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V --target-env vulkan1.1 -o $(ProjectDir)data\spirv\%(Filename).spv &amp;&amp; $(VULKAN_SDK)\Bin\spirv-opt $(ProjectDir)data\spirv\%(Filename).spv -O --strip-debug -o $(ProjectDir)data\spirv\%(Filename).spv</Command>
+      <Command>$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V --target-env vulkan1.2 -o $(ProjectDir)data\spirv\%(Filename).spv &amp;&amp; $(VULKAN_SDK)\Bin\spirv-opt $(ProjectDir)data\spirv\%(Filename).spv -O --strip-debug -o $(ProjectDir)data\spirv\%(Filename).spv</Command>
       <Outputs>$(ProjectDir)data\spirv\%(Filename).spv</Outputs>
       <AdditionalInputs>$(ProjectDir)src\shaders\rt_utils.glsl;$(ProjectDir)src\shaders\common.glsl</AdditionalInputs>
       <LinkObjects>false</LinkObjects>
@@ -101,7 +101,7 @@
       <AdditionalManifestFiles>DeclareDPIAware.manifest</AdditionalManifestFiles>
     </Manifest>
     <CustomBuild>
-      <Command>$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V --target-env vulkan1.1 -o $(ProjectDir)data\spirv\%(Filename).spv &amp;&amp; $(VULKAN_SDK)\Bin\spirv-opt $(ProjectDir)data\spirv\%(Filename).spv -O --strip-debug -o $(ProjectDir)data\spirv\%(Filename).spv</Command>
+      <Command>$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V --target-env vulkan1.2 -o $(ProjectDir)data\spirv\%(Filename).spv &amp;&amp; $(VULKAN_SDK)\Bin\spirv-opt $(ProjectDir)data\spirv\%(Filename).spv -O --strip-debug -o $(ProjectDir)data\spirv\%(Filename).spv</Command>
       <Outputs>$(ProjectDir)data\spirv\%(Filename).spv</Outputs>
       <AdditionalInputs>$(ProjectDir)src\shaders\rt_utils.glsl;$(ProjectDir)src\shaders\common.glsl</AdditionalInputs>
       <LinkObjects>false</LinkObjects>
@@ -144,8 +144,8 @@
     <ClCompile Include="third_party\imgui\impl\imgui_impl_glfw.cpp" />
     <ClCompile Include="third_party\imgui\impl\imgui_impl_vulkan.cpp" />
     <ClCompile Include="third_party\volk\volk.c">
-      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">VK_USE_PLATFORM_WIN32_KHR;VK_ENABLE_BETA_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">VK_USE_PLATFORM_WIN32_KHR;VK_ENABLE_BETA_EXTENSIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">VK_USE_PLATFORM_WIN32_KHR;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -194,8 +194,6 @@
     </CustomBuild>
     <CustomBuild Include="src\shaders\rt_mesh.rgen.glsl">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V -o $(ProjectDir)data/spirv/%(Filename).spv</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(VULKAN_SDK)\Bin\glslangValidator %(FullPath) -V -o $(ProjectDir)data/spirv/%(Filename).spv</Command>
     </CustomBuild>
     <CustomBuild Include="src\shaders\rt_mesh.rmiss.glsl">
       <FileType>Document</FileType>
