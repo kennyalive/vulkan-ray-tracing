@@ -3,6 +3,7 @@
 #include "vk.h"
 
 struct Matrix3x4;
+struct GPU_Mesh;
 
 struct Draw_Mesh {
     VkDescriptorSetLayout       descriptor_set_layout;
@@ -21,4 +22,5 @@ struct Draw_Mesh {
     void create_framebuffer(VkImageView output_image_view);
     void destroy_framebuffer();
     void update(const Matrix3x4& model_transform, const Matrix3x4& view_transform);
+    void dispatch(const GPU_Mesh& mesh, bool show_texture_lod);
 };

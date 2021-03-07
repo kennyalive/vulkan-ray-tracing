@@ -288,53 +288,13 @@ void Vk_Demo::draw_rasterized_image() {
     render_pass_begin_info.pClearValues      = clear_values;
 
     vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
-    const VkDeviceSize zero_offset = 0;
-    vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &gpu_mesh.vertex_buffer.handle, &zero_offset);
-    vkCmdBindIndexBuffer(vk.command_buffer, gpu_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
-    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw_mesh.pipeline_layout, 0, 1, &draw_mesh.descriptor_set, 0, nullptr);
-    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw_mesh.pipeline);
-    uint32_t show_texture_lod_uint = show_texture_lod;
-    vkCmdPushConstants(vk.command_buffer, draw_mesh.pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &show_texture_lod_uint);
-    vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
+    draw_mesh.dispatch(gpu_mesh, show_texture_lod);
     vkCmdEndRenderPass(vk.command_buffer);
 }
 
 void Vk_Demo::draw_raytraced_image() {
     GPU_TIME_SCOPE(gpu_times.draw);
-
-    raytrace_scene.accelerator.rebuild_top_level_accel(vk.command_buffer);
-
-    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytrace_scene.pipeline_layout, 0, 1, &raytrace_scene.descriptor_set, 0, nullptr);
-    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytrace_scene.pipeline);
-
-    uint32_t push_constants[2] = { spp4, show_texture_lod };
-    vkCmdPushConstants(vk.command_buffer, raytrace_scene.pipeline_layout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, 4, &push_constants[0]);
-    vkCmdPushConstants(vk.command_buffer, raytrace_scene.pipeline_layout, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 4, 4, &push_constants[1]);
-
-    const VkBuffer sbt = raytrace_scene.shader_binding_table.handle;
-    const uint32_t sbt_slot_size = raytrace_scene.properties.shaderGroupHandleSize;
-    const uint32_t miss_offset = round_up(sbt_slot_size /* raygen slot*/, raytrace_scene.properties.shaderGroupBaseAlignment);
-    const uint32_t hit_offset = round_up(miss_offset + sbt_slot_size /* miss slot */, raytrace_scene.properties.shaderGroupBaseAlignment);
-
-    VkStridedDeviceAddressRegionKHR raygen_sbt{};
-    raygen_sbt.deviceAddress = raytrace_scene.shader_binding_table.device_address + 0;
-    raygen_sbt.stride = sbt_slot_size;
-    raygen_sbt.size = sbt_slot_size;
-
-    VkStridedDeviceAddressRegionKHR miss_sbt{};
-    miss_sbt.deviceAddress = raytrace_scene.shader_binding_table.device_address + miss_offset;
-    miss_sbt.stride = sbt_slot_size;
-    miss_sbt.size = sbt_slot_size;
-
-    VkStridedDeviceAddressRegionKHR chit_sbt{};
-    chit_sbt.deviceAddress = raytrace_scene.shader_binding_table.device_address + hit_offset;
-    chit_sbt.stride = sbt_slot_size;
-    chit_sbt.size = sbt_slot_size;
-
-    VkStridedDeviceAddressRegionKHR callable_sbt{};
-
-    vkCmdTraceRaysKHR(vk.command_buffer, &raygen_sbt, &miss_sbt, &chit_sbt, &callable_sbt,
-        vk.surface_size.width, vk.surface_size.height, 1);
+    raytrace_scene.dispatch(spp4, show_texture_lod);
 }
 
 void Vk_Demo::draw_imgui() {
@@ -379,12 +339,6 @@ void Vk_Demo::draw_imgui() {
 void Vk_Demo::copy_output_image_to_swapchain() {
     GPU_TIME_SCOPE(gpu_times.compute_copy);
 
-    const uint32_t group_size_x = 32; // according to shader
-    const uint32_t group_size_y = 32;
-
-    uint32_t group_count_x = (vk.surface_size.width + group_size_x - 1) / group_size_x;
-    uint32_t group_count_y = (vk.surface_size.height + group_size_y - 1) / group_size_y;
-
     if (raytracing_active) {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
             VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,   VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -397,16 +351,7 @@ void Vk_Demo::copy_output_image_to_swapchain() {
         0,                                  VK_ACCESS_SHADER_WRITE_BIT,
         VK_IMAGE_LAYOUT_UNDEFINED,          VK_IMAGE_LAYOUT_GENERAL);
 
-    uint32_t push_constants[] = { vk.surface_size.width, vk.surface_size.height };
-
-    vkCmdPushConstants(vk.command_buffer, copy_to_swapchain.pipeline_layout, VK_SHADER_STAGE_COMPUTE_BIT,
-        0, sizeof(push_constants), push_constants);
-
-    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, copy_to_swapchain.pipeline_layout,
-        0, 1, &copy_to_swapchain.sets[vk.swapchain_image_index], 0, nullptr);
-
-    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, copy_to_swapchain.pipeline);
-    vkCmdDispatch(vk.command_buffer, group_count_x, group_count_y, 1);
+    copy_to_swapchain.dispatch();
 
     vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,   VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,

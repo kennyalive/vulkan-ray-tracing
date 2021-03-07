@@ -22,6 +22,7 @@ struct Raytrace_Scene {
     void destroy();
     void update_output_image_descriptor(VkImageView output_image_view);
     void update(const Matrix3x4& model_transform, const Matrix3x4& camera_to_world_transform);
+    void dispatch(bool spp4, bool show_texture_lod);
 
 private:
     void create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler);

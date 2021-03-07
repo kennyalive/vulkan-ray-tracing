@@ -172,3 +172,16 @@ void Draw_Mesh::update(const Matrix3x4& model_transform, const Matrix3x4& view_t
     static_cast<Uniform_Buffer*>(mapped_uniform_buffer)->model_view_proj = model_view_proj;
     static_cast<Uniform_Buffer*>(mapped_uniform_buffer)->model_view = model_view;
 }
+
+void Draw_Mesh::dispatch(const GPU_Mesh& mesh, bool show_texture_lod) {
+    const VkDeviceSize zero_offset = 0;
+    vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &mesh.vertex_buffer.handle, &zero_offset);
+    vkCmdBindIndexBuffer(vk.command_buffer, mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+
+    uint32_t show_texture_lod_uint = show_texture_lod;
+    vkCmdPushConstants(vk.command_buffer, pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &show_texture_lod_uint);
+
+    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
+    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdDrawIndexed(vk.command_buffer, mesh.index_count, 1, 0, 0, 0);
+}

@@ -12,4 +12,5 @@ struct Copy_To_Swapchain {
     void create();
     void destroy();
     void update_resolution_dependent_descriptors(VkImageView output_image_view);
+    void dispatch();
 };
