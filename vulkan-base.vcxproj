@@ -59,7 +59,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)third_party;$(ProjectDir)third_party\imgui</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)third_party;$(ProjectDir)third_party\imgui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_DEBUG;_GLFW_WIN32;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -87,7 +87,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(ProjectDir)third_party;$(ProjectDir)third_party\imgui</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)third_party;$(ProjectDir)third_party\imgui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>NDEBUG;_GLFW_WIN32;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -112,12 +112,12 @@
   <ItemGroup>
     <ClCompile Include="src\acceleration_structure.cpp" />
     <ClCompile Include="src\common.cpp" />
-    <ClCompile Include="src\copy_to_swapchain.cpp" />
+    <ClCompile Include="src\kernels\copy_to_swapchain.cpp" />
+    <ClCompile Include="src\kernels\draw_mesh.cpp" />
+    <ClCompile Include="src\kernels\raytrace_scene.cpp" />
     <ClCompile Include="src\mesh.cpp" />
     <ClCompile Include="src\vk_utils.cpp" />
     <ClCompile Include="src\matrix.cpp" />
-    <ClCompile Include="src\raster_resources.cpp" />
-    <ClCompile Include="src\raytracing_resources.cpp" />
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\demo.cpp" />
@@ -151,13 +151,13 @@
   <ItemGroup>
     <ClInclude Include="src\acceleration_structure.h" />
     <ClInclude Include="src\common.h" />
-    <ClInclude Include="src\copy_to_swapchain.h" />
+    <ClInclude Include="src\kernels\copy_to_swapchain.h" />
+    <ClInclude Include="src\kernels\draw_mesh.h" />
+    <ClInclude Include="src\kernels\raytrace_scene.h" />
     <ClInclude Include="src\mesh.h" />
     <ClInclude Include="src\platform.h" />
     <ClInclude Include="src\vk_utils.h" />
     <ClInclude Include="src\matrix.h" />
-    <ClInclude Include="src\raster_resources.h" />
-    <ClInclude Include="src\raytracing_resources.h" />
     <ClInclude Include="src\vector.h" />
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\demo.h" />

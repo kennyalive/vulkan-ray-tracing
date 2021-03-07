@@ -1,11 +1,12 @@
 #pragma once
 
-#include "copy_to_swapchain.h"
 #include "matrix.h"
-#include "raster_resources.h"
-#include "raytracing_resources.h"
 #include "vk_utils.h"
 #include "vk.h"
+
+#include "kernels/copy_to_swapchain.h"
+#include "kernels/draw_mesh.h"
+#include "kernels/raytrace_scene.h"
 
 #include <vector>
 
@@ -53,7 +54,6 @@ private:
     VkRenderPass                ui_render_pass;
     VkFramebuffer               ui_framebuffer;
     Vk_Image                    output_image;
-    Copy_To_Swapchain           copy_to_swapchain;
     GPU_Mesh                    gpu_mesh;
     Vk_Image                    texture;
     VkSampler                   sampler;
@@ -62,8 +62,9 @@ private:
     Matrix3x4                   model_transform;
     Matrix3x4                   view_transform;
 
-    Rasterization_Resources     raster;
-    Raytracing_Resources        raytracing;
+    Copy_To_Swapchain copy_to_swapchain;
+    Draw_Mesh draw_mesh;
+    Raytrace_Scene raytrace_scene;
 
     GPU_Time_Keeper             time_keeper;
     struct {

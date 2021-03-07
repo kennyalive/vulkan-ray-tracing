@@ -24,8 +24,6 @@
       <Filter>3rdparty\imgui</Filter>
     </ClCompile>
     <ClCompile Include="src\matrix.cpp" />
-    <ClCompile Include="src\copy_to_swapchain.cpp" />
-    <ClCompile Include="src\raster_resources.cpp" />
     <ClCompile Include="src\mesh.cpp" />
     <ClCompile Include="third_party\imgui\impl\imgui_impl_glfw.cpp">
       <Filter>3rdparty\imgui\impl</Filter>
@@ -78,7 +76,15 @@
     </ClCompile>
     <ClCompile Include="src\acceleration_structure.cpp" />
     <ClCompile Include="src\vk_utils.cpp" />
-    <ClCompile Include="src\raytracing_resources.cpp" />
+    <ClCompile Include="src\kernels\copy_to_swapchain.cpp">
+      <Filter>kernels</Filter>
+    </ClCompile>
+    <ClCompile Include="src\kernels\draw_mesh.cpp">
+      <Filter>kernels</Filter>
+    </ClCompile>
+    <ClCompile Include="src\kernels\raytrace_scene.cpp">
+      <Filter>kernels</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\demo.h" />
@@ -98,8 +104,6 @@
     </ClInclude>
     <ClInclude Include="src\matrix.h" />
     <ClInclude Include="src\vector.h" />
-    <ClInclude Include="src\copy_to_swapchain.h" />
-    <ClInclude Include="src\raster_resources.h" />
     <ClInclude Include="src\mesh.h" />
     <ClInclude Include="third_party\imgui\impl\imgui_impl_glfw.h">
       <Filter>3rdparty\imgui\impl</Filter>
@@ -140,7 +144,15 @@
     </ClInclude>
     <ClInclude Include="src\acceleration_structure.h" />
     <ClInclude Include="src\vk_utils.h" />
-    <ClInclude Include="src\raytracing_resources.h" />
+    <ClInclude Include="src\kernels\copy_to_swapchain.h">
+      <Filter>kernels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kernels\draw_mesh.h">
+      <Filter>kernels</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kernels\raytrace_scene.h">
+      <Filter>kernels</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="3rdparty">
@@ -163,6 +175,9 @@
     </Filter>
     <Filter Include="3rdparty\vma">
       <UniqueIdentifier>{03384505-17ef-43f0-bb7e-abbec6639a07}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="kernels">
+      <UniqueIdentifier>{d101bbb0-a674-4726-8a9f-8675ebe770da}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -21,8 +21,10 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
     {
         VkPhysicalDeviceProperties2 physical_device_properties { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
 
-        raytracing.properties = VkPhysicalDeviceRayTracingPipelinePropertiesKHR { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
-        physical_device_properties.pNext = &raytracing.properties;
+        auto& rt_properties = raytrace_scene.properties;
+
+        rt_properties = VkPhysicalDeviceRayTracingPipelinePropertiesKHR { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
+        physical_device_properties.pNext = &rt_properties;
 
         vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
 
@@ -35,13 +37,13 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
 
         printf("\n");
         printf("VkPhysicalDeviceRayTracingPropertiesKHR:\n");
-        printf("  shaderGroupHandleSize = %u\n", raytracing.properties.shaderGroupHandleSize);
-        printf("  maxRayRecursionDepth = %u\n", raytracing.properties.maxRayRecursionDepth);
-        printf("  maxShaderGroupStride = %u\n", raytracing.properties.maxShaderGroupStride);
-        printf("  shaderGroupBaseAlignment = %u\n", raytracing.properties.shaderGroupBaseAlignment);
-        printf("  maxRayDispatchInvocationCount = %u\n", raytracing.properties.maxRayDispatchInvocationCount);
-        printf("  shaderGroupHandleAlignment = %u\n", raytracing.properties.shaderGroupHandleAlignment);
-        printf("  maxRayHitAttributeSize = %u\n", raytracing.properties.maxRayHitAttributeSize);
+        printf("  shaderGroupHandleSize = %u\n", rt_properties.shaderGroupHandleSize);
+        printf("  maxRayRecursionDepth = %u\n", rt_properties.maxRayRecursionDepth);
+        printf("  maxShaderGroupStride = %u\n", rt_properties.maxShaderGroupStride);
+        printf("  shaderGroupBaseAlignment = %u\n", rt_properties.shaderGroupBaseAlignment);
+        printf("  maxRayDispatchInvocationCount = %u\n", rt_properties.maxRayDispatchInvocationCount);
+        printf("  shaderGroupHandleAlignment = %u\n", rt_properties.shaderGroupHandleAlignment);
+        printf("  maxRayHitAttributeSize = %u\n", rt_properties.maxRayHitAttributeSize);
     }
 
     // Geometry buffers.
@@ -113,8 +115,8 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         vk_set_debug_name(ui_render_pass, "ui_render_pass");
     }
 
-    raster.create(texture.view, sampler);
-    raytracing.create(gpu_mesh, texture.view, sampler);
+    draw_mesh.create(texture.view, sampler);
+    raytrace_scene.create(gpu_mesh, texture.view, sampler);
     copy_to_swapchain.create();
     restore_resolution_dependent_resources();
 
@@ -160,8 +162,8 @@ void Vk_Demo::shutdown() {
     vkDestroySampler(vk.device, sampler, nullptr);
     vkDestroyRenderPass(vk.device, ui_render_pass, nullptr);
     release_resolution_dependent_resources();
-    raster.destroy();
-    raytracing.destroy();
+    draw_mesh.destroy();
+    raytrace_scene.destroy();
     
     vk_shutdown();
 }
@@ -170,7 +172,7 @@ void Vk_Demo::release_resolution_dependent_resources() {
     vkDestroyFramebuffer(vk.device, ui_framebuffer, nullptr);
     ui_framebuffer = VK_NULL_HANDLE;
 
-    raster.destroy_framebuffer();
+    draw_mesh.destroy_framebuffer();
     output_image.destroy();
 }
 
@@ -203,8 +205,8 @@ void Vk_Demo::restore_resolution_dependent_resources() {
         VK_CHECK(vkCreateFramebuffer(vk.device, &create_info, nullptr, &ui_framebuffer));
     }
 
-    raster.create_framebuffer(output_image.view);
-    raytracing.update_output_image_descriptor(output_image.view);
+    draw_mesh.create_framebuffer(output_image.view);
+    raytrace_scene.update_output_image_descriptor(output_image.view);
 
     copy_to_swapchain.update_resolution_dependent_descriptors(output_image.view);
     last_frame_time = Clock::now();
@@ -220,7 +222,7 @@ void Vk_Demo::run_frame() {
 
     model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(20.0f));
     view_transform = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
-    raster.update(model_transform, view_transform);
+    draw_mesh.update(model_transform, view_transform);
 
     Matrix3x4 camera_to_world_transform;
     camera_to_world_transform.set_column(0, Vector3(view_transform.get_row(0)));
@@ -228,7 +230,7 @@ void Vk_Demo::run_frame() {
     camera_to_world_transform.set_column(2, Vector3(view_transform.get_row(2)));
     camera_to_world_transform.set_column(3, camera_pos);
     
-    raytracing.update(model_transform, camera_to_world_transform);
+    raytrace_scene.update(model_transform, camera_to_world_transform);
 
     bool old_raytracing = raytracing_active;
     do_imgui();
@@ -279,8 +281,8 @@ void Vk_Demo::draw_rasterized_image() {
     clear_values[1].depthStencil.stencil = 0;
 
     VkRenderPassBeginInfo render_pass_begin_info { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    render_pass_begin_info.renderPass        = raster.render_pass;
-    render_pass_begin_info.framebuffer       = raster.framebuffer;
+    render_pass_begin_info.renderPass        = draw_mesh.render_pass;
+    render_pass_begin_info.framebuffer       = draw_mesh.framebuffer;
     render_pass_begin_info.renderArea.extent = vk.surface_size;
     render_pass_begin_info.clearValueCount   = (uint32_t)std::size(clear_values);
     render_pass_begin_info.pClearValues      = clear_values;
@@ -289,10 +291,10 @@ void Vk_Demo::draw_rasterized_image() {
     const VkDeviceSize zero_offset = 0;
     vkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &gpu_mesh.vertex_buffer.handle, &zero_offset);
     vkCmdBindIndexBuffer(vk.command_buffer, gpu_mesh.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
-    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline_layout, 0, 1, &raster.descriptor_set, 0, nullptr);
-    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, raster.pipeline);
+    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw_mesh.pipeline_layout, 0, 1, &draw_mesh.descriptor_set, 0, nullptr);
+    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw_mesh.pipeline);
     uint32_t show_texture_lod_uint = show_texture_lod;
-    vkCmdPushConstants(vk.command_buffer, raster.pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &show_texture_lod_uint);
+    vkCmdPushConstants(vk.command_buffer, draw_mesh.pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4, &show_texture_lod_uint);
     vkCmdDrawIndexed(vk.command_buffer, gpu_mesh.index_count, 1, 0, 0, 0);
     vkCmdEndRenderPass(vk.command_buffer);
 }
@@ -300,32 +302,32 @@ void Vk_Demo::draw_rasterized_image() {
 void Vk_Demo::draw_raytraced_image() {
     GPU_TIME_SCOPE(gpu_times.draw);
 
-    raytracing.accelerator.rebuild_top_level_accel(vk.command_buffer);
+    raytrace_scene.accelerator.rebuild_top_level_accel(vk.command_buffer);
 
-    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytracing.pipeline_layout, 0, 1, &raytracing.descriptor_set, 0, nullptr);
-    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytracing.pipeline);
+    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytrace_scene.pipeline_layout, 0, 1, &raytrace_scene.descriptor_set, 0, nullptr);
+    vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytrace_scene.pipeline);
 
     uint32_t push_constants[2] = { spp4, show_texture_lod };
-    vkCmdPushConstants(vk.command_buffer, raytracing.pipeline_layout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, 4, &push_constants[0]);
-    vkCmdPushConstants(vk.command_buffer, raytracing.pipeline_layout, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 4, 4, &push_constants[1]);
+    vkCmdPushConstants(vk.command_buffer, raytrace_scene.pipeline_layout, VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, 4, &push_constants[0]);
+    vkCmdPushConstants(vk.command_buffer, raytrace_scene.pipeline_layout, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 4, 4, &push_constants[1]);
 
-    const VkBuffer sbt = raytracing.shader_binding_table.handle;
-    const uint32_t sbt_slot_size = raytracing.properties.shaderGroupHandleSize;
-    const uint32_t miss_offset = round_up(sbt_slot_size /* raygen slot*/, raytracing.properties.shaderGroupBaseAlignment);
-    const uint32_t hit_offset = round_up(miss_offset + sbt_slot_size /* miss slot */, raytracing.properties.shaderGroupBaseAlignment);
+    const VkBuffer sbt = raytrace_scene.shader_binding_table.handle;
+    const uint32_t sbt_slot_size = raytrace_scene.properties.shaderGroupHandleSize;
+    const uint32_t miss_offset = round_up(sbt_slot_size /* raygen slot*/, raytrace_scene.properties.shaderGroupBaseAlignment);
+    const uint32_t hit_offset = round_up(miss_offset + sbt_slot_size /* miss slot */, raytrace_scene.properties.shaderGroupBaseAlignment);
 
     VkStridedDeviceAddressRegionKHR raygen_sbt{};
-    raygen_sbt.deviceAddress = raytracing.shader_binding_table.device_address + 0;
+    raygen_sbt.deviceAddress = raytrace_scene.shader_binding_table.device_address + 0;
     raygen_sbt.stride = sbt_slot_size;
     raygen_sbt.size = sbt_slot_size;
 
     VkStridedDeviceAddressRegionKHR miss_sbt{};
-    miss_sbt.deviceAddress = raytracing.shader_binding_table.device_address + miss_offset;
+    miss_sbt.deviceAddress = raytrace_scene.shader_binding_table.device_address + miss_offset;
     miss_sbt.stride = sbt_slot_size;
     miss_sbt.size = sbt_slot_size;
 
     VkStridedDeviceAddressRegionKHR chit_sbt{};
-    chit_sbt.deviceAddress = raytracing.shader_binding_table.device_address + hit_offset;
+    chit_sbt.deviceAddress = raytrace_scene.shader_binding_table.device_address + hit_offset;
     chit_sbt.stride = sbt_slot_size;
     chit_sbt.size = sbt_slot_size;
 

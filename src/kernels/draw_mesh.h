@@ -4,7 +4,7 @@
 
 struct Matrix3x4;
 
-struct Rasterization_Resources {
+struct Draw_Mesh {
     VkDescriptorSetLayout       descriptor_set_layout;
     VkPipelineLayout            pipeline_layout;
     VkPipeline                  pipeline;

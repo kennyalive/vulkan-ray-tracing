@@ -1,6 +1,6 @@
 #include "matrix.h"
 #include "mesh.h"
-#include "raster_resources.h"
+#include "draw_mesh.h"
 #include "vk_utils.h"
 
 namespace {
@@ -10,7 +10,7 @@ struct Uniform_Buffer {
 };
 }
 
-void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler) {
+void Draw_Mesh::create(VkImageView texture_view, VkSampler sampler) {
     uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "raster_uniform_buffer");
 
@@ -135,16 +135,16 @@ void Rasterization_Resources::create(VkImageView texture_view, VkSampler sampler
     }
 }
 
-void Rasterization_Resources::destroy() {
+void Draw_Mesh::destroy() {
     uniform_buffer.destroy();
     vkDestroyDescriptorSetLayout(vk.device, descriptor_set_layout, nullptr);
     vkDestroyPipelineLayout(vk.device, pipeline_layout, nullptr);
     vkDestroyPipeline(vk.device, pipeline, nullptr);
     vkDestroyRenderPass(vk.device, render_pass, nullptr);
-    *this = Rasterization_Resources{};
+    *this = Draw_Mesh{};
 }
 
-void Rasterization_Resources::create_framebuffer(VkImageView output_image_view) {
+void Draw_Mesh::create_framebuffer(VkImageView output_image_view) {
     VkImageView attachments[] = {output_image_view, vk.depth_info.image_view};
 
     VkFramebufferCreateInfo create_info { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
@@ -159,12 +159,12 @@ void Rasterization_Resources::create_framebuffer(VkImageView output_image_view) 
     vk_set_debug_name(framebuffer, "color_depth_framebuffer");
 }
 
-void Rasterization_Resources::destroy_framebuffer() {
+void Draw_Mesh::destroy_framebuffer() {
     vkDestroyFramebuffer(vk.device, framebuffer, nullptr);
     framebuffer = VK_NULL_HANDLE;
 }
 
-void Rasterization_Resources::update(const Matrix3x4& model_transform, const Matrix3x4& view_transform) {
+void Draw_Mesh::update(const Matrix3x4& model_transform, const Matrix3x4& view_transform) {
     float aspect_ratio = (float)vk.surface_size.width / (float)vk.surface_size.height;
     Matrix4x4 proj = perspective_transform_opengl_z01(radians(45.0f), aspect_ratio, 0.1f, 50.0f);
     Matrix4x4 model_view = Matrix4x4::identity * view_transform * model_transform;

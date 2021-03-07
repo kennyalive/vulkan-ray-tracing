@@ -7,7 +7,7 @@
 struct GPU_Mesh;
 struct Rt_Uniform_Buffer;
 
-struct Raytracing_Resources {
+struct Raytrace_Scene {
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR properties;
     Vk_Intersection_Accelerator accelerator;
     VkDescriptorSetLayout descriptor_set_layout;

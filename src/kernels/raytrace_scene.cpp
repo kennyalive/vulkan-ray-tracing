@@ -1,5 +1,5 @@
 #include "mesh.h"
-#include "raytracing_resources.h"
+#include "raytrace_scene.h"
 #include "vk_utils.h"
 
 #include <algorithm>
@@ -9,7 +9,7 @@ struct Rt_Uniform_Buffer {
     Matrix3x4 camera_to_world;
 };
 
-void Raytracing_Resources::create(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler) {
+void Raytrace_Scene::create(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler) {
     uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Rt_Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &(void*&)mapped_uniform_buffer, "rt_uniform_buffer");
 
@@ -30,7 +30,7 @@ void Raytracing_Resources::create(const GPU_Mesh& gpu_mesh, VkImageView texture_
     }
 }
 
-void Raytracing_Resources::destroy() {
+void Raytrace_Scene::destroy() {
     uniform_buffer.destroy();
     shader_binding_table.destroy();
     accelerator.destroy();
@@ -40,11 +40,11 @@ void Raytracing_Resources::destroy() {
     vkDestroyPipeline(vk.device, pipeline, nullptr);
 }
 
-void Raytracing_Resources::update_output_image_descriptor(VkImageView output_image_view) {
+void Raytrace_Scene::update_output_image_descriptor(VkImageView output_image_view) {
     Descriptor_Writes(descriptor_set).storage_image(0, output_image_view);
 }
 
-void Raytracing_Resources::update(const Matrix3x4& model_transform, const Matrix3x4& camera_to_world_transform) {
+void Raytrace_Scene::update(const Matrix3x4& model_transform, const Matrix3x4& camera_to_world_transform) {
     assert(accelerator.bottom_level_accels.size() == 1);
 
     VkAccelerationStructureInstanceKHR& instance = *accelerator.mapped_instance_buffer;
@@ -59,7 +59,7 @@ void Raytracing_Resources::update(const Matrix3x4& model_transform, const Matrix
     uniform_buffer.camera_to_world = camera_to_world_transform;
 }
 
-void Raytracing_Resources::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler) {
+void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler) {
     descriptor_set_layout = Descriptor_Set_Layout()
         .storage_image  (0, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
         .accelerator    (1, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
