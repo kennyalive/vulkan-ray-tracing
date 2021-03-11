@@ -28,7 +28,6 @@
     <ClCompile Include="third_party\imgui\impl\imgui_impl_glfw.cpp">
       <Filter>3rdparty\imgui\impl</Filter>
     </ClCompile>
-    <ClCompile Include="src\win32.cpp" />
     <ClCompile Include="third_party\glfw\context.c">
       <Filter>3rdparty\glfw</Filter>
     </ClCompile>
@@ -108,7 +107,6 @@
     <ClInclude Include="third_party\imgui\impl\imgui_impl_glfw.h">
       <Filter>3rdparty\imgui\impl</Filter>
     </ClInclude>
-    <ClInclude Include="src\platform.h" />
     <ClInclude Include="third_party\glfw\egl_context.h">
       <Filter>3rdparty\glfw</Filter>
     </ClInclude>

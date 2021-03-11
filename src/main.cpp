@@ -1,9 +1,16 @@
 #include "demo.h"
-#include "platform.h"
 
 #include "glfw/glfw3.h"
 
 #include <cassert>
+
+#ifdef _WIN32
+void platform_sleep(int milliseconds) {
+    ::Sleep(milliseconds);
+}
+#else
+#error platform_sleep() is not implemented on this platform
+#endif
 
 struct Command_Line_Options {
     bool enable_validation_layers;
@@ -125,7 +132,7 @@ int main(int argc, char** argv) {
             demo.restore_resolution_dependent_resources();
             recreate_swapchain = false;
         }
-        platform::sleep(1);
+        platform_sleep(1);
     }
 
     demo.shutdown();

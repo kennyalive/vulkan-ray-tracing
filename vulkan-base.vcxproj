@@ -121,7 +121,6 @@
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\demo.cpp" />
-    <ClCompile Include="src\win32.cpp" />
     <ClCompile Include="third_party\glfw\context.c" />
     <ClCompile Include="third_party\glfw\egl_context.c" />
     <ClCompile Include="third_party\glfw\init.c" />
@@ -155,7 +154,6 @@
     <ClInclude Include="src\kernels\draw_mesh.h" />
     <ClInclude Include="src\kernels\raytrace_scene.h" />
     <ClInclude Include="src\mesh.h" />
-    <ClInclude Include="src\platform.h" />
     <ClInclude Include="src\vk_utils.h" />
     <ClInclude Include="src\matrix.h" />
     <ClInclude Include="src\vector.h" />
