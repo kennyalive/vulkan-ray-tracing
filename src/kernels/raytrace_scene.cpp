@@ -5,18 +5,20 @@
 #include <algorithm>
 #include <cassert>
 
-struct Rt_Uniform_Buffer {
+namespace {
+struct Uniform_Buffer {
     Matrix3x4 camera_to_world;
 };
+}
 
 void Raytrace_Scene::create(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler) {
-    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Rt_Uniform_Buffer)),
+    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &(void*&)mapped_uniform_buffer, "rt_uniform_buffer");
 
     accelerator = create_intersection_accelerator({gpu_mesh});
     create_pipeline(gpu_mesh, texture_view, sampler);
 
-    // Shader binding table.
+    // shader binding table
     {
         uint32_t miss_offset = round_up(properties.shaderGroupHandleSize /* raygen slot*/, properties.shaderGroupBaseAlignment);
         uint32_t hit_offset = round_up(miss_offset + properties.shaderGroupHandleSize /* miss slot */, properties.shaderGroupBaseAlignment);
@@ -55,7 +57,7 @@ void Raytrace_Scene::update(const Matrix3x4& model_transform, const Matrix3x4& c
     instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
     instance.accelerationStructureReference = accelerator.bottom_level_accels[0].device_address;
 
-    Rt_Uniform_Buffer& uniform_buffer = *mapped_uniform_buffer;
+    Uniform_Buffer& uniform_buffer = *(Uniform_Buffer*&)mapped_uniform_buffer;
     uniform_buffer.camera_to_world = camera_to_world_transform;
 }
 
@@ -166,7 +168,7 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
 
         Descriptor_Writes(descriptor_set)
             .accelerator(1, accelerator.top_level_accel.aceleration_structure)
-            .uniform_buffer(2, uniform_buffer.handle, 0, sizeof(Rt_Uniform_Buffer))
+            .uniform_buffer(2, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
 
             .storage_buffer(3,
                 gpu_mesh.index_buffer.handle,

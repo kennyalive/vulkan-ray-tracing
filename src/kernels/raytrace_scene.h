@@ -5,7 +5,6 @@
 #include "vk.h"
 
 struct GPU_Mesh;
-struct Rt_Uniform_Buffer;
 
 struct Raytrace_Scene {
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR properties;
@@ -16,7 +15,7 @@ struct Raytrace_Scene {
     VkDescriptorSet descriptor_set;
     Vk_Buffer shader_binding_table;
     Vk_Buffer uniform_buffer;
-    Rt_Uniform_Buffer* mapped_uniform_buffer;
+    void* mapped_uniform_buffer;
 
     void create(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler);
     void destroy();

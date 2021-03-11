@@ -84,6 +84,51 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         vk_set_debug_name(sampler, "diffuse_texture_sampler");
     }
 
+    // Render pass.
+    {
+        VkAttachmentDescription attachments[2] = {};
+        attachments[0].format           = VK_FORMAT_R16G16B16A16_SFLOAT;
+        attachments[0].samples          = VK_SAMPLE_COUNT_1_BIT;
+        attachments[0].loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[0].storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
+        attachments[0].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[0].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[0].initialLayout    = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[0].finalLayout      = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        attachments[1].format           = vk.depth_info.format;
+        attachments[1].samples          = VK_SAMPLE_COUNT_1_BIT;
+        attachments[1].loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[1].storeOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[1].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[1].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[1].initialLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachments[1].finalLayout      = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference color_attachment_ref;
+        color_attachment_ref.attachment = 0;
+        color_attachment_ref.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference depth_attachment_ref;
+        depth_attachment_ref.attachment = 1;
+        depth_attachment_ref.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount    = 1;
+        subpass.pColorAttachments       = &color_attachment_ref;
+        subpass.pDepthStencilAttachment = &depth_attachment_ref;
+
+        VkRenderPassCreateInfo create_info{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+        create_info.attachmentCount = (uint32_t)std::size(attachments);
+        create_info.pAttachments = attachments;
+        create_info.subpassCount = 1;
+        create_info.pSubpasses = &subpass;
+
+        VK_CHECK(vkCreateRenderPass(vk.device, &create_info, nullptr, &render_pass));
+        vk_set_debug_name(render_pass, "color_depth_render_pass");
+    }
+
     // UI render pass.
     {
         VkAttachmentDescription attachments[1] = {};
@@ -115,7 +160,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         vk_set_debug_name(ui_render_pass, "ui_render_pass");
     }
 
-    draw_mesh.create(texture.view, sampler);
+    draw_mesh.create(render_pass, texture.view, sampler);
     raytrace_scene.create(gpu_mesh, texture.view, sampler);
     copy_to_swapchain.create();
     restore_resolution_dependent_resources();
@@ -160,6 +205,7 @@ void Vk_Demo::shutdown() {
     texture.destroy();
     copy_to_swapchain.destroy();
     vkDestroySampler(vk.device, sampler, nullptr);
+    vkDestroyRenderPass(vk.device, render_pass, nullptr);
     vkDestroyRenderPass(vk.device, ui_render_pass, nullptr);
     release_resolution_dependent_resources();
     draw_mesh.destroy();
@@ -169,10 +215,12 @@ void Vk_Demo::shutdown() {
 }
 
 void Vk_Demo::release_resolution_dependent_resources() {
+    vkDestroyFramebuffer(vk.device, framebuffer, nullptr);
+    framebuffer = VK_NULL_HANDLE;
+
     vkDestroyFramebuffer(vk.device, ui_framebuffer, nullptr);
     ui_framebuffer = VK_NULL_HANDLE;
 
-    draw_mesh.destroy_framebuffer();
     output_image.destroy();
 }
 
@@ -192,22 +240,33 @@ void Vk_Demo::restore_resolution_dependent_resources() {
         }
     }
 
+    // framebuffer
+    {
+        VkImageView attachments[] = {output_image.view, vk.depth_info.image_view};
+        VkFramebufferCreateInfo create_info { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+        create_info.renderPass = render_pass;
+        create_info.attachmentCount = (uint32_t)std::size(attachments);
+        create_info.pAttachments = attachments;
+        create_info.width = vk.surface_size.width;
+        create_info.height = vk.surface_size.height;
+        create_info.layers = 1;
+        VK_CHECK(vkCreateFramebuffer(vk.device, &create_info, nullptr, &framebuffer));
+        vk_set_debug_name(framebuffer, "color_depth_framebuffer");
+    }
+
     // imgui framebuffer
     {
         VkFramebufferCreateInfo create_info { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-        create_info.renderPass      = ui_render_pass;
+        create_info.renderPass = ui_render_pass;
         create_info.attachmentCount = 1;
-        create_info.pAttachments    = &output_image.view;
-        create_info.width           = vk.surface_size.width;
-        create_info.height          = vk.surface_size.height;
-        create_info.layers          = 1;
-
+        create_info.pAttachments = &output_image.view;
+        create_info.width = vk.surface_size.width;
+        create_info.height = vk.surface_size.height;
+        create_info.layers = 1;
         VK_CHECK(vkCreateFramebuffer(vk.device, &create_info, nullptr, &ui_framebuffer));
     }
 
-    draw_mesh.create_framebuffer(output_image.view);
     raytrace_scene.update_output_image_descriptor(output_image.view);
-
     copy_to_swapchain.update_resolution_dependent_descriptors(output_image.view);
     last_frame_time = Clock::now();
 }
@@ -281,8 +340,8 @@ void Vk_Demo::draw_rasterized_image() {
     clear_values[1].depthStencil.stencil = 0;
 
     VkRenderPassBeginInfo render_pass_begin_info { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    render_pass_begin_info.renderPass        = draw_mesh.render_pass;
-    render_pass_begin_info.framebuffer       = draw_mesh.framebuffer;
+    render_pass_begin_info.renderPass        = render_pass;
+    render_pass_begin_info.framebuffer       = framebuffer;
     render_pass_begin_info.renderArea.extent = vk.surface_size;
     render_pass_begin_info.clearValueCount   = (uint32_t)std::size(clear_values);
     render_pass_begin_info.pClearValues      = clear_values;

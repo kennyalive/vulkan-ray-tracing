@@ -51,6 +51,8 @@ private:
 
     UI_Result                   ui_result;
 
+    VkRenderPass                render_pass;
+    VkFramebuffer               framebuffer;
     VkRenderPass                ui_render_pass;
     VkFramebuffer               ui_framebuffer;
     Vk_Image                    output_image;
