@@ -427,6 +427,8 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     uint32_t instance_version = volkGetInstanceVersion();
 
     // Require version 1.1 or higher of instance-level functionality.
+    // "As long as the instance supports at least Vulkan 1.1, an application can use different 
+    // versions of Vulkan with an instance than it does with a device or physical device."
     bool loader_supports_version_higher_than_or_equal_to_1_1 =
         VK_VERSION_MAJOR(instance_version) > 1 || VK_VERSION_MINOR(instance_version) >= 1;
     if (!loader_supports_version_higher_than_or_equal_to_1_1)
