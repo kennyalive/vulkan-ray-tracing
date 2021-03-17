@@ -57,8 +57,9 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers);
 // Shutdown vulkan subsystem by releasing resources acquired by Vk_Instance.
 void vk_shutdown();
 
-void vk_release_resolution_dependent_resources();
-void vk_restore_resolution_dependent_resources(bool vsync);
+// vk_initialize/vk_shutdown call these functions. Should be called manually to recreate swapchain if needed.
+void vk_create_swapchain(bool vsync);
+void vk_destroy_swapchain();
 
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size);
 Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data = nullptr, const char* name = nullptr);
@@ -148,8 +149,8 @@ void vk_set_debug_name(Vk_Object_Type object, const char* name) {
 }
 
 struct Swapchain_Info {
-    VkSwapchainKHR           handle;
-    std::vector<VkImage>     images;
+    VkSwapchainKHR handle = VK_NULL_HANDLE;
+    std::vector<VkImage> images;
     std::vector<VkImageView> image_views;
 };
 

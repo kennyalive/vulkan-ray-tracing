@@ -127,8 +127,8 @@ int main(int argc, char** argv) {
         if (recreate_swapchain) {
             VK_CHECK(vkDeviceWaitIdle(vk.device));
             demo.release_resolution_dependent_resources();
-            vk_release_resolution_dependent_resources();
-            vk_restore_resolution_dependent_resources(demo.vsync_enabled());
+            vk_destroy_swapchain();
+            vk_create_swapchain(demo.vsync_enabled());
             demo.restore_resolution_dependent_resources();
             recreate_swapchain = false;
         }
