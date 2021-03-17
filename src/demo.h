@@ -24,6 +24,8 @@ public:
     void run_frame();
 
 private:
+    void create_depth_buffer();
+    void destroy_depth_buffer();
     void draw_frame();
     void draw_rasterized_image();
     void draw_raytraced_image();
@@ -50,6 +52,13 @@ private:
     double                      sim_time;
 
     UI_Result                   ui_result;
+
+    struct Depth_Buffer_Info {
+        VkImage image;
+        VkImageView image_view;
+        VmaAllocation allocation;
+    };
+    Depth_Buffer_Info depth_info;
 
     VkRenderPass                render_pass;
     VkFramebuffer               framebuffer;

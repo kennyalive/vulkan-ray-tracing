@@ -321,78 +321,6 @@ static void create_device(GLFWwindow* window) {
     }
 }
 
-static void create_depth_buffer() {
-    // choose depth image format
-    {
-        VkFormat candidates[2] = { VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT };
-        for (auto format : candidates) {
-            VkFormatProperties props;
-            vkGetPhysicalDeviceFormatProperties(vk.physical_device, format, &props);
-            if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
-                vk.depth_info.format = format;
-                break;
-            }
-        }
-        if (vk.depth_info.format == VK_FORMAT_UNDEFINED)
-            error("failed to choose depth attachment format");
-    }
-
-    // create depth image
-    {
-        VkImageCreateInfo create_info { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-        create_info.imageType       = VK_IMAGE_TYPE_2D;
-        create_info.format          = vk.depth_info.format;
-        create_info.extent.width    = vk.surface_size.width;
-        create_info.extent.height   = vk.surface_size.height;
-        create_info.extent.depth    = 1;
-        create_info.mipLevels       = 1;
-        create_info.arrayLayers     = 1;
-        create_info.samples         = VK_SAMPLE_COUNT_1_BIT;
-        create_info.tiling          = VK_IMAGE_TILING_OPTIMAL;
-        create_info.usage           = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        create_info.sharingMode     = VK_SHARING_MODE_EXCLUSIVE;
-        create_info.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
-
-        VmaAllocationCreateInfo alloc_create_info{};
-        alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-        VK_CHECK(vmaCreateImage(vk.allocator, &create_info, &alloc_create_info, &vk.depth_info.image, &vk.depth_info.allocation, nullptr));
-    }
-
-    // create depth image view
-    {
-        VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-        desc.image      = vk.depth_info.image;
-        desc.viewType   = VK_IMAGE_VIEW_TYPE_2D;
-        desc.format     = vk.depth_info.format;
-
-        desc.subresourceRange.aspectMask        = VK_IMAGE_ASPECT_DEPTH_BIT;
-        desc.subresourceRange.baseMipLevel      = 0;
-        desc.subresourceRange.levelCount        = 1;
-        desc.subresourceRange.baseArrayLayer    = 0;
-        desc.subresourceRange.layerCount        = 1;
-
-        VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.depth_info.image_view));
-    }
-
-    VkImageSubresourceRange subresource_range{};
-    subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-    subresource_range.levelCount = 1;
-    subresource_range.layerCount = 1;
-
-    vk_execute(vk.command_pools[0], vk.queue, [&subresource_range](VkCommandBuffer command_buffer) {
-        vk_cmd_image_barrier_for_subresource(command_buffer, vk.depth_info.image, subresource_range,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-    });
-}
-
-static void destroy_depth_buffer() {
-    vmaDestroyImage(vk.allocator, vk.depth_info.image, vk.depth_info.allocation);
-    vkDestroyImageView(vk.device, vk.depth_info.image_view, nullptr);
-    vk.depth_info = Depth_Buffer_Info{};
-}
-
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_utils_messenger_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT          message_severity,
     VkDebugUtilsMessageTypeFlagsEXT                 message_type,
@@ -569,7 +497,6 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     }
 
     create_swapchain(true);
-    create_depth_buffer();
 
     // Query pool.
     {
@@ -600,7 +527,6 @@ void vk_shutdown() {
     vkDestroyQueryPool(vk.device, vk.timestamp_query_pools[0], nullptr);
     vkDestroyQueryPool(vk.device, vk.timestamp_query_pools[1], nullptr);
     destroy_swapchain();
-    destroy_depth_buffer();
     vmaDestroyAllocator(vk.allocator);
     vkDestroyDevice(vk.device, nullptr);
     vkDestroySurfaceKHR(vk.instance, vk.surface, nullptr);
@@ -610,12 +536,10 @@ void vk_shutdown() {
 
 void vk_release_resolution_dependent_resources() {
     destroy_swapchain();
-    destroy_depth_buffer();
 }
 
 void vk_restore_resolution_dependent_resources(bool vsync) {
     create_swapchain(vsync);
-    create_depth_buffer();
 }
 
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {

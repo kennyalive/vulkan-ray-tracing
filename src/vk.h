@@ -153,13 +153,6 @@ struct Swapchain_Info {
     std::vector<VkImageView> image_views;
 };
 
-struct Depth_Buffer_Info {
-    VkImage                 image;
-    VkImageView             image_view;
-    VmaAllocation           allocation;
-    VkFormat                format;
-};
-
 // Vk_Instance contains vulkan resources that do not depend on applicaton logic.
 // This structure is initialized/deinitialized by vk_initialize/vk_shutdown functions correspondingly.
 struct Vk_Instance {
@@ -200,7 +193,6 @@ struct Vk_Instance {
     VkDeviceSize                    staging_buffer_size;
     uint8_t*                        staging_buffer_ptr; // pointer to mapped staging buffer
 
-    Depth_Buffer_Info               depth_info;
     VkDebugUtilsMessengerEXT        debug_utils_messenger;
 };
 
