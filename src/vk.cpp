@@ -382,9 +382,8 @@ static void create_depth_buffer() {
 
     vk_execute(vk.command_pools[0], vk.queue, [&subresource_range](VkCommandBuffer command_buffer) {
         vk_cmd_image_barrier_for_subresource(command_buffer, vk.depth_info.image, subresource_range,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            0, 0,
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     });
 }
 
@@ -432,7 +431,7 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     bool loader_supports_version_higher_than_or_equal_to_1_1 =
         VK_VERSION_MAJOR(instance_version) > 1 || VK_VERSION_MINOR(instance_version) >= 1;
     if (!loader_supports_version_higher_than_or_equal_to_1_1)
-        error("Vulkan loader does not support Vulkan API version 1.1");
+        error("Old Vulkan loader detected which supports only Vulkan 1.0, please update your driver");
 
     create_instance(enable_validation_layers);
     volkLoadInstance(vk.instance);
@@ -777,18 +776,16 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
             subresource_range.baseMipLevel = 0;
 
             vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
-                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,  VK_PIPELINE_STAGE_TRANSFER_BIT,
-                0,                                  VK_ACCESS_TRANSFER_WRITE_BIT,
-                VK_IMAGE_LAYOUT_UNDEFINED,          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
             vkCmdCopyBufferToImage(command_buffer, vk.staging_buffer, image.handle,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
             if (mip_levels == 1) {
                 vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
-                    VK_PIPELINE_STAGE_TRANSFER_BIT,         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                    VK_ACCESS_TRANSFER_WRITE_BIT,           0,
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                 return;
             }
 
@@ -815,15 +812,13 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
 
                 subresource_range.baseMipLevel = i-1;
                 vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
-                    VK_PIPELINE_STAGE_TRANSFER_BIT,         VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    VK_ACCESS_TRANSFER_WRITE_BIT,           VK_ACCESS_TRANSFER_READ_BIT,
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
                 subresource_range.baseMipLevel = i;
                 vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
-                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,      VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    0,                                      VK_ACCESS_TRANSFER_WRITE_BIT,
-                    VK_IMAGE_LAYOUT_UNDEFINED,              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
                 vkCmdBlitImage(command_buffer,
                     image.handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -832,16 +827,14 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
 
                 subresource_range.baseMipLevel = i-1;
                 vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
-                    VK_PIPELINE_STAGE_TRANSFER_BIT,         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                    VK_ACCESS_TRANSFER_READ_BIT,            0,
-                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
 
             subresource_range.baseMipLevel = mip_levels - 1;
             vk_cmd_image_barrier_for_subresource(command_buffer, image.handle, subresource_range,
-                VK_PIPELINE_STAGE_TRANSFER_BIT,         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                VK_ACCESS_TRANSFER_WRITE_BIT,           0,
-                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         });
     }
 
@@ -1124,26 +1117,24 @@ void vk_execute(VkCommandPool command_pool, VkQueue queue, std::function<void(Vk
     vkFreeCommandBuffers(vk.device, command_pool, 1, &command_buffer);
 }
 
-void vk_cmd_image_barrier(
-    VkCommandBuffer command_buffer, VkImage image,
-    VkPipelineStageFlags    src_stage_mask,     VkPipelineStageFlags    dst_stage_mask,
-    VkAccessFlags           src_access_mask,    VkAccessFlags           dst_access_mask,
-    VkImageLayout           old_layout,         VkImageLayout           new_layout)
+void vk_cmd_image_barrier(VkCommandBuffer command_buffer, VkImage image,
+    VkPipelineStageFlags src_stage_mask, VkAccessFlags src_access_mask, VkImageLayout old_layout,
+    VkPipelineStageFlags dst_stage_mask, VkAccessFlags dst_access_mask, VkImageLayout new_layout)
 {
     VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    barrier.srcAccessMask       = src_access_mask;
-    barrier.dstAccessMask       = dst_access_mask;
-    barrier.oldLayout           = old_layout;
-    barrier.newLayout           = new_layout;
+    barrier.srcAccessMask = src_access_mask;
+    barrier.dstAccessMask = dst_access_mask;
+    barrier.oldLayout = old_layout;
+    barrier.newLayout = new_layout;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image               = image;
+    barrier.image = image;
 
-    barrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel   = 0;
-    barrier.subresourceRange.levelCount     = VK_REMAINING_MIP_LEVELS;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount     = VK_REMAINING_ARRAY_LAYERS;
+    barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
     vkCmdPipelineBarrier(command_buffer, src_stage_mask, dst_stage_mask, 0,
         0, nullptr, 0, nullptr, 1, &barrier);
@@ -1151,19 +1142,18 @@ void vk_cmd_image_barrier(
 
 void vk_cmd_image_barrier_for_subresource(
     VkCommandBuffer command_buffer, VkImage image, const VkImageSubresourceRange& subresource_range,
-    VkPipelineStageFlags    src_stage_mask,     VkPipelineStageFlags    dst_stage_mask,
-    VkAccessFlags           src_access_flags,   VkAccessFlags           dst_access_flags,
-    VkImageLayout           old_layout,         VkImageLayout           new_layout)
+    VkPipelineStageFlags src_stage_mask, VkAccessFlags src_access_mask, VkImageLayout old_layout,
+    VkPipelineStageFlags dst_stage_mask, VkAccessFlags dst_access_mask, VkImageLayout new_layout)
 {
     VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    barrier.srcAccessMask       = src_access_flags;
-    barrier.dstAccessMask       = dst_access_flags;
-    barrier.oldLayout           = old_layout;
-    barrier.newLayout           = new_layout;
+    barrier.srcAccessMask = src_access_mask;
+    barrier.dstAccessMask = dst_access_mask;
+    barrier.oldLayout = old_layout;
+    barrier.newLayout = new_layout;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image               = image;
-    barrier.subresourceRange    = subresource_range;
+    barrier.image = image;
+    barrier.subresourceRange = subresource_range;
 
     vkCmdPipelineBarrier(command_buffer, src_stage_mask, dst_stage_mask, 0,
         0, nullptr, 0, nullptr, 1, &barrier);
