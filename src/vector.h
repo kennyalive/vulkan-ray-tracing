@@ -9,8 +9,9 @@ struct Vector4;
 struct Vector3 {
     float x, y, z;
 
-    Vector3() {}
-    
+    Vector3()
+        : x(0.f), y(0.f), z(0.f) {}
+
     constexpr explicit Vector3(float v)
         : x(v), y(v), z(v) {}
 

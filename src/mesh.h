@@ -15,4 +15,3 @@ struct Mesh {
 };
 
 Mesh load_obj_mesh(const std::string& path, float additional_scale);
-void compute_normals(const Vector3* vertex_positions, uint32_t vertex_count, uint32_t vertex_stride, const uint32_t* indices, uint32_t index_count, Vector3* normals);

@@ -22,6 +22,69 @@ static inline bool operator==(const Vertex& v1, const Vertex& v2) {
     return v1.pos == v2.pos && v1.normal == v2.normal && v1.uv == v2.uv;
 }
 
+static void compute_normals(Mesh& mesh) {
+    std::unordered_map<Vector3, std::vector<uint32_t>> duplicated_vertices; // due to different texture coordinates
+    for (uint32_t i = 0; i < (uint32_t)mesh.vertices.size(); i++) {
+        const Vector3& pos = mesh.vertices[i].pos;
+        duplicated_vertices[pos].push_back(i);
+    }
+
+    std::vector<bool> has_duplicates(mesh.vertices.size());
+    for (uint32_t i = 0; i < (uint32_t)mesh.vertices.size(); i++) {
+        const Vector3& pos = mesh.vertices[i].pos;
+        uint32_t vertex_count = (uint32_t)duplicated_vertices[pos].size();
+        assert(vertex_count > 0);
+        has_duplicates[i] = vertex_count > 1;
+    }
+
+    for (uint32_t i = 0; i < (uint32_t)mesh.vertices.size(); i++)
+        mesh.vertices[i].normal = Vector3();
+
+    for (uint32_t i = 0; i < (uint32_t)mesh.indices.size(); i += 3) {
+        uint32_t i0 = mesh.indices[i + 0];
+        uint32_t i1 = mesh.indices[i + 1];
+        uint32_t i2 = mesh.indices[i + 2];
+
+        Vector3 a = mesh.vertices[i0].pos;
+        Vector3 b = mesh.vertices[i1].pos;
+        Vector3 c = mesh.vertices[i2].pos;
+
+        Vector3 d1 = b - a;
+        assert(d1.length() > 1e-6f);
+        Vector3 d2 = c - a;
+        assert(d2.length() > 1e-6f);
+
+        Vector3 n = cross(d1, d2).normalized();
+
+        if (has_duplicates[i0]) {
+            for (uint32_t vi : duplicated_vertices[a])
+                mesh.vertices[vi].normal += n;
+        } else {
+            mesh.vertices[i0].normal += n;
+        }
+
+        if (has_duplicates[i1]) {
+            for (uint32_t vi : duplicated_vertices[b])
+                mesh.vertices[vi].normal += n;
+        } else {
+            mesh.vertices[i1].normal += n;
+        }
+
+        if (has_duplicates[i2]) {
+            for (uint32_t vi : duplicated_vertices[c])
+                mesh.vertices[vi].normal += n;
+        } else {
+            mesh.vertices[i2].normal += n;
+        }
+    }
+
+    for (uint32_t i = 0; i < (uint32_t)mesh.vertices.size(); i++) {
+        Vector3& n = mesh.vertices[i].normal;
+        assert(n.length() > 1e-6f);
+        n.normalize();
+    }
+}
+
 Mesh load_obj_mesh(const std::string& path, float additional_scale) {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -84,7 +147,7 @@ Mesh load_obj_mesh(const std::string& path, float additional_scale) {
     }
 
     if (attrib.normals.empty())
-        compute_normals(&mesh.vertices[0].pos, (int)mesh.vertices.size(), (int)sizeof(Vertex), mesh.indices.data(), (int)mesh.indices.size(), &mesh.vertices[0].normal);
+        compute_normals(mesh);
 
     // scale and center the mesh
     Vector3 diag = mesh_max - mesh_min;
@@ -97,67 +160,4 @@ Mesh load_obj_mesh(const std::string& path, float additional_scale) {
         v.pos *= scale;
     }
     return mesh;
-}
-
-void compute_normals(const Vector3* vertex_positions, uint32_t vertex_count, uint32_t vertex_stride, const uint32_t* indices, uint32_t index_count, Vector3* normals) {
-    std::unordered_map<Vector3, std::vector<uint32_t>> duplicated_vertices; // due to different texture coordinates
-    for (uint32_t i = 0; i < vertex_count; i++) {
-        const Vector3& pos = index_array_with_stride(vertex_positions, vertex_stride, i);
-        duplicated_vertices[pos].push_back(i);
-    }
-
-    std::vector<bool> has_duplicates(vertex_count);
-    for (uint32_t i = 0; i < vertex_count; i++) {
-        const Vector3& pos = index_array_with_stride(vertex_positions, vertex_stride, i);
-        uint32_t vertex_count = (uint32_t)duplicated_vertices[pos].size();
-        assert(vertex_count > 0);
-        has_duplicates[i] = vertex_count > 1;
-    }
-
-    for (uint32_t i = 0; i < vertex_count; i++)
-        index_array_with_stride(normals, vertex_stride, i) = Vector3_Zero;
-
-    for (uint32_t i = 0; i < index_count; i += 3) {
-        uint32_t i0 = indices[i + 0];
-        uint32_t i1 = indices[i + 1];
-        uint32_t i2 = indices[i + 2];
-
-        Vector3 a = index_array_with_stride(vertex_positions, vertex_stride, i0);
-        Vector3 b = index_array_with_stride(vertex_positions, vertex_stride, i1);
-        Vector3 c = index_array_with_stride(vertex_positions, vertex_stride, i2);
-
-        Vector3 d1 = b - a;
-        assert(d1.length() > 1e-6f);
-        Vector3 d2 = c - a;
-        assert(d2.length() > 1e-6f);
-
-        Vector3 n = cross(d1, d2).normalized();
-
-        if (has_duplicates[i0]) {
-            for (uint32_t vi : duplicated_vertices[a])
-                index_array_with_stride(normals, vertex_stride, vi) += n;
-        } else {
-            index_array_with_stride(normals, vertex_stride, i0) += n;
-        }
-
-        if (has_duplicates[i1]) {
-            for (uint32_t vi : duplicated_vertices[b])
-                index_array_with_stride(normals, vertex_stride, vi) += n;
-        } else {
-            index_array_with_stride(normals, vertex_stride, i1) += n;
-        }
-
-        if (has_duplicates[i2]) {
-            for (uint32_t vi : duplicated_vertices[c])
-                index_array_with_stride(normals, vertex_stride, vi) += n;
-        } else {
-            index_array_with_stride(normals, vertex_stride, i2) += n;
-        }
-    }
-
-    for (uint32_t i = 0; i < vertex_count; i++) {
-        Vector3& n = index_array_with_stride(normals, vertex_stride, i);
-        assert(n.length() > 1e-6f);
-        n.normalize();
-    }
 }
