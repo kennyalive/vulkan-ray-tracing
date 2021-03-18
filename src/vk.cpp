@@ -213,9 +213,6 @@ static void create_device(GLFWwindow* window) {
 
         VkPhysicalDeviceFeatures2 features2 { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
         features2.pNext = &vulkan12_features;
-        // to shut up improper validation warning (image store is in the raygen
-        // shader not in the vertex stage)
-        features2.features.vertexPipelineStoresAndAtomics = VK_TRUE;
 
         VkDeviceCreateInfo device_create_info { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
         device_create_info.pNext = &features2;
