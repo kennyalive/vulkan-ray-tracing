@@ -117,8 +117,6 @@ Mesh load_obj_mesh(const std::string& path, float additional_scale) {
                     attrib.normals[3 * index.normal_index + 1],
                     attrib.normals[3 * index.normal_index + 2],
                 };
-            } else {
-                vertex.normal = Vector3_Zero;
             }
 
             if (!attrib.texcoords.empty()) {
@@ -126,8 +124,6 @@ Mesh load_obj_mesh(const std::string& path, float additional_scale) {
                     attrib.texcoords[2 * index.texcoord_index + 0],
                     1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
                 };
-            } else {
-                vertex.uv = Vector2_Zero;
             }
 
             if (unique_vertices.count(vertex) == 0) {
