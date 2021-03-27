@@ -63,30 +63,30 @@ void Raytrace_Scene::update(const Matrix3x4& model_transform, const Matrix3x4& c
 
 void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler) {
     descriptor_set_layout = Descriptor_Set_Layout()
-        .storage_image  (0, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
-        .accelerator    (1, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+        .storage_image (0, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
+        .accelerator (1, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
         .uniform_buffer (2, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
         .storage_buffer (3, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
         .storage_buffer (4, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
-        .sampled_image  (5, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
-        .sampler        (6, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
-        .create         ("rt_set_layout");
+        .sampled_image (5, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
+        .sampler (6, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
+        .create ("rt_set_layout");
 
     // pipeline layout
     {
         VkPushConstantRange push_constant_ranges[2]; // show_texture_lods value
-        push_constant_ranges[0].stageFlags  = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-        push_constant_ranges[0].offset      = 0;
-        push_constant_ranges[0].size        = 4;
-        push_constant_ranges[1].stageFlags  = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-        push_constant_ranges[1].offset      = 4;
-        push_constant_ranges[1].size        = 4;
+        push_constant_ranges[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+        push_constant_ranges[0].offset = 0;
+        push_constant_ranges[0].size = 4;
+        push_constant_ranges[1].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+        push_constant_ranges[1].offset = 4;
+        push_constant_ranges[1].size = 4;
 
         VkPipelineLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        create_info.setLayoutCount          = 1;
-        create_info.pSetLayouts             = &descriptor_set_layout;
-        create_info.pushConstantRangeCount  = (uint32_t)std::size(push_constant_ranges);
-        create_info.pPushConstantRanges     = push_constant_ranges;
+        create_info.setLayoutCount = 1;
+        create_info.pSetLayouts = &descriptor_set_layout;
+        create_info.pushConstantRangeCount = (uint32_t)std::size(push_constant_ranges);
+        create_info.pPushConstantRanges = push_constant_ranges;
 
         VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
     }
@@ -98,20 +98,20 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
         VkShaderModule chit_shader = vk_load_spirv("spirv/rt_mesh.rchit.spv");
 
         VkPipelineShaderStageCreateInfo stage_infos[3] {};
-        stage_infos[0].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stage_infos[0].stage    = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-        stage_infos[0].module   = rgen_shader;
-        stage_infos[0].pName    = "main";
+        stage_infos[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stage_infos[0].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+        stage_infos[0].module = rgen_shader;
+        stage_infos[0].pName = "main";
 
-        stage_infos[1].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stage_infos[1].stage    = VK_SHADER_STAGE_MISS_BIT_KHR;
-        stage_infos[1].module   = miss_shader;
-        stage_infos[1].pName    = "main";
+        stage_infos[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stage_infos[1].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+        stage_infos[1].module = miss_shader;
+        stage_infos[1].pName = "main";
 
-        stage_infos[2].sType    = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stage_infos[2].stage    = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-        stage_infos[2].module   = chit_shader;
-        stage_infos[2].pName    = "main";
+        stage_infos[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stage_infos[2].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+        stage_infos[2].module = chit_shader;
+        stage_infos[2].pName = "main";
 
         VkRayTracingShaderGroupCreateInfoKHR shader_groups[3];
         {
@@ -161,9 +161,9 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
     // descriptor set
     {
         VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-        desc.descriptorPool     = vk.descriptor_pool;
+        desc.descriptorPool = vk.descriptor_pool;
         desc.descriptorSetCount = 1;
-        desc.pSetLayouts        = &descriptor_set_layout;
+        desc.pSetLayouts = &descriptor_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
 
         Descriptor_Writes(descriptor_set)

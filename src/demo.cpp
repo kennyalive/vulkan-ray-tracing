@@ -81,17 +81,17 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         texture = vk_load_texture("model/diffuse.jpg");
 
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-        create_info.magFilter           = VK_FILTER_LINEAR;
-        create_info.minFilter           = VK_FILTER_LINEAR;
-        create_info.mipmapMode          = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        create_info.addressModeU        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        create_info.addressModeV        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        create_info.addressModeW        = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        create_info.mipLodBias          = 0.0f;
-        create_info.anisotropyEnable    = VK_FALSE;
-        create_info.maxAnisotropy       = 1;
-        create_info.minLod              = 0.0f;
-        create_info.maxLod              = 12.0f;
+        create_info.magFilter = VK_FILTER_LINEAR;
+        create_info.minFilter = VK_FILTER_LINEAR;
+        create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        create_info.mipLodBias = 0.0f;
+        create_info.anisotropyEnable = VK_FALSE;
+        create_info.maxAnisotropy = 1;
+        create_info.minLod = 0.0f;
+        create_info.maxLod = 12.0f;
 
         VK_CHECK(vkCreateSampler(vk.device, &create_info, nullptr, &sampler));
         vk_set_debug_name(sampler, "diffuse_texture_sampler");
@@ -100,36 +100,36 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
     // Render pass.
     {
         VkAttachmentDescription attachments[2] = {};
-        attachments[0].format           = VK_FORMAT_R16G16B16A16_SFLOAT;
-        attachments[0].samples          = VK_SAMPLE_COUNT_1_BIT;
-        attachments[0].loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[0].storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
-        attachments[0].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[0].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[0].initialLayout    = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[0].finalLayout      = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        attachments[1].format           = get_depth_image_format();
-        attachments[1].samples          = VK_SAMPLE_COUNT_1_BIT;
-        attachments[1].loadOp           = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[1].storeOp          = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[1].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[1].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[1].initialLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        attachments[1].finalLayout      = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachments[1].format = get_depth_image_format();
+        attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
         VkAttachmentReference color_attachment_ref;
         color_attachment_ref.attachment = 0;
-        color_attachment_ref.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkAttachmentReference depth_attachment_ref;
         depth_attachment_ref.attachment = 1;
-        depth_attachment_ref.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
         VkSubpassDescription subpass{};
-        subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpass.colorAttachmentCount    = 1;
-        subpass.pColorAttachments       = &color_attachment_ref;
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &color_attachment_ref;
         subpass.pDepthStencilAttachment = &depth_attachment_ref;
 
         VkRenderPassCreateInfo create_info{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
@@ -145,23 +145,23 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
     // UI render pass.
     {
         VkAttachmentDescription attachments[1] = {};
-        attachments[0].format           = VK_FORMAT_R16G16B16A16_SFLOAT;
-        attachments[0].samples          = VK_SAMPLE_COUNT_1_BIT;
-        attachments[0].loadOp           = VK_ATTACHMENT_LOAD_OP_LOAD;
-        attachments[0].storeOp          = VK_ATTACHMENT_STORE_OP_STORE;
-        attachments[0].stencilLoadOp    = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[0].stencilStoreOp   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[0].initialLayout    = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        attachments[0].finalLayout      = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkAttachmentReference color_attachment_ref;
         color_attachment_ref.attachment = 0;
-        color_attachment_ref.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkSubpassDescription subpass{};
-        subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpass.colorAttachmentCount    = 1;
-        subpass.pColorAttachments       = &color_attachment_ref;
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &color_attachment_ref;
 
         VkRenderPassCreateInfo create_info{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
         create_info.attachmentCount = (uint32_t)std::size(attachments);
@@ -179,12 +179,12 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         ImGui_ImplGlfw_InitForVulkan(window, true);
 
         ImGui_ImplVulkan_InitInfo init_info{};
-        init_info.Instance          = vk.instance;
-        init_info.PhysicalDevice    = vk.physical_device;
-        init_info.Device            = vk.device;
-        init_info.QueueFamily       = vk.queue_family_index;
-        init_info.Queue             = vk.queue;
-        init_info.DescriptorPool    = vk.descriptor_pool;
+        init_info.Instance = vk.instance;
+        init_info.PhysicalDevice = vk.physical_device;
+        init_info.Device = vk.device;
+        init_info.QueueFamily = vk.queue_family_index;
+        init_info.Queue = vk.queue;
+        init_info.DescriptorPool = vk.descriptor_pool;
 
         ImGui_ImplVulkan_Init(&init_info, ui_render_pass);
         ImGui::StyleColorsDark();
@@ -319,18 +319,18 @@ void Vk_Demo::create_depth_buffer() {
     // create depth image
     {
         VkImageCreateInfo create_info { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-        create_info.imageType       = VK_IMAGE_TYPE_2D;
-        create_info.format          = depth_format;
-        create_info.extent.width    = vk.surface_size.width;
-        create_info.extent.height   = vk.surface_size.height;
-        create_info.extent.depth    = 1;
-        create_info.mipLevels       = 1;
-        create_info.arrayLayers     = 1;
-        create_info.samples         = VK_SAMPLE_COUNT_1_BIT;
-        create_info.tiling          = VK_IMAGE_TILING_OPTIMAL;
-        create_info.usage           = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        create_info.sharingMode     = VK_SHARING_MODE_EXCLUSIVE;
-        create_info.initialLayout   = VK_IMAGE_LAYOUT_UNDEFINED;
+        create_info.imageType = VK_IMAGE_TYPE_2D;
+        create_info.format = depth_format;
+        create_info.extent.width = vk.surface_size.width;
+        create_info.extent.height = vk.surface_size.height;
+        create_info.extent.depth = 1;
+        create_info.mipLevels = 1;
+        create_info.arrayLayers = 1;
+        create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+        create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+        create_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
         VmaAllocationCreateInfo alloc_create_info{};
         alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -415,11 +415,11 @@ void Vk_Demo::draw_rasterized_image() {
     clear_values[1].depthStencil.stencil = 0;
 
     VkRenderPassBeginInfo render_pass_begin_info { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    render_pass_begin_info.renderPass        = render_pass;
-    render_pass_begin_info.framebuffer       = framebuffer;
+    render_pass_begin_info.renderPass = render_pass;
+    render_pass_begin_info.framebuffer = framebuffer;
     render_pass_begin_info.renderArea.extent = vk.surface_size;
-    render_pass_begin_info.clearValueCount   = (uint32_t)std::size(clear_values);
-    render_pass_begin_info.pClearValues      = clear_values;
+    render_pass_begin_info.clearValueCount = (uint32_t)std::size(clear_values);
+    render_pass_begin_info.pClearValues = clear_values;
 
     vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
     draw_mesh.dispatch(gpu_mesh, show_texture_lod);
@@ -447,9 +447,9 @@ void Vk_Demo::draw_imgui() {
     }
 
     VkRenderPassBeginInfo render_pass_begin_info{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    render_pass_begin_info.renderPass           = ui_render_pass;
-    render_pass_begin_info.framebuffer          = ui_framebuffer;
-    render_pass_begin_info.renderArea.extent    = vk.surface_size;
+    render_pass_begin_info.renderPass = ui_render_pass;
+    render_pass_begin_info.framebuffer = ui_framebuffer;
+    render_pass_begin_info.renderArea.extent = vk.surface_size;
 
     vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);

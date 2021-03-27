@@ -5,8 +5,8 @@
 
 namespace {
 struct Uniform_Buffer {
-    Matrix4x4   model_view_proj;
-    Matrix4x4   model_view;
+    Matrix4x4 model_view_proj;
+    Matrix4x4 model_view;
 };
 }
 
@@ -16,22 +16,22 @@ void Draw_Mesh::create(VkRenderPass render_pass, VkImageView texture_view, VkSam
 
     descriptor_set_layout = Descriptor_Set_Layout()
         .uniform_buffer (0, VK_SHADER_STAGE_VERTEX_BIT)
-        .sampled_image  (1, VK_SHADER_STAGE_FRAGMENT_BIT)
-        .sampler        (2, VK_SHADER_STAGE_FRAGMENT_BIT)
-        .create         ("raster_set_layout");
+        .sampled_image (1, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .sampler (2, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .create ("raster_set_layout");
 
     // pipeline layout
     {
         VkPushConstantRange push_constant_range; // show_texture_lods value
-        push_constant_range.stageFlags  = VK_SHADER_STAGE_FRAGMENT_BIT;
-        push_constant_range.offset      = 0;
-        push_constant_range.size        = 4;
+        push_constant_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        push_constant_range.offset = 0;
+        push_constant_range.size = 4;
 
         VkPipelineLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        create_info.setLayoutCount          = 1;
-        create_info.pSetLayouts             = &descriptor_set_layout;
-        create_info.pushConstantRangeCount  = 1;
-        create_info.pPushConstantRanges     = &push_constant_range;
+        create_info.setLayoutCount = 1;
+        create_info.pSetLayouts = &descriptor_set_layout;
+        create_info.pushConstantRangeCount = 1;
+        create_info.pPushConstantRanges = &push_constant_range;
 
         VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
         vk_set_debug_name(pipeline_layout, "raster_pipeline_layout");
@@ -76,15 +76,15 @@ void Draw_Mesh::create(VkRenderPass render_pass, VkImageView texture_view, VkSam
     // descriptor sets
     {
         VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-        desc.descriptorPool     = vk.descriptor_pool;
+        desc.descriptorPool = vk.descriptor_pool;
         desc.descriptorSetCount = 1;
-        desc.pSetLayouts        = &descriptor_set_layout;
+        desc.pSetLayouts = &descriptor_set_layout;
         VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
 
         Descriptor_Writes(descriptor_set)
-            .uniform_buffer (0, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
-            .sampled_image  (1, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-            .sampler        (2, sampler);
+            .uniform_buffer(0, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
+            .sampled_image(1, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .sampler(2, sampler);
     }
 }
 
