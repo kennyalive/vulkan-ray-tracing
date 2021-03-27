@@ -28,15 +28,15 @@ struct Descriptor_Writes {
     };
 
     union Resource_Info {
-        VkDescriptorImageInfo   image;
-        VkDescriptorBufferInfo  buffer;
-        Accel_Info              accel_info;
+        VkDescriptorImageInfo image;
+        VkDescriptorBufferInfo buffer;
+        Accel_Info accel_info;
     };
 
-    VkDescriptorSet         descriptor_set;
-    VkWriteDescriptorSet    descriptor_writes[max_writes];
-    Resource_Info           resource_infos[max_writes];
-    uint32_t                write_count;
+    VkDescriptorSet descriptor_set;
+    VkWriteDescriptorSet descriptor_writes[max_writes];
+    Resource_Info resource_infos[max_writes];
+    uint32_t write_count;
 
     Descriptor_Writes(VkDescriptorSet set) {
         descriptor_set = set;
@@ -46,12 +46,12 @@ struct Descriptor_Writes {
         commit();
     }
 
-    Descriptor_Writes& sampled_image    (uint32_t binding, VkImageView image_view, VkImageLayout layout);
-    Descriptor_Writes& storage_image    (uint32_t binding, VkImageView image_view);
-    Descriptor_Writes& sampler          (uint32_t binding, VkSampler sampler);
-    Descriptor_Writes& uniform_buffer   (uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range);
-    Descriptor_Writes& storage_buffer   (uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range);
-    Descriptor_Writes& accelerator      (uint32_t binding, VkAccelerationStructureKHR acceleration_structure);
+    Descriptor_Writes& sampled_image(uint32_t binding, VkImageView image_view, VkImageLayout layout);
+    Descriptor_Writes& storage_image(uint32_t binding, VkImageView image_view);
+    Descriptor_Writes& sampler(uint32_t binding, VkSampler sampler);
+    Descriptor_Writes& uniform_buffer(uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range);
+    Descriptor_Writes& storage_buffer(uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range);
+    Descriptor_Writes& accelerator(uint32_t binding, VkAccelerationStructureKHR acceleration_structure);
     void commit();
 };
 
@@ -65,15 +65,18 @@ struct Descriptor_Set_Layout {
         binding_count = 0;
     }
 
-    Descriptor_Set_Layout& sampled_image    (uint32_t binding, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& storage_image    (uint32_t binding, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& sampler          (uint32_t binding, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& uniform_buffer   (uint32_t binding, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& storage_buffer   (uint32_t binding, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& accelerator      (uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& sampled_image(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& storage_image(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& sampler(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& uniform_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& storage_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& accelerator(uint32_t binding, VkShaderStageFlags stage_flags);
     VkDescriptorSetLayout create(const char* name);
 };
 
+//
+// GPU time queries.
+//
 struct GPU_Time_Interval {
     uint32_t start_query[2]; // end query == (start_query[frame_index] + 1)
     float length_ms;
@@ -107,3 +110,26 @@ private:
 };
 
 #define GPU_TIME_SCOPE(time_interval) GPU_Time_Scope gpu_time_scope##__LINE__(time_interval)
+
+//
+// GPU debug markers.
+//
+void begin_gpu_marker_scope(VkCommandBuffer command_buffer, const char* name);
+void end_gpu_marker_scope(VkCommandBuffer command_buffer);
+void write_gpu_marker(VkCommandBuffer command_buffer, const char* name);
+
+struct GPU_Marker_Scope {
+    GPU_Marker_Scope(VkCommandBuffer command_buffer, const char* name) {
+        this->command_buffer = command_buffer;
+        begin_gpu_marker_scope(command_buffer, name);
+    }
+    ~GPU_Marker_Scope() {
+        end_gpu_marker_scope(command_buffer);
+    }
+
+private:
+    VkCommandBuffer command_buffer;
+};
+
+#define GPU_MARKER_SCOPE(command_buffer, name) GPU_Marker_Scope gpu_marker_scope##__LINE__(command_buffer, name)
+

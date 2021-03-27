@@ -4,24 +4,23 @@
 void Copy_To_Swapchain::create() {
 
     set_layout = Descriptor_Set_Layout()
-        .sampler        (0, VK_SHADER_STAGE_COMPUTE_BIT)
-        .sampled_image  (1, VK_SHADER_STAGE_COMPUTE_BIT)
-        .storage_image  (2, VK_SHADER_STAGE_COMPUTE_BIT)
-        .create         ("copy_to_swapchain_set_layout");
+        .sampler(0, VK_SHADER_STAGE_COMPUTE_BIT)
+        .sampled_image(1, VK_SHADER_STAGE_COMPUTE_BIT)
+        .storage_image(2, VK_SHADER_STAGE_COMPUTE_BIT)
+        .create("copy_to_swapchain_set_layout");
 
     // pipeline layout
     {
         VkPushConstantRange range;
-        range.stageFlags    = VK_SHADER_STAGE_COMPUTE_BIT;
-        range.offset        = 0;
-        range.size          = 8; // uint32 width + uint32 height
+        range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        range.offset = 0;
+        range.size = 8; // uint32 width + uint32 height
 
         VkPipelineLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        create_info.setLayoutCount          = 1;
-        create_info.pSetLayouts             = &set_layout;
-        create_info.pushConstantRangeCount  = 1;
-        create_info.pPushConstantRanges     = &range;
-
+        create_info.setLayoutCount = 1;
+        create_info.pSetLayouts = &set_layout;
+        create_info.pushConstantRangeCount = 1;
+        create_info.pPushConstantRanges = &range;
         VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
     }
 
@@ -30,9 +29,9 @@ void Copy_To_Swapchain::create() {
         VkShaderModule copy_shader = vk_load_spirv("spirv/copy_to_swapchain.comp.spv");
 
         VkPipelineShaderStageCreateInfo compute_stage { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-        compute_stage.stage    = VK_SHADER_STAGE_COMPUTE_BIT;
-        compute_stage.module   = copy_shader;
-        compute_stage.pName    = "main";
+        compute_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        compute_stage.module = copy_shader;
+        compute_stage.pName = "main";
 
         VkComputePipelineCreateInfo create_info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
         create_info.stage = compute_stage;
@@ -65,9 +64,9 @@ void Copy_To_Swapchain::update_resolution_dependent_descriptors(VkImageView outp
         for (size_t i = 0; i < n; i++)
         {
             VkDescriptorSetAllocateInfo alloc_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-            alloc_info.descriptorPool     = vk.descriptor_pool;
+            alloc_info.descriptorPool = vk.descriptor_pool;
             alloc_info.descriptorSetCount = 1;
-            alloc_info.pSetLayouts        = &set_layout;
+            alloc_info.pSetLayouts = &set_layout;
 
             VkDescriptorSet set;
             VK_CHECK(vkAllocateDescriptorSets(vk.device, &alloc_info, &set));

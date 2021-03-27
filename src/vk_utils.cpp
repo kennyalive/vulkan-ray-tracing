@@ -8,84 +8,84 @@
 Descriptor_Writes& Descriptor_Writes::sampled_image(uint32_t binding, VkImageView image_view, VkImageLayout layout) {
     assert(write_count < max_writes);
     VkDescriptorImageInfo& image = resource_infos[write_count].image;
-    image               = VkDescriptorImageInfo{};
-    image.imageView     = image_view;
-    image.imageLayout   = layout;
+    image = VkDescriptorImageInfo{};
+    image.imageView = image_view;
+    image.imageLayout = layout;
 
     VkWriteDescriptorSet& write = descriptor_writes[write_count++];
     write = VkWriteDescriptorSet { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    write.dstSet             = descriptor_set;
-    write.dstBinding         = binding;
-    write.descriptorCount    = 1;
-    write.descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    write.pImageInfo         = &image;
+    write.dstSet = descriptor_set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    write.pImageInfo = &image;
     return *this;
 }
 
 Descriptor_Writes& Descriptor_Writes::storage_image(uint32_t binding, VkImageView image_view) {
     assert(write_count < max_writes);
     VkDescriptorImageInfo& image = resource_infos[write_count].image;
-    image               = VkDescriptorImageInfo{};
-    image.imageView     = image_view;
-    image.imageLayout   = VK_IMAGE_LAYOUT_GENERAL;
+    image = VkDescriptorImageInfo{};
+    image.imageView = image_view;
+    image.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkWriteDescriptorSet& write = descriptor_writes[write_count++];
     write = VkWriteDescriptorSet { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    write.dstSet             = descriptor_set;
-    write.dstBinding         = binding;
-    write.descriptorCount    = 1;
-    write.descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    write.pImageInfo         = &image;
+    write.dstSet = descriptor_set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    write.pImageInfo = &image;
     return *this;
 }
 
 Descriptor_Writes& Descriptor_Writes::sampler(uint32_t binding, VkSampler sampler) {
     assert(write_count < max_writes);
     VkDescriptorImageInfo& image = resource_infos[write_count].image;
-    image           = VkDescriptorImageInfo{};
-    image.sampler   = sampler;
+    image = VkDescriptorImageInfo{};
+    image.sampler = sampler;
 
     VkWriteDescriptorSet& write = descriptor_writes[write_count++];
     write = VkWriteDescriptorSet { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    write.dstSet             = descriptor_set;
-    write.dstBinding         = binding;
-    write.descriptorCount    = 1;
-    write.descriptorType     = VK_DESCRIPTOR_TYPE_SAMPLER;
-    write.pImageInfo         = &image;
+    write.dstSet = descriptor_set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+    write.pImageInfo = &image;
     return *this;
 }
 
 Descriptor_Writes& Descriptor_Writes::uniform_buffer(uint32_t binding, VkBuffer buffer_handle, VkDeviceSize offset, VkDeviceSize range) {
     assert(write_count < max_writes);
     VkDescriptorBufferInfo& buffer = resource_infos[write_count].buffer;
-    buffer.buffer   = buffer_handle;
-    buffer.offset   = offset;
-    buffer.range    = range;
+    buffer.buffer = buffer_handle;
+    buffer.offset = offset;
+    buffer.range = range;
 
     VkWriteDescriptorSet& write = descriptor_writes[write_count++];
     write = VkWriteDescriptorSet { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    write.dstSet             = descriptor_set;
-    write.dstBinding         = binding;
-    write.descriptorCount    = 1;
-    write.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    write.pBufferInfo        = &buffer;
+    write.dstSet = descriptor_set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.pBufferInfo = &buffer;
     return *this;
 }
 
 Descriptor_Writes& Descriptor_Writes::storage_buffer(uint32_t binding, VkBuffer buffer_handle, VkDeviceSize offset, VkDeviceSize range) {
     assert(write_count < max_writes);
     VkDescriptorBufferInfo& buffer = resource_infos[write_count].buffer;
-    buffer.buffer   = buffer_handle;
-    buffer.offset   = offset;
-    buffer.range    = range;
+    buffer.buffer = buffer_handle;
+    buffer.offset = offset;
+    buffer.range = range;
 
     VkWriteDescriptorSet& write = descriptor_writes[write_count++];
     write = VkWriteDescriptorSet { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    write.dstSet             = descriptor_set;
-    write.dstBinding         = binding;
-    write.descriptorCount    = 1;
-    write.descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    write.pBufferInfo        = &buffer;
+    write.dstSet = descriptor_set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.pBufferInfo = &buffer;
     return *this;
 }
 
@@ -101,11 +101,11 @@ Descriptor_Writes& Descriptor_Writes::accelerator(uint32_t binding, VkAccelerati
 
     VkWriteDescriptorSet& write = descriptor_writes[write_count++];
     write = VkWriteDescriptorSet { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    write.pNext              = &accel;
-    write.dstSet             = descriptor_set;
-    write.dstBinding         = binding;
-    write.descriptorCount    = 1;
-    write.descriptorType     = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+    write.pNext = &accel;
+    write.dstSet = descriptor_set;
+    write.dstBinding = binding;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     return *this;
 }
 
@@ -122,10 +122,10 @@ void Descriptor_Writes::commit() {
 //
 static VkDescriptorSetLayoutBinding get_set_layout_binding(uint32_t binding, VkDescriptorType descriptor_type, VkShaderStageFlags stage_flags) {
     VkDescriptorSetLayoutBinding entry{};
-    entry.binding           = binding;
-    entry.descriptorType    = descriptor_type;
-    entry.descriptorCount   = 1;
-    entry.stageFlags        = stage_flags;
+    entry.binding = binding;
+    entry.descriptorType = descriptor_type;
+    entry.descriptorCount = 1;
+    entry.stageFlags = stage_flags;
     return entry;
 }
 
@@ -222,3 +222,20 @@ void GPU_Time_Keeper::next_frame() {
 
     vkCmdResetQueryPool(vk.command_buffer, vk.timestamp_query_pool, 0, query_count);
 }
+
+void begin_gpu_marker_scope(VkCommandBuffer command_buffer, const char* name) {
+    VkDebugUtilsLabelEXT label { VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT };
+    label.pLabelName = name;
+    vkCmdBeginDebugUtilsLabelEXT(command_buffer, &label);
+}
+
+void end_gpu_marker_scope(VkCommandBuffer command_buffer) {
+    vkCmdEndDebugUtilsLabelEXT(command_buffer);
+}
+
+void write_gpu_marker(VkCommandBuffer command_buffer, const char* name) {
+    VkDebugUtilsLabelEXT label { VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT };
+    label.pLabelName = name;
+    vkCmdInsertDebugUtilsLabelEXT(command_buffer, &label);
+}
+
