@@ -27,6 +27,7 @@ vec3 trace_ray(vec2 sample_pos) {
     Ray ray = generate_ray(camera_to_world, sample_pos);
     payload.rx_dir = ray.rx_dir;
     payload.ry_dir = ray.ry_dir;
+    payload.color = vec3(0);
     traceRayEXT(accel, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, ray.origin, tmin, ray.dir, tmax, 0);
     return payload.color;
 }
