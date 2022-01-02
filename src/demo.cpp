@@ -187,14 +187,15 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         init_info.QueueFamily = vk.queue_family_index;
         init_info.Queue = vk.queue;
         init_info.DescriptorPool = vk.descriptor_pool;
-
+		init_info.MinImageCount = 2;
+		init_info.ImageCount = (uint32_t)vk.swapchain_info.images.size();
         ImGui_ImplVulkan_Init(&init_info, ui_render_pass);
         ImGui::StyleColorsDark();
 
         vk_execute(vk.command_pools[0], vk.queue, [](VkCommandBuffer cb) {
             ImGui_ImplVulkan_CreateFontsTexture(cb);
         });
-        ImGui_ImplVulkan_InvalidateFontUploadObjects();
+		ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 
     draw_mesh.create(render_pass, texture.view, sampler);
