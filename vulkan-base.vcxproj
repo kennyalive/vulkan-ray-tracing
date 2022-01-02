@@ -139,6 +139,7 @@
     <ClCompile Include="third_party\imgui\imgui.cpp" />
     <ClCompile Include="third_party\imgui\imgui_demo.cpp" />
     <ClCompile Include="third_party\imgui\imgui_draw.cpp" />
+    <ClCompile Include="third_party\imgui\imgui_tables.cpp" />
     <ClCompile Include="third_party\imgui\imgui_widgets.cpp" />
     <ClCompile Include="third_party\imgui\impl\imgui_impl_glfw.cpp" />
     <ClCompile Include="third_party\imgui\impl\imgui_impl_vulkan.cpp" />

@@ -84,6 +84,9 @@
     <ClCompile Include="src\kernels\raytrace_scene.cpp">
       <Filter>kernels</Filter>
     </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_tables.cpp">
+      <Filter>3rdparty\imgui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\demo.h" />
