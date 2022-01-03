@@ -132,7 +132,6 @@ int main(int argc, char** argv) {
             demo.restore_resolution_dependent_resources();
             recreate_swapchain = false;
         }
-        platform_sleep(1);
     }
 
     demo.shutdown();
