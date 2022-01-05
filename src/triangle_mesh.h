@@ -1,6 +1,7 @@
 #pragma once
 
 #include "linear_algebra.h"
+#include <string>
 #include <vector>
 
 struct Vertex {
