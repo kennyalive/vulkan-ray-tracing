@@ -1,4 +1,4 @@
-# 🖖🏽 vulkan-raytracing
+# 🌋 vulkan-raytracing 🖖🏽
 
 * "Simple" Vulkan raytracing demo based on __VK_KHR_ray_tracing_pipeline__ + __VK_KHR_acceleration_structure__ extensions.
 * Highlights: setup of ray tracing pipeline, example of how to use ray differentials for texture filtering, setup of compute pipeline and more.
