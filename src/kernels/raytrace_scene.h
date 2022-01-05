@@ -1,8 +1,7 @@
 #pragma once
 
 #include "acceleration_structure.h"
-#include "matrix.h"
-#include "vk.h"
+#include "linear_algebra.h"
 
 struct GPU_Mesh;
 

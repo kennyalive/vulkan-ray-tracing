@@ -1,16 +1,6 @@
 #include "demo.h"
-
 #include "glfw/glfw3.h"
-
 #include <cassert>
-
-#ifdef _WIN32
-void platform_sleep(int milliseconds) {
-    ::Sleep(milliseconds);
-}
-#else
-#error platform_sleep() is not implemented on this platform
-#endif
 
 struct Command_Line_Options {
     bool enable_validation_layers;

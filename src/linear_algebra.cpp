@@ -1,4 +1,4 @@
-#include "matrix.h"
+#include "linear_algebra.h"
 #include <cassert>
 
 const Matrix3x4 Matrix3x4::identity = [] {

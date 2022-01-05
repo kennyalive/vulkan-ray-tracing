@@ -11,7 +11,6 @@ hitAttributeEXT vec2 attribs;
 
 struct Buffer_Vertex {
     float x, y, z;
-    float nx, ny, nz;
     float u, v;
 };
 
@@ -38,7 +37,6 @@ Vertex fetch_vertex(int vertex_index) {
 
     Vertex v;
     v.p = vec3(bv.x, bv.y, bv.z);
-    v.n = vec3(bv.nx, bv.ny, bv.nz);
     v.uv = fract(vec2(bv.u, bv.v));
     return v;
 }

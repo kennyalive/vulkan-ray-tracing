@@ -1,10 +1,5 @@
 layout(row_major) uniform;
 
-struct Frag_In {
-    vec3 normal;
-    vec2 uv;
-};
-
 float srgb_encode(float c) {
     if (c <= 0.0031308f)
         return 12.92f * c;

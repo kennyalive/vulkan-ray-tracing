@@ -1,18 +1,11 @@
-#include "common.h"
 #include "demo.h"
-#include "matrix.h"
-#include "mesh.h"
-#include "vk.h"
-#include "vk_utils.h"
+#include "triangle_mesh.h"
 
 #include "glfw/glfw3.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_internal.h"
 #include "imgui/impl/imgui_impl_vulkan.h"
 #include "imgui/impl/imgui_impl_glfw.h"
-
-#include <cinttypes>
-#include <chrono>
 
 static VkFormat get_depth_image_format() {
     VkFormat candidates[2] = { VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT };
@@ -61,7 +54,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
 
     // Geometry buffers.
     {
-        Mesh mesh = load_obj_mesh(get_resource_path("model/mesh.obj"), 1.25f);
+        Triangle_Mesh mesh = load_obj_model((get_data_directory() / "model/mesh.obj").string(), 1.25f);
         {
             VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
             VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
@@ -80,7 +73,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
 
     // Texture.
     {
-        texture = vk_load_texture("model/diffuse.jpg");
+        texture = vk_load_texture((get_data_directory() / "model/diffuse.jpg").string());
 
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
         create_info.magFilter = VK_FILTER_LINEAR;
@@ -141,7 +134,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         create_info.pSubpasses = &subpass;
 
         VK_CHECK(vkCreateRenderPass(vk.device, &create_info, nullptr, &render_pass));
-        vk_set_debug_name(render_pass, "color_depth_render_pass");
+        vk_set_debug_name(render_pass, "render_pass");
     }
 
     // UI render pass.
@@ -299,8 +292,8 @@ void Vk_Demo::run_frame() {
     }
     last_frame_time = current_time;
 
-    model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(20.0f));
-    view_transform = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
+    Matrix3x4 model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(20.0f));
+    Matrix3x4 view_transform = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
     draw_mesh.update(model_transform, view_transform);
 
     Matrix3x4 camera_to_world_transform;

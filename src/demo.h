@@ -1,14 +1,12 @@
 #pragma once
 
-#include "matrix.h"
+#include "linear_algebra.h"
 #include "vk_utils.h"
-#include "vk.h"
+#include <chrono>
 
 #include "kernels/copy_to_swapchain.h"
 #include "kernels/draw_mesh.h"
 #include "kernels/raytrace_scene.h"
-
-#include <vector>
 
 struct GLFWwindow;
 
@@ -49,6 +47,7 @@ private:
 
     Time last_frame_time;
     double sim_time;
+    Vector3 camera_pos = Vector3(0, 0.5, 3.0);
 
     UI_Result ui_result;
 
@@ -78,8 +77,4 @@ private:
     Copy_To_Swapchain copy_to_swapchain;
     Draw_Mesh draw_mesh;
     Raytrace_Scene raytrace_scene;
-
-    Vector3 camera_pos = Vector3(0, 0.5, 3.0);
-    Matrix3x4 model_transform;
-    Matrix3x4 view_transform;
 };

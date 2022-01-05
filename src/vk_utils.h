@@ -1,9 +1,7 @@
 #pragma once
 
-#include "vector.h"
+#include "lib.h"
 #include "vk.h"
-
-#include <vector>
 
 struct GPU_Mesh {
     Vk_Buffer vertex_buffer;
@@ -17,6 +15,16 @@ struct GPU_Mesh {
         vertex_count = 0;
         index_count = 0;
     }
+};
+
+struct Shader_Module {
+    Shader_Module(const std::string& spirv_file) {
+        handle = vk_load_spirv((get_data_directory() / spirv_file).string());
+    }
+    ~Shader_Module() {
+        vkDestroyShaderModule(vk.device, handle, nullptr);
+    }
+    VkShaderModule handle;
 };
 
 struct Descriptor_Writes {

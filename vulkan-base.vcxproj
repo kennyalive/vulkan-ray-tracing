@@ -111,13 +111,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\acceleration_structure.cpp" />
-    <ClCompile Include="src\common.cpp" />
+    <ClCompile Include="src\lib.cpp" />
     <ClCompile Include="src\kernels\copy_to_swapchain.cpp" />
     <ClCompile Include="src\kernels\draw_mesh.cpp" />
     <ClCompile Include="src\kernels\raytrace_scene.cpp" />
-    <ClCompile Include="src\mesh.cpp" />
+    <ClCompile Include="src\triangle_mesh.cpp" />
     <ClCompile Include="src\vk_utils.cpp" />
-    <ClCompile Include="src\matrix.cpp" />
+    <ClCompile Include="src\linear_algebra.cpp" />
     <ClCompile Include="src\vk.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\demo.cpp" />
@@ -150,14 +150,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\acceleration_structure.h" />
-    <ClInclude Include="src\common.h" />
+    <ClInclude Include="src\lib.h" />
     <ClInclude Include="src\kernels\copy_to_swapchain.h" />
     <ClInclude Include="src\kernels\draw_mesh.h" />
     <ClInclude Include="src\kernels\raytrace_scene.h" />
-    <ClInclude Include="src\mesh.h" />
+    <ClInclude Include="src\triangle_mesh.h" />
     <ClInclude Include="src\vk_utils.h" />
-    <ClInclude Include="src\matrix.h" />
-    <ClInclude Include="src\vector.h" />
+    <ClInclude Include="src\linear_algebra.h" />
     <ClInclude Include="src\vk.h" />
     <ClInclude Include="src\demo.h" />
     <ClInclude Include="third_party\glfw\egl_context.h" />

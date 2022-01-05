@@ -1,10 +1,13 @@
 #pragma once
 
 #include <chrono>
-#include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <limits> // std::numeric_limits
 #include <string>
 #include <vector>
+
+namespace fs = std::filesystem;
 
 constexpr float Pi = 3.14159265f;
 constexpr float Infinity = std::numeric_limits<float>::infinity();
@@ -20,19 +23,19 @@ inline float degrees(float radians) {
 }
 
 void error(const std::string& message);
-std::string get_resource_path(const std::string& resource_relative_path);
+
+// The place where program's resources are located (models, textures, spirv binaries).
+// This location can be configured with --data-dir command line option.
+fs::path get_data_directory();
+
 std::vector<uint8_t> read_binary_file(const std::string& file_name);
 
 struct Timestamp {
     Timestamp() : t(std::chrono::steady_clock::now()) {}
     std::chrono::time_point<std::chrono::steady_clock> t;
 };
-
-int64_t elapsed_milliseconds(Timestamp timestamp);
-int64_t elapsed_microseconds(Timestamp timestamp);
-int64_t elapsed_nanoseconds(Timestamp timestamp);
-
-double get_base_cpu_frequency_ghz();
+uint64_t elapsed_milliseconds(Timestamp timestamp);
+uint64_t elapsed_nanoseconds(Timestamp timestamp);
 
 // Boost hash combine.
 template <typename T>
@@ -56,11 +59,11 @@ inline T round_up(T k, T alignment) {
 #if 0
 #define START_TIMER { Timestamp t;
 #define STOP_TIMER(message) \
-	auto d = elapsed_nanoseconds(t); \
-	static Timestamp t0; \
-	if (elapsed_milliseconds(t0) > 1000) { \
-		t0 = Timestamp(); \
-		printf(message ## " time = %lld  microseconds\n", d / 1000); } }
+    auto d = elapsed_nanoseconds(t); \
+    static Timestamp t0; \
+    if (elapsed_milliseconds(t0) > 1000) { \
+        t0 = Timestamp(); \
+        printf(message ## " time = %lld  microseconds\n", d / 1000); } }
 
 #else
 #define START_TIMER

@@ -6,7 +6,6 @@ struct Ray_Payload {
 
 struct Vertex {
     vec3 p;
-    vec3 n;
     vec2 uv;
 };
 

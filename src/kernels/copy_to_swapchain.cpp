@@ -26,19 +26,17 @@ void Copy_To_Swapchain::create() {
 
     // pipeline
     {
-        VkShaderModule copy_shader = vk_load_spirv("spirv/copy_to_swapchain.comp.spv");
+        Shader_Module copy_shader("spirv/copy_to_swapchain.comp.spv");
 
         VkPipelineShaderStageCreateInfo compute_stage { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         compute_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-        compute_stage.module = copy_shader;
+        compute_stage.module = copy_shader.handle;
         compute_stage.pName = "main";
 
         VkComputePipelineCreateInfo create_info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
         create_info.stage = compute_stage;
         create_info.layout = pipeline_layout;
         VK_CHECK(vkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
-
-        vkDestroyShaderModule(vk.device, copy_shader, nullptr);
     }
 
     // point sampler

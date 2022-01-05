@@ -1,8 +1,6 @@
-#include "mesh.h"
 #include "raytrace_scene.h"
+#include "triangle_mesh.h"
 #include "vk_utils.h"
-
-#include <algorithm>
 #include <cassert>
 
 namespace {
@@ -93,24 +91,24 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
 
     // pipeline
     {
-        VkShaderModule rgen_shader = vk_load_spirv("spirv/rt_mesh.rgen.spv");
-        VkShaderModule miss_shader = vk_load_spirv("spirv/rt_mesh.rmiss.spv");
-        VkShaderModule chit_shader = vk_load_spirv("spirv/rt_mesh.rchit.spv");
+        Shader_Module rgen_shader("spirv/rt_mesh.rgen.spv");
+        Shader_Module miss_shader("spirv/rt_mesh.rmiss.spv");
+        Shader_Module chit_shader("spirv/rt_mesh.rchit.spv");
 
         VkPipelineShaderStageCreateInfo stage_infos[3] {};
         stage_infos[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stage_infos[0].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-        stage_infos[0].module = rgen_shader;
+        stage_infos[0].module = rgen_shader.handle;
         stage_infos[0].pName = "main";
 
         stage_infos[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stage_infos[1].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
-        stage_infos[1].module = miss_shader;
+        stage_infos[1].module = miss_shader.handle;
         stage_infos[1].pName = "main";
 
         stage_infos[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stage_infos[2].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-        stage_infos[2].module = chit_shader;
+        stage_infos[2].module = chit_shader.handle;
         stage_infos[2].pName = "main";
 
         VkRayTracingShaderGroupCreateInfoKHR shader_groups[3];
@@ -152,10 +150,6 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
         create_info.maxPipelineRayRecursionDepth = 1;
         create_info.layout = pipeline_layout;
         VK_CHECK(vkCreateRayTracingPipelinesKHR(vk.device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
-
-        vkDestroyShaderModule(vk.device, rgen_shader, nullptr);
-        vkDestroyShaderModule(vk.device, miss_shader, nullptr);
-        vkDestroyShaderModule(vk.device, chit_shader, nullptr);
     }
 
     // descriptor set

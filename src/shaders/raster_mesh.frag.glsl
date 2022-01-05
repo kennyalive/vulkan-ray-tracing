@@ -7,7 +7,7 @@ layout(push_constant) uniform Push_Constants {
     uint show_texture_lods;
 };
 
-layout(location=0) in Frag_In frag_in;
+layout(location=0) in vec2 frag_uv;
 layout(location = 0) out vec4 color_attachment0;
 
 layout(binding=1) uniform texture2D image;
@@ -25,10 +25,10 @@ void main() {
         // float filter_width = max(max(uvdx[0], uvdx[1]), max(uvdy[0], uvdy[1]));
         // float lod = textureQueryLevels(sampler2D(image, image_sampler)) - 1 + log2(filter_width);
 
-        float lod = textureQueryLod(sampler2D(image, image_sampler), frag_in.uv).y;
+        float lod = textureQueryLod(sampler2D(image, image_sampler), frag_uv).y;
         color = color_encode_lod(lod);
     } else {
-        color = texture(sampler2D(image, image_sampler), frag_in.uv).xyz;
+        color = texture(sampler2D(image, image_sampler), frag_uv).xyz;
     }
     color_attachment0 = vec4(srgb_encode(color), 1);
 }

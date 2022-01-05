@@ -1,5 +1,4 @@
 #include "vk_utils.h"
-
 #include <cassert>
 
 //

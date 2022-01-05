@@ -1,6 +1,6 @@
 #include "acceleration_structure.h"
-#include "matrix.h"
-#include "mesh.h"
+#include "linear_algebra.h"
+#include "triangle_mesh.h"
 #include "vk_utils.h"
 
 static BLAS_Info create_BLAS(const GPU_Mesh& mesh) {
@@ -136,7 +136,7 @@ Vk_Intersection_Accelerator create_intersection_accelerator(const std::vector<GP
     // Create TLAS.
     accelerator.top_level_accel = create_TLAS((uint32_t)gpu_meshes.size(), accelerator.instance_buffer.device_address);
 
-    printf("\nAcceleration structures build time = %lld microseconds\n", elapsed_microseconds(t));
+    printf("\nAcceleration structures build time = %lld microseconds\n", elapsed_nanoseconds(t) / 1000);
     return accelerator;
 }
 
