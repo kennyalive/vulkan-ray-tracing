@@ -41,7 +41,7 @@ private:
     bool show_ui = true;
     bool vsync = true;
     bool animate = false;
-    bool raytracing_active = false;
+    bool raytracing_active = true;
     bool show_texture_lod = false;
     bool spp4 = false;
 
