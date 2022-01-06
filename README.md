@@ -14,6 +14,8 @@ Build steps:
 1. Open solution in Visual Studio IDE.
 2. Press F7 (Build Solution). That's all. All dependencies are included.
 
+In order to enable Vulkan validation layers specify ```--validation-layers``` command line argument.
+
 ![demo](https://user-images.githubusercontent.com/4964024/48605463-26722a00-e97d-11e8-9548-65de42d50c21.png)
 
 _"About 128KB of source code is a reasonable upper limit for the complexity of explicit graphics API initialization problems now envisioned."_
