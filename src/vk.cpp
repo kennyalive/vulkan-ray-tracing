@@ -67,28 +67,26 @@ static void create_instance(bool enable_validation_layers) {
             }
         }
         if (!supported)
-            error("Vulkan: required instance extension is not available: " + std::string(name));
+            error("Required instance extension is not available: " + std::string(name));
     }
 
     VkApplicationInfo app_info { VK_STRUCTURE_TYPE_APPLICATION_INFO };
-    // The highest version of instance-level, physical-device-level or
-    // device-level functionality we are going to use.
-    app_info.apiVersion = VK_API_VERSION_1_2;
+    app_info.apiVersion = VK_API_VERSION_1_3;
 
-    VkInstanceCreateInfo desc { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
-    desc.pApplicationInfo        = &app_info;
-    desc.enabledExtensionCount   = sizeof(instance_extensions)/sizeof(instance_extensions[0]);
-    desc.ppEnabledExtensionNames = instance_extensions;
+    VkInstanceCreateInfo instance_create_info { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+    instance_create_info.pApplicationInfo = &app_info;
+    instance_create_info.enabledExtensionCount = sizeof(instance_extensions)/sizeof(instance_extensions[0]);
+    instance_create_info.ppEnabledExtensionNames = instance_extensions;
 
     if (enable_validation_layers) {
         static const char* layer_names[] = {
             "VK_LAYER_KHRONOS_validation"
         };
-        desc.enabledLayerCount = (uint32_t)std::size(layer_names);
-        desc.ppEnabledLayerNames = layer_names;
+		instance_create_info.enabledLayerCount = (uint32_t)std::size(layer_names);
+		instance_create_info.ppEnabledLayerNames = layer_names;
     }    
 
-    VK_CHECK(vkCreateInstance(&desc, nullptr, &vk.instance));
+    VK_CHECK(vkCreateInstance(&instance_create_info, nullptr, &vk.instance));
 }
 
 static void create_device(GLFWwindow* window) {
@@ -108,8 +106,8 @@ static void create_device(GLFWwindow* window) {
             VkPhysicalDeviceProperties props;
             vkGetPhysicalDeviceProperties(physical_device, &props);
 
-            // Check for device-level Vulkan 1.2 compatibility.
-            if (VK_VERSION_MAJOR(props.apiVersion) == 1 && VK_VERSION_MINOR(props.apiVersion) >= 2)
+            // Check for device-level Vulkan 1.3 compatibility.
+            if (VK_VERSION_MAJOR(props.apiVersion) == 1 && VK_VERSION_MINOR(props.apiVersion) >= 3)
             {
                 vk.physical_device = physical_device;
                 vk.timestamp_period_ms = (double)props.limits.timestampPeriod * 1e-6;
@@ -199,8 +197,9 @@ static void create_device(GLFWwindow* window) {
         queue_create_info.queueCount = 1;
         queue_create_info.pQueuePriorities = &priority;
 
-        VkPhysicalDeviceVulkan12Features vulkan12_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
-        vulkan12_features.bufferDeviceAddress = VK_TRUE;
+        VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+		buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
 
         VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
         acceleration_structure_features.accelerationStructure = VK_TRUE;
@@ -208,11 +207,11 @@ static void create_device(GLFWwindow* window) {
         VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
         ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
 
-        vulkan12_features.pNext = &acceleration_structure_features;
+		buffer_device_address_features.pNext = &acceleration_structure_features;
         acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
 
         VkPhysicalDeviceFeatures2 features2 { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-        features2.pNext = &vulkan12_features;
+        features2.pNext = &buffer_device_address_features;
 
         VkDeviceCreateInfo device_create_info { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
         device_create_info.pNext = &features2;
@@ -260,10 +259,10 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
     // Require version 1.1 or higher of instance-level functionality.
     // "As long as the instance supports at least Vulkan 1.1, an application can use different 
     // versions of Vulkan with an instance than it does with a device or physical device."
-    bool loader_supports_version_higher_than_or_equal_to_1_1 =
+    bool instance_version_higher_than_or_equal_to_1_1 =
         VK_VERSION_MAJOR(instance_version) > 1 || VK_VERSION_MINOR(instance_version) >= 1;
-    if (!loader_supports_version_higher_than_or_equal_to_1_1)
-        error("Old Vulkan loader detected which supports only Vulkan 1.0, please update your driver");
+    if (!instance_version_higher_than_or_equal_to_1_1)
+        error("The supported instance version is Vulkan 1.1 or higher, but Vulkan 1.0 loader is detected");
 
     create_instance(enable_validation_layers);
     volkLoadInstance(vk.instance);
