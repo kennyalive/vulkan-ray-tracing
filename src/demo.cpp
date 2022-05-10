@@ -92,51 +92,6 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         vk_set_debug_name(sampler, "diffuse_texture_sampler");
     }
 
-    // Render pass.
-    {
-        VkAttachmentDescription attachments[2] = {};
-        attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
-        attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        attachments[1].format = get_depth_image_format();
-        attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[1].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-        VkAttachmentReference color_attachment_ref;
-        color_attachment_ref.attachment = 0;
-        color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-        VkAttachmentReference depth_attachment_ref;
-        depth_attachment_ref.attachment = 1;
-        depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-        VkSubpassDescription subpass{};
-        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpass.colorAttachmentCount = 1;
-        subpass.pColorAttachments = &color_attachment_ref;
-        subpass.pDepthStencilAttachment = &depth_attachment_ref;
-
-        VkRenderPassCreateInfo create_info{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
-        create_info.attachmentCount = (uint32_t)std::size(attachments);
-        create_info.pAttachments = attachments;
-        create_info.subpassCount = 1;
-        create_info.pSubpasses = &subpass;
-
-        VK_CHECK(vkCreateRenderPass(vk.device, &create_info, nullptr, &render_pass));
-        vk_set_debug_name(render_pass, "render_pass");
-    }
-
     // UI render pass.
     {
         VkAttachmentDescription attachments[1] = {};
@@ -191,7 +146,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
 		ImGui_ImplVulkan_DestroyFontUploadObjects();
     }
 
-    draw_mesh.create(render_pass, texture.view, sampler);
+    draw_mesh.create(get_depth_image_format(), texture.view, sampler);
     raytrace_scene.create(gpu_mesh, texture.view, sampler);
     copy_to_swapchain.create();
     restore_resolution_dependent_resources();
@@ -214,7 +169,6 @@ void Vk_Demo::shutdown() {
     texture.destroy();
     copy_to_swapchain.destroy();
     vkDestroySampler(vk.device, sampler, nullptr);
-    vkDestroyRenderPass(vk.device, render_pass, nullptr);
     vkDestroyRenderPass(vk.device, ui_render_pass, nullptr);
     release_resolution_dependent_resources();
     draw_mesh.destroy();
@@ -224,9 +178,6 @@ void Vk_Demo::shutdown() {
 }
 
 void Vk_Demo::release_resolution_dependent_resources() {
-    vkDestroyFramebuffer(vk.device, framebuffer, nullptr);
-    framebuffer = VK_NULL_HANDLE;
-
     vkDestroyFramebuffer(vk.device, ui_framebuffer, nullptr);
     ui_framebuffer = VK_NULL_HANDLE;
 
@@ -242,30 +193,8 @@ void Vk_Demo::restore_resolution_dependent_resources() {
         output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_R16G16B16A16_SFLOAT,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, "output_image");
 
-        if (raytracing_active) {
-            vk_execute(vk.command_pools[0], vk.queue, [this](VkCommandBuffer command_buffer) {
-                vk_cmd_image_barrier(command_buffer, output_image.handle,
-                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
-                    VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_GENERAL);
-            });
-        }
-
         raytrace_scene.update_output_image_descriptor(output_image.view);
         copy_to_swapchain.update_resolution_dependent_descriptors(output_image.view);
-    }
-
-    // framebuffer
-    {
-        VkImageView attachments[] = {output_image.view, depth_info.image_view};
-        VkFramebufferCreateInfo create_info { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-        create_info.renderPass = render_pass;
-        create_info.attachmentCount = (uint32_t)std::size(attachments);
-        create_info.pAttachments = attachments;
-        create_info.width = vk.surface_size.width;
-        create_info.height = vk.surface_size.height;
-        create_info.layers = 1;
-        VK_CHECK(vkCreateFramebuffer(vk.device, &create_info, nullptr, &framebuffer));
-        vk_set_debug_name(framebuffer, "color_depth_framebuffer");
     }
 
     // imgui framebuffer
@@ -336,29 +265,27 @@ void Vk_Demo::create_depth_buffer() {
 
     // create depth image view
     {
-        VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-        desc.image = depth_info.image;
-        desc.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        desc.format = depth_format;
-
-        desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        desc.subresourceRange.baseMipLevel = 0;
-        desc.subresourceRange.levelCount = 1;
-        desc.subresourceRange.baseArrayLayer = 0;
-        desc.subresourceRange.layerCount = 1;
-
-        VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &depth_info.image_view));
+        VkImageViewCreateInfo create_info { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+        create_info.image = depth_info.image;
+        create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        create_info.format = depth_format;
+        create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        create_info.subresourceRange.baseMipLevel = 0;
+        create_info.subresourceRange.levelCount = 1;
+        create_info.subresourceRange.baseArrayLayer = 0;
+        create_info.subresourceRange.layerCount = 1;
+        VK_CHECK(vkCreateImageView(vk.device, &create_info, nullptr, &depth_info.image_view));
     }
 
-    VkImageSubresourceRange subresource_range{};
-    subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-    subresource_range.levelCount = 1;
-    subresource_range.layerCount = 1;
+    vk_execute(vk.command_pools[0], vk.queue, [this](VkCommandBuffer command_buffer) {
+        VkImageSubresourceRange subresource_range{};
+        subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        subresource_range.levelCount = 1;
+        subresource_range.layerCount = 1;
 
-    vk_execute(vk.command_pools[0], vk.queue, [&subresource_range, this](VkCommandBuffer command_buffer) {
         vk_cmd_image_barrier_for_subresource(command_buffer, depth_info.image, subresource_range,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+            VK_PIPELINE_STAGE_NONE, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_PIPELINE_STAGE_NONE, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     });
 }
 
@@ -373,12 +300,6 @@ void Vk_Demo::draw_frame() {
     time_keeper.next_frame();
     gpu_times.frame->begin();
 
-    if (raytracing_active && ui_result.raytracing_toggled) {
-        vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL);
-    }
-
     if (raytracing_active)
         draw_raytraced_image();
     else
@@ -386,6 +307,7 @@ void Vk_Demo::draw_frame() {
 
     draw_imgui();
     copy_output_image_to_swapchain();
+
     gpu_times.frame->end();
     vk_end_frame();
 }
@@ -393,37 +315,54 @@ void Vk_Demo::draw_frame() {
 void Vk_Demo::draw_rasterized_image() {
     GPU_TIME_SCOPE(gpu_times.draw);
 
+    vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
     VkViewport viewport{};
     viewport.width = static_cast<float>(vk.surface_size.width);
     viewport.height = static_cast<float>(vk.surface_size.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(vk.command_buffer, 0, 1, &viewport);
 
     VkRect2D scissor{};
     scissor.extent = vk.surface_size;
-
-    vkCmdSetViewport(vk.command_buffer, 0, 1, &viewport);
     vkCmdSetScissor(vk.command_buffer, 0, 1, &scissor);
 
-    VkClearValue clear_values[2];
-    clear_values[0].color = {srgb_encode(0.32f), srgb_encode(0.32f), srgb_encode(0.4f), 0.0f};
-    clear_values[1].depthStencil.depth = 1.0;
-    clear_values[1].depthStencil.stencil = 0;
+    VkRenderingAttachmentInfo color_attachment{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO };
+    color_attachment.imageView = output_image.view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment.clearValue.color = { srgb_encode(0.32f), srgb_encode(0.32f), srgb_encode(0.4f), 0.0f };
 
-    VkRenderPassBeginInfo render_pass_begin_info { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    render_pass_begin_info.renderPass = render_pass;
-    render_pass_begin_info.framebuffer = framebuffer;
-    render_pass_begin_info.renderArea.extent = vk.surface_size;
-    render_pass_begin_info.clearValueCount = (uint32_t)std::size(clear_values);
-    render_pass_begin_info.pClearValues = clear_values;
+    VkRenderingAttachmentInfo depth_attachment{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO };
+    depth_attachment.imageView = depth_info.image_view;
+    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.clearValue.depthStencil = { 1.f, 0 };
 
-    vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+    VkRenderingInfo rendering_info{ VK_STRUCTURE_TYPE_RENDERING_INFO };
+    rendering_info.renderArea.extent = vk.surface_size;
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+    rendering_info.pDepthAttachment = &depth_attachment;
+
+    vkCmdBeginRendering(vk.command_buffer, &rendering_info);
     draw_mesh.dispatch(gpu_mesh, show_texture_lod);
-    vkCmdEndRenderPass(vk.command_buffer);
+    vkCmdEndRendering(vk.command_buffer);
 }
 
 void Vk_Demo::draw_raytraced_image() {
     GPU_TIME_SCOPE(gpu_times.draw);
+
+    vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL);
+
     raytrace_scene.dispatch(spp4, show_texture_lod);
 }
 
@@ -436,10 +375,6 @@ void Vk_Demo::draw_imgui() {
         vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
             VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL,
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    } else {
-        vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     }
 
     VkRenderPassBeginInfo render_pass_begin_info{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
@@ -450,46 +385,27 @@ void Vk_Demo::draw_imgui() {
     vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
     vkCmdEndRenderPass(vk.command_buffer);
-
-    if (raytracing_active) {
-        vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL);
-    } else {
-        vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    }
 }
 
 void Vk_Demo::copy_output_image_to_swapchain() {
     GPU_TIME_SCOPE(gpu_times.compute_copy);
 
-    if (raytracing_active) {
-        vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-            VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    }
+    vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_PIPELINE_STAGE_NONE, 0, VK_IMAGE_LAYOUT_UNDEFINED,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT,  VK_IMAGE_LAYOUT_GENERAL);
 
     copy_to_swapchain.dispatch();
 
     vk_cmd_image_barrier(vk.command_buffer, vk.swapchain_info.images[vk.swapchain_image_index],
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
-    if (raytracing_active) {
-        vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL);
-    }
+        VK_PIPELINE_STAGE_NONE, 0, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 }
 
 void Vk_Demo::do_imgui() {
-    ui_result = UI_Result{};
     ImGuiIO& io = ImGui::GetIO();
 
     ImGui_ImplVulkan_NewFrame();
@@ -537,7 +453,7 @@ void Vk_Demo::do_imgui() {
             ImGui::Checkbox("Animate", &animate);
             ImGui::Checkbox("Show texture lod", &show_texture_lod);
 
-            ui_result.raytracing_toggled = ImGui::Checkbox("Raytracing", &raytracing_active);
+            ImGui::Checkbox("Raytracing", &raytracing_active);
             ImGui::Checkbox("4 rays per pixel", &spp4);
 
             if (ImGui::BeginPopupContextWindow()) {

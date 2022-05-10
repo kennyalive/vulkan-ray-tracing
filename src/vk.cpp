@@ -10,12 +10,6 @@
 #include "glfw/glfw3.h"
 #include "glfw/glfw3native.h"
 
-#include <algorithm>
-#include <cassert>
-#include <functional>
-#include <iostream>
-#include <vector>
-
 static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
     {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             16},
     {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,              16},
@@ -198,16 +192,28 @@ static void create_device(GLFWwindow* window) {
         queue_create_info.pQueuePriorities = &priority;
 
         VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{
-			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
-		buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+        buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
 
-        VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+        VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES };
+        dynamic_rendering_features.dynamicRendering = VK_TRUE;
+
+        VkPhysicalDeviceSynchronization2Features synchronization2_features{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES };
+        synchronization2_features.synchronization2 = VK_TRUE;
+
+        VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
         acceleration_structure_features.accelerationStructure = VK_TRUE;
 
-        VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+        VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
         ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
 
-		buffer_device_address_features.pNext = &acceleration_structure_features;
+        buffer_device_address_features.pNext = &dynamic_rendering_features;
+        dynamic_rendering_features.pNext = &synchronization2_features;
+        synchronization2_features.pNext = &acceleration_structure_features;
         acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
 
         VkPhysicalDeviceFeatures2 features2 { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
@@ -894,13 +900,17 @@ Vk_Graphics_Pipeline_State get_default_graphics_pipeline_state() {
     state.dynamic_state[1]                      = VK_DYNAMIC_STATE_SCISSOR;
     state.dynamic_state_count                   = 2;
 
+    // VkPipelineRenderingCreateInfo
+    state.color_attachment_formats[0]           = vk.surface_format.format;
+    state.color_attachment_count                = 1;
+    state.depth_attachment_format               = VK_FORMAT_UNDEFINED;
+
     return state;
 }
 
 VkPipeline vk_create_graphics_pipeline(
     const Vk_Graphics_Pipeline_State&   state,
     VkPipelineLayout                    pipeline_layout,
-    VkRenderPass                        render_pass,
     VkShaderModule                      vertex_shader,
     VkShaderModule                      fragment_shader)
 {
@@ -933,7 +943,13 @@ VkPipeline vk_create_graphics_pipeline(
     dynamic_state_create_info.dynamicStateCount         = state.dynamic_state_count;
     dynamic_state_create_info.pDynamicStates            = state.dynamic_state;
 
+	VkPipelineRenderingCreateInfo rendering_create_info{ VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+    rendering_create_info.colorAttachmentCount          = state.color_attachment_count;
+    rendering_create_info.pColorAttachmentFormats       = state.color_attachment_formats;
+    rendering_create_info.depthAttachmentFormat         = state.depth_attachment_format;
+
     VkGraphicsPipelineCreateInfo create_info { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+    create_info.pNext                                   = &rendering_create_info;
     create_info.stageCount                              = (uint32_t)std::size(shader_stages_state);
     create_info.pStages                                 = shader_stages_state;
     create_info.pVertexInputState                       = &vertex_input_state;
@@ -945,7 +961,6 @@ VkPipeline vk_create_graphics_pipeline(
     create_info.pColorBlendState                        = &blend_state;
     create_info.pDynamicState                           = &dynamic_state_create_info;
     create_info.layout                                  = pipeline_layout;
-    create_info.renderPass                              = render_pass;
     create_info.subpass                                 = 0;
 
     VkPipeline pipeline;

@@ -31,10 +31,6 @@ private:
     void do_imgui();
 
 private:
-    struct UI_Result {
-        bool raytracing_toggled;
-    };
-
     using Clock = std::chrono::high_resolution_clock;
     using Time  = std::chrono::time_point<Clock>;
 
@@ -48,8 +44,6 @@ private:
     Time last_frame_time;
     double sim_time;
     Vector3 camera_pos = Vector3(0, 0.5, 3.0);
-
-    UI_Result ui_result;
 
     struct Depth_Buffer_Info {
         VkImage image;
@@ -66,8 +60,6 @@ private:
         GPU_Time_Interval* compute_copy;
     } gpu_times;
 
-    VkRenderPass render_pass;
-    VkFramebuffer framebuffer;
     VkRenderPass ui_render_pass;
     VkFramebuffer ui_framebuffer;
     Vk_Image output_image;

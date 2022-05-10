@@ -43,9 +43,12 @@ struct Vk_Graphics_Pipeline_State {
     VkPipelineMultisampleStateCreateInfo    multisample_state;
     VkPipelineDepthStencilStateCreateInfo   depth_stencil_state;
     VkPipelineColorBlendAttachmentState     attachment_blend_state[4];
-    UINT32                                  attachment_blend_state_count;
+    uint32_t                                attachment_blend_state_count;
     VkDynamicState                          dynamic_state[8];
     uint32_t                                dynamic_state_count;
+    VkFormat                                color_attachment_formats[4];
+    uint32_t                                color_attachment_count;
+    VkFormat                                depth_attachment_format;
 };
 
 struct GLFWwindow;
@@ -74,7 +77,6 @@ Vk_Graphics_Pipeline_State get_default_graphics_pipeline_state();
 VkPipeline vk_create_graphics_pipeline(
     const Vk_Graphics_Pipeline_State&   state,
     VkPipelineLayout                    pipeline_layout,
-    VkRenderPass                        render_pass,
     VkShaderModule                      vertex_shader,
     VkShaderModule                      fragment_shader
 );

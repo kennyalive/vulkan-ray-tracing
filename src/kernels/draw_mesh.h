@@ -13,7 +13,7 @@ struct Draw_Mesh {
     Vk_Buffer uniform_buffer;
     void* mapped_uniform_buffer;
 
-    void create(VkRenderPass render_pass, VkImageView texture_view, VkSampler sample);
+    void create(VkFormat depth_attachment_format, VkImageView texture_view, VkSampler sample);
     void destroy();
     void update(const Matrix3x4& model_transform, const Matrix3x4& view_transform);
     void dispatch(const GPU_Mesh& mesh, bool show_texture_lod);

@@ -9,7 +9,7 @@ struct Uniform_Buffer {
 };
 }
 
-void Draw_Mesh::create(VkRenderPass render_pass, VkImageView texture_view, VkSampler sampler) {
+void Draw_Mesh::create(VkFormat depth_attachment_format, VkImageView texture_view, VkSampler sampler) {
     uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "raster_uniform_buffer");
 
@@ -62,7 +62,11 @@ void Draw_Mesh::create(VkRenderPass render_pass, VkImageView texture_view, VkSam
 
         state.vertex_attribute_count = 2;
 
-        pipeline = vk_create_graphics_pipeline(state, pipeline_layout, render_pass, vertex_shader.handle, fragment_shader.handle);
+        state.color_attachment_formats[0] = VK_FORMAT_R16G16B16A16_SFLOAT;
+        state.color_attachment_count = 1;
+        state.depth_attachment_format = depth_attachment_format;
+
+        pipeline = vk_create_graphics_pipeline(state, pipeline_layout, vertex_shader.handle, fragment_shader.handle);
     }
 
     // descriptor sets
