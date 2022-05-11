@@ -21,8 +21,6 @@ public:
     void run_frame();
 
 private:
-    void create_depth_buffer();
-    void destroy_depth_buffer();
     void draw_frame();
     void draw_rasterized_image();
     void draw_raytraced_image();
@@ -45,13 +43,6 @@ private:
     double sim_time;
     Vector3 camera_pos = Vector3(0, 0.5, 3.0);
 
-    struct Depth_Buffer_Info {
-        VkImage image;
-        VkImageView image_view;
-        VmaAllocation allocation;
-    };
-    Depth_Buffer_Info depth_info;
-
     GPU_Time_Keeper time_keeper;
     struct {
         GPU_Time_Interval* frame;
@@ -62,6 +53,7 @@ private:
 
     VkRenderPass ui_render_pass;
     VkFramebuffer ui_framebuffer;
+    Vk_Image depth_buffer_image;
     Vk_Image output_image;
     GPU_Mesh gpu_mesh;
     Vk_Image texture;
