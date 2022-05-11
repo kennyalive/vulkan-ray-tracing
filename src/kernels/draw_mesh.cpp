@@ -96,7 +96,7 @@ void Draw_Mesh::update(const Matrix3x4& model_transform, const Matrix3x4& view_t
     float aspect_ratio = (float)vk.surface_size.width / (float)vk.surface_size.height;
     Matrix4x4 projection_transform = perspective_transform_opengl_z01(radians(45.0f), aspect_ratio, 0.1f, 50.0f);
     Matrix4x4 model_view_projection = projection_transform * view_transform * model_transform;
-    static_cast<Uniform_Buffer*>(mapped_uniform_buffer)->model_view_proj = model_view_projection;
+    memcpy(mapped_uniform_buffer, &model_view_projection, sizeof(model_view_projection));
 }
 
 void Draw_Mesh::dispatch(const GPU_Mesh& mesh, bool show_texture_lod) {

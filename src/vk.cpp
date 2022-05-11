@@ -246,15 +246,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_utils_messenger_callback(
 }
 
 void Vk_Image::destroy() {
-    vkDestroyImage(vk.device, handle, nullptr);
+    vmaDestroyImage(vk.allocator, handle, allocation);
     vkDestroyImageView(vk.device, view, nullptr);
-    vmaFreeMemory(vk.allocator, allocation);
     *this = Vk_Image{};
 }
 
 void Vk_Buffer::destroy() {
-    vkDestroyBuffer(vk.device, handle, nullptr);
-    vmaFreeMemory(vk.allocator, allocation);
+    vmaDestroyBuffer(vk.allocator, handle, allocation);
     *this = Vk_Buffer{};
 }
 
@@ -293,34 +291,43 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
 
     vkGetDeviceQueue(vk.device, vk.queue_family_index, 0, &vk.queue);
 
-    VmaVulkanFunctions alloc_funcs{};
-    alloc_funcs.vkGetPhysicalDeviceProperties       = vkGetPhysicalDeviceProperties;
-    alloc_funcs.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
-    alloc_funcs.vkAllocateMemory                    = vkAllocateMemory;
-    alloc_funcs.vkFreeMemory                        = vkFreeMemory;
-    alloc_funcs.vkMapMemory                         = vkMapMemory;
-    alloc_funcs.vkUnmapMemory                       = vkUnmapMemory;
-    alloc_funcs.vkFlushMappedMemoryRanges           = vkFlushMappedMemoryRanges;
-    alloc_funcs.vkInvalidateMappedMemoryRanges      = vkInvalidateMappedMemoryRanges;
-    alloc_funcs.vkBindBufferMemory                  = vkBindBufferMemory;
-    alloc_funcs.vkBindImageMemory                   = vkBindImageMemory;
-    alloc_funcs.vkGetBufferMemoryRequirements       = vkGetBufferMemoryRequirements;
-    alloc_funcs.vkGetImageMemoryRequirements        = vkGetImageMemoryRequirements;
-    alloc_funcs.vkCreateBuffer                      = vkCreateBuffer;
-    alloc_funcs.vkDestroyBuffer                     = vkDestroyBuffer;
-    alloc_funcs.vkCreateImage                       = vkCreateImage;
-    alloc_funcs.vkDestroyImage                      = vkDestroyImage;
-    alloc_funcs.vkCmdCopyBuffer                     = vkCmdCopyBuffer;
-    alloc_funcs.vkGetBufferMemoryRequirements2KHR   = vkGetBufferMemoryRequirements2KHR;
-    alloc_funcs.vkGetImageMemoryRequirements2KHR    = vkGetImageMemoryRequirements2KHR;
+    // Initialize Vulkan memory allocator.
+    {
+        VmaVulkanFunctions alloc_funcs{};
+        alloc_funcs.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+        alloc_funcs.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+        alloc_funcs.vkAllocateMemory = vkAllocateMemory;
+        alloc_funcs.vkFreeMemory = vkFreeMemory;
+        alloc_funcs.vkMapMemory = vkMapMemory;
+        alloc_funcs.vkUnmapMemory = vkUnmapMemory;
+        alloc_funcs.vkFlushMappedMemoryRanges = vkFlushMappedMemoryRanges;
+        alloc_funcs.vkInvalidateMappedMemoryRanges = vkInvalidateMappedMemoryRanges;
+        alloc_funcs.vkBindBufferMemory = vkBindBufferMemory;
+        alloc_funcs.vkBindImageMemory = vkBindImageMemory;
+        alloc_funcs.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
+        alloc_funcs.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
+        alloc_funcs.vkCreateBuffer = vkCreateBuffer;
+        alloc_funcs.vkDestroyBuffer = vkDestroyBuffer;
+        alloc_funcs.vkCreateImage = vkCreateImage;
+        alloc_funcs.vkDestroyImage = vkDestroyImage;
+        alloc_funcs.vkCmdCopyBuffer = vkCmdCopyBuffer;
+        alloc_funcs.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2;
+        alloc_funcs.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2;
+        alloc_funcs.vkBindBufferMemory2KHR = vkBindBufferMemory2;
+        alloc_funcs.vkBindImageMemory2KHR = vkBindImageMemory2;
+        alloc_funcs.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2;
+        alloc_funcs.vkGetDeviceBufferMemoryRequirements = vkGetDeviceBufferMemoryRequirements;
+        alloc_funcs.vkGetDeviceImageMemoryRequirements = vkGetDeviceImageMemoryRequirements;
 
-    VmaAllocatorCreateInfo allocator_info {};
-    allocator_info.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
-    allocator_info.physicalDevice = vk.physical_device;
-    allocator_info.device = vk.device;
-    allocator_info.instance = vk.instance;
-    allocator_info.pVulkanFunctions = &alloc_funcs;
-    VK_CHECK(vmaCreateAllocator(&allocator_info, &vk.allocator));
+        VmaAllocatorCreateInfo allocator_info{};
+        allocator_info.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+        allocator_info.physicalDevice = vk.physical_device;
+        allocator_info.device = vk.device;
+        allocator_info.instance = vk.instance;
+        allocator_info.pVulkanFunctions = &alloc_funcs;
+        allocator_info.vulkanApiVersion = VK_API_VERSION_1_3;
+        VK_CHECK(vmaCreateAllocator(&allocator_info, &vk.allocator));
+    }
 
     // Sync primitives.
     {
@@ -543,17 +550,16 @@ void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
     if (vk.staging_buffer != VK_NULL_HANDLE)
         vmaDestroyBuffer(vk.allocator, vk.staging_buffer, vk.staging_buffer_allocation);
 
-    VkBufferCreateInfo buffer_desc { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-    buffer_desc.size        = size;
-    buffer_desc.usage       = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    buffer_desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    buffer_create_info.size = size;
+    buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
     VmaAllocationCreateInfo alloc_create_info{};
-    alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    alloc_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
     VmaAllocationInfo alloc_info;
-    VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_desc, &alloc_create_info, &vk.staging_buffer, &vk.staging_buffer_allocation, &alloc_info));
+    VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &vk.staging_buffer, &vk.staging_buffer_allocation, &alloc_info));
 
     vk.staging_buffer_ptr = (uint8_t*)alloc_info.pMappedData;
     vk.staging_buffer_size = size;
@@ -563,10 +569,9 @@ Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const vo
     VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     buffer_create_info.size = size;
     buffer_create_info.usage = usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-    buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VmaAllocationCreateInfo alloc_create_info{};
-    alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
     Vk_Buffer buffer;
     VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &buffer.handle, &buffer.allocation, nullptr));
@@ -597,8 +602,8 @@ Vk_Buffer vk_create_mapped_buffer(VkDeviceSize size, VkBufferUsageFlags usage, v
     buffer_create_info.usage = usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
     VmaAllocationCreateInfo alloc_create_info{};
-    alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    alloc_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
     VmaAllocationInfo alloc_info;
     Vk_Buffer buffer;
@@ -641,7 +646,7 @@ Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate
         image_create_info.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 
         VmaAllocationCreateInfo alloc_create_info{};
-        alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
         VK_CHECK(vmaCreateImage(vk.allocator, &image_create_info, &alloc_create_info, &image.handle, &image.allocation, nullptr));
         vk_set_debug_name(image.handle, name);
@@ -808,7 +813,7 @@ Vk_Image vk_create_image(int width, int height, VkFormat format, VkImageCreateFl
         create_info.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
 
         VmaAllocationCreateInfo alloc_create_info{};
-        alloc_create_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
         VK_CHECK(vmaCreateImage(vk.allocator, &create_info, &alloc_create_info, &image.handle, &image.allocation, nullptr));
         vk_set_debug_name(image.handle, name);

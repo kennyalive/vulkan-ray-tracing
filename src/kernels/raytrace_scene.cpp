@@ -55,8 +55,7 @@ void Raytrace_Scene::update(const Matrix3x4& model_transform, const Matrix3x4& c
     instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
     instance.accelerationStructureReference = accelerator.bottom_level_accels[0].device_address;
 
-    Uniform_Buffer& uniform_buffer = *(Uniform_Buffer*&)mapped_uniform_buffer;
-    uniform_buffer.camera_to_world = camera_to_world_transform;
+    memcpy(mapped_uniform_buffer, &camera_to_world_transform, sizeof(camera_to_world_transform));
 }
 
 void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler) {
