@@ -20,22 +20,10 @@ void Draw_Mesh::create(VkFormat depth_attachment_format, VkImageView texture_vie
         .sampler (2, VK_SHADER_STAGE_FRAGMENT_BIT)
         .create ("raster_set_layout");
 
-    // pipeline layout
-    {
-        VkPushConstantRange push_constant_range; // show_texture_lods value
-        push_constant_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        push_constant_range.offset = 0;
-        push_constant_range.size = 4;
-
-        VkPipelineLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        create_info.setLayoutCount = 1;
-        create_info.pSetLayouts = &descriptor_set_layout;
-        create_info.pushConstantRangeCount = 1;
-        create_info.pPushConstantRanges = &push_constant_range;
-
-        VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
-        vk_set_debug_name(pipeline_layout, "raster_pipeline_layout");
-    }
+    pipeline_layout = create_pipeline_layout(
+        { descriptor_set_layout },
+        { VkPushConstantRange{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4} },
+        "raster_pipeline_layout");
 
     // pipeline
     {
@@ -70,19 +58,11 @@ void Draw_Mesh::create(VkFormat depth_attachment_format, VkImageView texture_vie
         pipeline = vk_create_graphics_pipeline(state, pipeline_layout, vertex_shader.handle, fragment_shader.handle);
     }
 
-    // descriptor sets
-    {
-        VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-        desc.descriptorPool = vk.descriptor_pool;
-        desc.descriptorSetCount = 1;
-        desc.pSetLayouts = &descriptor_set_layout;
-        VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
-
-        Descriptor_Writes(descriptor_set)
-            .uniform_buffer(0, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
-            .sampled_image(1, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-            .sampler(2, sampler);
-    }
+    descriptor_set = allocate_descriptor_set(descriptor_set_layout);
+    Descriptor_Writes(descriptor_set)
+        .uniform_buffer(0, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
+        .sampled_image(1, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .sampler(2, sampler);
 }
 
 void Draw_Mesh::destroy() {

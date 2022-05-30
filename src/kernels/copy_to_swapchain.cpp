@@ -9,35 +9,13 @@ void Copy_To_Swapchain::create() {
         .storage_image(2, VK_SHADER_STAGE_COMPUTE_BIT)
         .create("copy_to_swapchain_set_layout");
 
-    // pipeline layout
-    {
-        VkPushConstantRange range;
-        range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        range.offset = 0;
-        range.size = 8; // uint32 width + uint32 height
+    pipeline_layout = create_pipeline_layout(
+        { set_layout },
+        { VkPushConstantRange{VK_SHADER_STAGE_COMPUTE_BIT, 0, 8 /*uint32 width + uint32 height*/} },
+        "copy_to_swapchain_pipeline_layout");
 
-        VkPipelineLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        create_info.setLayoutCount = 1;
-        create_info.pSetLayouts = &set_layout;
-        create_info.pushConstantRangeCount = 1;
-        create_info.pPushConstantRanges = &range;
-        VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
-    }
-
-    // pipeline
-    {
-        Shader_Module copy_shader("spirv/copy_to_swapchain.comp.spv");
-
-        VkPipelineShaderStageCreateInfo compute_stage { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-        compute_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-        compute_stage.module = copy_shader.handle;
-        compute_stage.pName = "main";
-
-        VkComputePipelineCreateInfo create_info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-        create_info.stage = compute_stage;
-        create_info.layout = pipeline_layout;
-        VK_CHECK(vkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
-    }
+    pipeline = create_compute_pipeline("spirv/copy_to_swapchain.comp.spv", pipeline_layout,
+        "copy_to_swapchain_pipeline");
 
     // point sampler
     {
@@ -61,15 +39,8 @@ void Copy_To_Swapchain::update_resolution_dependent_descriptors(VkImageView outp
         size_t n = vk.swapchain_info.images.size() - sets.size();
         for (size_t i = 0; i < n; i++)
         {
-            VkDescriptorSetAllocateInfo alloc_info { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-            alloc_info.descriptorPool = vk.descriptor_pool;
-            alloc_info.descriptorSetCount = 1;
-            alloc_info.pSetLayouts = &set_layout;
-
-            VkDescriptorSet set;
-            VK_CHECK(vkAllocateDescriptorSets(vk.device, &alloc_info, &set));
+            VkDescriptorSet set = allocate_descriptor_set(set_layout);
             sets.push_back(set);
-
             Descriptor_Writes(set).sampler(0, point_sampler);
         }
     }

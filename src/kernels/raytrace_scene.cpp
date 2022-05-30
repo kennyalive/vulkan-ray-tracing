@@ -70,24 +70,12 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
         .sampler (6, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
         .create ("rt_set_layout");
 
-    // pipeline layout
-    {
-        VkPushConstantRange push_constant_ranges[2]; // show_texture_lods value
-        push_constant_ranges[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-        push_constant_ranges[0].offset = 0;
-        push_constant_ranges[0].size = 4;
-        push_constant_ranges[1].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-        push_constant_ranges[1].offset = 4;
-        push_constant_ranges[1].size = 4;
-
-        VkPipelineLayoutCreateInfo create_info { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-        create_info.setLayoutCount = 1;
-        create_info.pSetLayouts = &descriptor_set_layout;
-        create_info.pushConstantRangeCount = (uint32_t)std::size(push_constant_ranges);
-        create_info.pPushConstantRanges = push_constant_ranges;
-
-        VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
-    }
+    pipeline_layout = create_pipeline_layout(
+        { descriptor_set_layout },
+        { VkPushConstantRange{VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, 4}, 
+          VkPushConstantRange{VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 4, 4} },
+        "rt_pipeline_layout"
+    );
 
     // pipeline
     {
@@ -152,31 +140,23 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
         VK_CHECK(vkCreateRayTracingPipelinesKHR(vk.device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
     }
 
-    // descriptor set
-    {
-        VkDescriptorSetAllocateInfo desc { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-        desc.descriptorPool = vk.descriptor_pool;
-        desc.descriptorSetCount = 1;
-        desc.pSetLayouts = &descriptor_set_layout;
-        VK_CHECK(vkAllocateDescriptorSets(vk.device, &desc, &descriptor_set));
+    descriptor_set = allocate_descriptor_set(descriptor_set_layout);
+    Descriptor_Writes(descriptor_set)
+        .accelerator(1, accelerator.top_level_accel.aceleration_structure)
+        .uniform_buffer(2, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
 
-        Descriptor_Writes(descriptor_set)
-            .accelerator(1, accelerator.top_level_accel.aceleration_structure)
-            .uniform_buffer(2, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
+        .storage_buffer(3,
+            gpu_mesh.index_buffer.handle,
+            0,
+            gpu_mesh.index_count * 4 /*VK_INDEX_TYPE_UINT32*/)
 
-            .storage_buffer(3,
-                gpu_mesh.index_buffer.handle,
-                0,
-                gpu_mesh.index_count * 4 /*VK_INDEX_TYPE_UINT32*/)
+        .storage_buffer(4,
+            gpu_mesh.vertex_buffer.handle,
+            0, /* assume that position is the first vertex attribute */
+            gpu_mesh.vertex_count * sizeof(Vertex))
 
-            .storage_buffer(4,
-                gpu_mesh.vertex_buffer.handle,
-                0, /* assume that position is the first vertex attribute */
-                gpu_mesh.vertex_count * sizeof(Vertex))
-
-            .sampled_image(5, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-            .sampler(6, sampler);
-    }
+        .sampled_image(5, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .sampler(6, sampler);
 }
 
 void Raytrace_Scene::dispatch(bool spp4, bool show_texture_lod) {

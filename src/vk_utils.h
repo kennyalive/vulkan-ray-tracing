@@ -3,6 +3,14 @@
 #include "lib.h"
 #include "vk.h"
 
+VkPipelineLayout create_pipeline_layout(
+    std::initializer_list<VkDescriptorSetLayout> set_layouts,
+    std::initializer_list<VkPushConstantRange> push_constant_ranges,
+    const char* name);
+
+VkPipeline create_compute_pipeline(const std::string& spirv_file, VkPipelineLayout pipeline_layout, const char* name);
+VkDescriptorSet allocate_descriptor_set(VkDescriptorSetLayout set_layout);
+
 struct Shader_Module {
     Shader_Module(const std::string& spirv_file) {
         handle = vk_load_spirv((get_data_directory() / spirv_file).string());
@@ -41,10 +49,12 @@ struct Descriptor_Writes {
     }
 
     Descriptor_Writes& sampled_image(uint32_t binding, VkImageView image_view, VkImageLayout layout);
+    Descriptor_Writes& sampled_image_array (uint32_t binding, uint32_t array_size, const VkDescriptorImageInfo* image_infos);
     Descriptor_Writes& storage_image(uint32_t binding, VkImageView image_view);
     Descriptor_Writes& sampler(uint32_t binding, VkSampler sampler);
     Descriptor_Writes& uniform_buffer(uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range);
     Descriptor_Writes& storage_buffer(uint32_t binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range);
+    Descriptor_Writes& storage_buffer_array(uint32_t binding, uint32_t array_size, const VkDescriptorBufferInfo* buffer_infos);
     Descriptor_Writes& accelerator(uint32_t binding, VkAccelerationStructureKHR acceleration_structure);
     void commit();
 };
@@ -60,10 +70,12 @@ struct Descriptor_Set_Layout {
     }
 
     Descriptor_Set_Layout& sampled_image(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& sampled_image_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags);
     Descriptor_Set_Layout& storage_image(uint32_t binding, VkShaderStageFlags stage_flags);
     Descriptor_Set_Layout& sampler(uint32_t binding, VkShaderStageFlags stage_flags);
     Descriptor_Set_Layout& uniform_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
     Descriptor_Set_Layout& storage_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& storage_buffer_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags);
     Descriptor_Set_Layout& accelerator(uint32_t binding, VkShaderStageFlags stage_flags);
     VkDescriptorSetLayout create(const char* name);
 };
