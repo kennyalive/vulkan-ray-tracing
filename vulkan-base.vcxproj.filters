@@ -153,6 +153,7 @@
     <ClInclude Include="src\lib.h" />
     <ClInclude Include="src\linear_algebra.h" />
     <ClInclude Include="src\triangle_mesh.h" />
+    <ClInclude Include="src\gpu_mesh.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="shaders">

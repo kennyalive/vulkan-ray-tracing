@@ -1,4 +1,5 @@
 #include "draw_mesh.h"
+#include "gpu_mesh.h"
 #include "linear_algebra.h"
 #include "triangle_mesh.h"
 #include "vk_utils.h"

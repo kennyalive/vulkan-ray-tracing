@@ -1,7 +1,7 @@
 #include "acceleration_structure.h"
-#include "linear_algebra.h"
+#include "gpu_mesh.h"
+#include "lib.h"
 #include "triangle_mesh.h"
-#include "vk_utils.h"
 
 static BLAS_Info create_BLAS(const GPU_Mesh& mesh) {
     VkAccelerationStructureGeometryKHR geometry { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };

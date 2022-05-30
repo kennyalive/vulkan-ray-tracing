@@ -150,6 +150,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\acceleration_structure.h" />
+    <ClInclude Include="src\gpu_mesh.h" />
     <ClInclude Include="src\lib.h" />
     <ClInclude Include="src\kernels\copy_to_swapchain.h" />
     <ClInclude Include="src\kernels\draw_mesh.h" />
