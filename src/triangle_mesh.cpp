@@ -1,3 +1,4 @@
+#include "std.h"
 #include "triangle_mesh.h"
 #include "lib.h"
 

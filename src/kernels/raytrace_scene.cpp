@@ -1,8 +1,8 @@
+#include "std.h"
 #include "raytrace_scene.h"
 #include "gpu_mesh.h"
 #include "triangle_mesh.h"
 #include "vk_utils.h"
-#include <cassert>
 
 namespace {
 struct Uniform_Buffer {

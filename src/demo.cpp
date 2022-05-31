@@ -1,3 +1,4 @@
+#include "std.h"
 #include "demo.h"
 #include "triangle_mesh.h"
 

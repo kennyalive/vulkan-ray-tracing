@@ -87,6 +87,7 @@
     <ClCompile Include="src\lib.cpp" />
     <ClCompile Include="src\linear_algebra.cpp" />
     <ClCompile Include="src\triangle_mesh.cpp" />
+    <ClCompile Include="src\std.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\demo.h" />
@@ -154,6 +155,7 @@
     <ClInclude Include="src\linear_algebra.h" />
     <ClInclude Include="src\triangle_mesh.h" />
     <ClInclude Include="src\gpu_mesh.h" />
+    <ClInclude Include="src\std.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="shaders">

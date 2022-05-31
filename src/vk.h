@@ -6,17 +6,17 @@
 #endif
 
 #include "volk/volk.h"
-#include "vulkan/vk_enum_string_helper.h"
 
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
+// Volk does not include vulkan.h because of windows.h disaster.
+// Here we define VULKAN_H_ to tell VMA that vulkan headers are included,
+// otherwise it will include vulkan.h + windows.h
+#define VULKAN_H_ 1
 #include "vma/vk_mem_alloc.h"
 
-#include <functional>
-#include <string>
-#include <vector>
-
-#define VK_CHECK_RESULT(result) if (result < 0) error(std::string("Error: ") + string_VkResult(result));
+const char* get_VkResult_string(VkResult result);
+#define VK_CHECK_RESULT(result) if (result < 0) error(std::string("Error: ") + get_VkResult_string(result));
 #define VK_CHECK(function_call) { VkResult result = function_call;  VK_CHECK_RESULT(result); }
 
 struct Vk_Image {

@@ -1,3 +1,4 @@
+#include "std.h"
 #include "lib.h"
 
 #define VMA_IMPLEMENTATION
@@ -9,6 +10,12 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include "glfw/glfw3.h"
 #include "glfw/glfw3native.h"
+
+#include "vulkan/vk_enum_string_helper.h"
+const char* get_VkResult_string(VkResult result)
+{
+    return string_VkResult(result);
+}
 
 static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
     {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             16},

@@ -1,7 +1,7 @@
+#include "std.h"
 #include "gpu_mesh.h"
 #include "demo.h"
 #include "glfw/glfw3.h"
-#include <cassert>
 
 struct Command_Line_Options {
     bool enable_validation_layers;
