@@ -3,10 +3,7 @@
 #include "lib.h"
 
 #define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
-#include <algorithm>
-#include <unordered_map>
+#include "tiny_obj_loader.h"
 
 Triangle_Mesh load_obj_model(const std::string& path, float additional_scale) {
     tinyobj::attrib_t attrib;

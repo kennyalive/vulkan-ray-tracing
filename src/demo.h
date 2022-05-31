@@ -8,8 +8,6 @@
 #include "kernels/draw_mesh.h"
 #include "kernels/raytrace_scene.h"
 
-#include <chrono>
-
 struct GLFWwindow;
 
 class Vk_Demo {
