@@ -12,6 +12,7 @@
 
 static const VkDescriptorPoolSize descriptor_pool_sizes[] = {
     {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,             16},
+    {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,             16},
     {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,              16},
     {VK_DESCRIPTOR_TYPE_SAMPLER,                    16},
     {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,              16},
@@ -141,7 +142,8 @@ static void create_device(GLFWwindow* window) {
     // create VkDevice
     {
         std::vector<const char*> device_extensions = {
-            VK_KHR_SWAPCHAIN_EXTENSION_NAME
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+            VK_EXT_ROBUSTNESS_2_EXTENSION_NAME, // nullDescriptor feature
         };
 
         uint32_t count = 0;
@@ -203,6 +205,14 @@ static void create_device(GLFWwindow* window) {
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES };
         synchronization2_features.synchronization2 = VK_TRUE;
 
+        VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES };
+        descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
+
+        VkPhysicalDeviceMaintenance4Features maintenance4_features{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES };
+        maintenance4_features.maintenance4 = VK_TRUE;
+
         VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features{
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
         acceleration_structure_features.accelerationStructure = VK_TRUE;
@@ -211,10 +221,17 @@ static void create_device(GLFWwindow* window) {
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
         ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
 
+        VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT };
+        robustness2_features.nullDescriptor = VK_TRUE;
+
         buffer_device_address_features.pNext = &dynamic_rendering_features;
         dynamic_rendering_features.pNext = &synchronization2_features;
-        synchronization2_features.pNext = &acceleration_structure_features;
+        synchronization2_features.pNext = &descriptor_indexing_features;
+        descriptor_indexing_features.pNext = &maintenance4_features;
+        maintenance4_features.pNext = &acceleration_structure_features;
         acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
+        ray_tracing_pipeline_features.pNext = &robustness2_features;
 
         VkPhysicalDeviceFeatures2 features2 { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
         features2.pNext = &buffer_device_address_features;
@@ -557,6 +574,7 @@ void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
     VmaAllocationCreateInfo alloc_create_info{};
     alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
     alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO;
+    alloc_create_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT; // to avoid manual flush/invalidation
 
     VmaAllocationInfo alloc_info;
     VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &vk.staging_buffer, &vk.staging_buffer_allocation, &alloc_info));
@@ -602,8 +620,9 @@ Vk_Buffer vk_create_mapped_buffer(VkDeviceSize size, VkBufferUsageFlags usage, v
     buffer_create_info.usage = usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
     VmaAllocationCreateInfo alloc_create_info{};
-    alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    alloc_create_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
     alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO;
+    alloc_create_info.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT; // to avoid manual flush/invalidation
 
     VmaAllocationInfo alloc_info;
     Vk_Buffer buffer;
@@ -910,8 +929,8 @@ Vk_Graphics_Pipeline_State get_default_graphics_pipeline_state() {
     state.dynamic_state_count                   = 2;
 
     // VkPipelineRenderingCreateInfo
-    state.color_attachment_formats[0]           = vk.surface_format.format;
-    state.color_attachment_count                = 1;
+    state.color_attachment_formats[0]           = VK_FORMAT_UNDEFINED;
+    state.color_attachment_count                = 0;
     state.depth_attachment_format               = VK_FORMAT_UNDEFINED;
 
     return state;
@@ -952,7 +971,7 @@ VkPipeline vk_create_graphics_pipeline(
     dynamic_state_create_info.dynamicStateCount         = state.dynamic_state_count;
     dynamic_state_create_info.pDynamicStates            = state.dynamic_state;
 
-	VkPipelineRenderingCreateInfo rendering_create_info{ VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+    VkPipelineRenderingCreateInfo rendering_create_info{ VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
     rendering_create_info.colorAttachmentCount          = state.color_attachment_count;
     rendering_create_info.pColorAttachmentFormats       = state.color_attachment_formats;
     rendering_create_info.depthAttachmentFormat         = state.depth_attachment_format;
@@ -1099,4 +1118,14 @@ uint32_t vk_allocate_timestamp_queries(uint32_t count) {
     uint32_t first_query = vk.timestamp_query_count;
     vk.timestamp_query_count += count;
     return first_query;
+}
+
+void set_debug_name_impl(VkObjectType object_type, uint64_t object_handle, const char* name) {
+    if (name) {
+        VkDebugUtilsObjectNameInfoEXT name_info { VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT };
+        name_info.objectType = object_type;
+        name_info.objectHandle = object_handle;
+        name_info.pObjectName = name;
+        VK_CHECK(vkSetDebugUtilsObjectNameEXT(vk.device, &name_info));
+    }
 }
