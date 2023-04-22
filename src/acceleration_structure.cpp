@@ -4,7 +4,7 @@
 #include "lib.h"
 #include "triangle_mesh.h"
 
-static BLAS_Info create_BLAS(const GPU_Mesh& mesh) {
+static BLAS_Info create_BLAS(const GPU_Mesh& mesh, uint32_t scratch_alignment) {
     VkAccelerationStructureGeometryKHR geometry { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
     geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
 
@@ -47,7 +47,7 @@ static BLAS_Info create_BLAS(const GPU_Mesh& mesh) {
     blas.device_address = vkGetAccelerationStructureDeviceAddressKHR(vk.device, &device_address_info);
 
     // Build acceleration structure.
-    Vk_Buffer scratch_buffer = vk_create_buffer(build_sizes.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    Vk_Buffer scratch_buffer = vk_create_buffer_with_alignment(build_sizes.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, scratch_alignment);
     build_info.dstAccelerationStructure = blas.acceleration_structure;
     build_info.scratchData.deviceAddress = scratch_buffer.device_address;
 
@@ -63,7 +63,7 @@ static BLAS_Info create_BLAS(const GPU_Mesh& mesh) {
     return blas;
 }
 
-static TLAS_Info create_TLAS(uint32_t instance_count, VkDeviceAddress instances_device_address) {
+static TLAS_Info create_TLAS(uint32_t instance_count, VkDeviceAddress instances_device_address, uint32_t scratch_alignment) {
     VkAccelerationStructureGeometryKHR geometry{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
     geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
     geometry.geometry.instances = VkAccelerationStructureGeometryInstancesDataKHR{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR };
@@ -94,7 +94,7 @@ static TLAS_Info create_TLAS(uint32_t instance_count, VkDeviceAddress instances_
     vk_set_debug_name(tlas.aceleration_structure, "tlas");
 
     // Build acceleration structure.
-    tlas.scratch_buffer = vk_create_buffer(build_sizes.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    tlas.scratch_buffer = vk_create_buffer_with_alignment(build_sizes.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, scratch_alignment);
     build_info.dstAccelerationStructure = tlas.aceleration_structure;
     build_info.scratchData.deviceAddress = tlas.scratch_buffer.device_address;
 
@@ -113,10 +113,20 @@ Vk_Intersection_Accelerator create_intersection_accelerator(const std::vector<GP
     Timestamp t;
     Vk_Intersection_Accelerator accelerator;
 
+    auto accel_properties = VkPhysicalDeviceAccelerationStructurePropertiesKHR{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR
+    };
+    VkPhysicalDeviceProperties2 physical_device_properties{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+        &accel_properties
+    };
+    vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
+    const uint32_t scratch_alignment = accel_properties.minAccelerationStructureScratchOffsetAlignment;
+
     // Create BLASes.
     accelerator.bottom_level_accels.resize(gpu_meshes.size());
     for (int i = 0; i < (int)gpu_meshes.size(); i++) {
-        accelerator.bottom_level_accels[i] = create_BLAS(gpu_meshes[i]);
+        accelerator.bottom_level_accels[i] = create_BLAS(gpu_meshes[i], scratch_alignment);
     }
     // Create instance buffer.
     {
@@ -135,7 +145,7 @@ Vk_Intersection_Accelerator create_intersection_accelerator(const std::vector<GP
             &(void*&)accelerator.mapped_instance_buffer, "instance_buffer");
     }
     // Create TLAS.
-    accelerator.top_level_accel = create_TLAS((uint32_t)gpu_meshes.size(), accelerator.instance_buffer.device_address);
+    accelerator.top_level_accel = create_TLAS((uint32_t)gpu_meshes.size(), accelerator.instance_buffer.device_address, scratch_alignment);
 
     printf("\nAcceleration structures build time = %lld microseconds\n", elapsed_nanoseconds(t) / 1000);
     return accelerator;

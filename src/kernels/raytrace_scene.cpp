@@ -27,7 +27,8 @@ void Raytrace_Scene::create(const GPU_Mesh& gpu_mesh, VkImageView texture_view, 
         VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(vk.device, pipeline, 0, 1, properties.shaderGroupHandleSize, data.data() + 0)); // raygen slot
         VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(vk.device, pipeline, 1, 1, properties.shaderGroupHandleSize, data.data() + miss_offset)); // miss slot
         VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(vk.device, pipeline, 2, 1, properties.shaderGroupHandleSize, data.data() + hit_offset)); // hit slot
-        shader_binding_table = vk_create_buffer(sbt_buffer_size, VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT, data.data(), "shader_binding_table");
+        const VkBufferUsageFlags usage = VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        shader_binding_table = vk_create_buffer_with_alignment(sbt_buffer_size, usage, properties.shaderGroupBaseAlignment, data.data(), "shader_binding_table");
     }
 }
 

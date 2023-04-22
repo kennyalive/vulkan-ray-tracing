@@ -590,8 +590,15 @@ void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
     vk.staging_buffer_size = size;
 }
 
-Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, const char* name) {
-    VkBufferCreateInfo buffer_create_info { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data, const char* name)
+{
+    return vk_create_buffer_with_alignment(size, usage, 1, data, name);
+}
+
+Vk_Buffer vk_create_buffer_with_alignment(VkDeviceSize size, VkBufferUsageFlags usage, uint32_t min_alignment,
+    const void* data, const char* name)
+{
+    VkBufferCreateInfo buffer_create_info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     buffer_create_info.size = size;
     buffer_create_info.usage = usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
@@ -599,21 +606,19 @@ Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage, const vo
     alloc_create_info.usage = VMA_MEMORY_USAGE_AUTO;
 
     Vk_Buffer buffer;
-    VK_CHECK(vmaCreateBuffer(vk.allocator, &buffer_create_info, &alloc_create_info, &buffer.handle, &buffer.allocation, nullptr));
+    VK_CHECK(vmaCreateBufferWithAlignment(vk.allocator, &buffer_create_info, &alloc_create_info, min_alignment,
+        &buffer.handle, &buffer.allocation, nullptr));
     vk_set_debug_name(buffer.handle, name);
 
-    VkBufferDeviceAddressInfo buffer_address_info { VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
+    VkBufferDeviceAddressInfo buffer_address_info{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
     buffer_address_info.buffer = buffer.handle;
     buffer.device_address = vkGetBufferDeviceAddress(vk.device, &buffer_address_info);
 
     if (data != nullptr) {
         vk_ensure_staging_buffer_allocation(size);
         memcpy(vk.staging_buffer_ptr, data, size);
-
         vk_execute(vk.command_pools[0], vk.queue, [size, &buffer](VkCommandBuffer command_buffer) {
-            VkBufferCopy region;
-            region.srcOffset = 0;
-            region.dstOffset = 0;
+            VkBufferCopy region{};
             region.size = size;
             vkCmdCopyBuffer(command_buffer, vk.staging_buffer, buffer.handle, 1, &region);
         });

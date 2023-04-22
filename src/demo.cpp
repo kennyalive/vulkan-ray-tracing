@@ -26,14 +26,15 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
 
     // Device properties.
     {
-        VkPhysicalDeviceProperties2 physical_device_properties { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-
-        auto& rt_properties = raytrace_scene.properties;
-
-        rt_properties = VkPhysicalDeviceRayTracingPipelinePropertiesKHR { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
-        physical_device_properties.pNext = &rt_properties;
-
-        vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
+		auto& rt_properties = raytrace_scene.properties;
+		rt_properties = VkPhysicalDeviceRayTracingPipelinePropertiesKHR{
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
+		};
+		VkPhysicalDeviceProperties2 physical_device_properties{
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+			&rt_properties
+		};
+		vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
 
         printf("Device: %s\n", physical_device_properties.properties.deviceName);
         printf("Vulkan API version: %d.%d.%d\n",
