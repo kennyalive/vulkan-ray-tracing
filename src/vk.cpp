@@ -192,6 +192,9 @@ static void create_device(GLFWwindow* window) {
             device_extensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
             device_extensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
             device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+
+            assert(is_extension_supported(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME));
+            device_extensions.push_back(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME);
         }
 
         const float priority = 1.0;
@@ -232,6 +235,10 @@ static void create_device(GLFWwindow* window) {
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT };
         robustness2_features.nullDescriptor = VK_TRUE;
 
+        VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR ray_tracing_position_fetch_features{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_POSITION_FETCH_FEATURES_KHR };
+        ray_tracing_position_fetch_features.rayTracingPositionFetch = VK_TRUE;
+
         buffer_device_address_features.pNext = &dynamic_rendering_features;
         dynamic_rendering_features.pNext = &synchronization2_features;
         synchronization2_features.pNext = &descriptor_indexing_features;
@@ -239,6 +246,7 @@ static void create_device(GLFWwindow* window) {
         maintenance4_features.pNext = &acceleration_structure_features;
         acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
         ray_tracing_pipeline_features.pNext = &robustness2_features;
+        robustness2_features.pNext = &ray_tracing_position_fetch_features;
 
         VkPhysicalDeviceFeatures2 features2 { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
         features2.pNext = &buffer_device_address_features;
