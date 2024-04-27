@@ -394,6 +394,7 @@ void vk_initialize(GLFWwindow* window, bool enable_validation_layers) {
             pool_sizes.push_back(descriptor_pool_sizes[i]);
         }
         VkDescriptorPoolCreateInfo desc{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        desc.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         desc.maxSets = max_descriptor_sets;
         desc.poolSizeCount = (uint32_t)pool_sizes.size();
         desc.pPoolSizes = pool_sizes.data();

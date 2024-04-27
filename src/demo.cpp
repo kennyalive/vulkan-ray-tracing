@@ -137,15 +137,12 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         init_info.QueueFamily = vk.queue_family_index;
         init_info.Queue = vk.queue;
         init_info.DescriptorPool = vk.descriptor_pool;
+        init_info.RenderPass = ui_render_pass;
 		init_info.MinImageCount = 2;
 		init_info.ImageCount = (uint32_t)vk.swapchain_info.images.size();
-        ImGui_ImplVulkan_Init(&init_info, ui_render_pass);
+        ImGui_ImplVulkan_Init(&init_info);
         ImGui::StyleColorsDark();
-
-        vk_execute(vk.command_pools[0], vk.queue, [](VkCommandBuffer cb) {
-            ImGui_ImplVulkan_CreateFontsTexture(cb);
-        });
-		ImGui_ImplVulkan_DestroyFontUploadObjects();
+        ImGui_ImplVulkan_CreateFontsTexture();
     }
 
     draw_mesh.create(get_depth_image_format(), texture.view, sampler);
@@ -373,13 +370,13 @@ void Vk_Demo::do_imgui() {
     ImGui::NewFrame();
 
     if (!io.WantCaptureKeyboard) {
-        if (ImGui::IsKeyPressed(GLFW_KEY_F10)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_F10)) {
             show_ui = !show_ui;
         }
-        if (ImGui::IsKeyPressed(GLFW_KEY_W) || ImGui::IsKeyPressed(GLFW_KEY_UP)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_W) || ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
             camera_pos.z -= 0.2f;
         }
-        if (ImGui::IsKeyPressed(GLFW_KEY_S) || ImGui::IsKeyPressed(GLFW_KEY_DOWN)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_S) || ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
             camera_pos.z += 0.2f;
         }
     }
