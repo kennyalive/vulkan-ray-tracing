@@ -48,7 +48,7 @@ void Copy_To_Swapchain::update_resolution_dependent_descriptors(VkImageView outp
 
     for (size_t i = 0; i < vk.swapchain_info.images.size(); i++) {
         Descriptor_Writes(sets[i])
-            .sampled_image(1, output_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            .sampled_image(1, output_image_view, VK_IMAGE_LAYOUT_GENERAL)
             .storage_image(2, vk.swapchain_info.image_views[i]);
     }
 }
