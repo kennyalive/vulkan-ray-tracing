@@ -20,6 +20,11 @@ void Matrix3x4::set_column(int column_index, Vector3 c) {
     a[2][column_index] = c.z;
 }
 
+Vector3 Matrix3x4::get_column(int c) const {
+    assert(c >= 0 && c < 4);
+    return Vector3(a[0][c], a[1][c], a[2][c]);
+}
+
 void Matrix3x4::set_row(int row_index, Vector4 r) {
     assert(row_index >= 0 && row_index < 3);
     a[row_index][0] = r.x;
@@ -77,10 +82,15 @@ Matrix4x4 operator*(const Matrix4x4& m1, const Matrix3x4& m2) {
 }
 
 Matrix3x4 get_inverse(const Matrix3x4& m) {
+    Vector3 x_axis = m.get_column(0);
+    Vector3 y_axis = m.get_column(1);
+    Vector3 z_axis = m.get_column(2);
+    Vector3 origin = m.get_column(3);
+
     Matrix3x4 m_inv;
-    m_inv.a[0][0] = m.a[0][0]; m_inv.a[0][1] = m.a[1][0]; m_inv.a[0][2] = m.a[2][0]; m_inv.a[0][3] = -m.a[0][3];
-    m_inv.a[1][0] = m.a[0][1]; m_inv.a[1][1] = m.a[1][1]; m_inv.a[1][2] = m.a[2][1]; m_inv.a[1][3] = -m.a[1][3];
-    m_inv.a[2][0] = m.a[0][2]; m_inv.a[2][1] = m.a[1][2]; m_inv.a[2][2] = m.a[2][2]; m_inv.a[2][3] = -m.a[2][3];
+    m_inv.set_row(0, Vector4(x_axis, -dot(x_axis, origin)));
+    m_inv.set_row(1, Vector4(y_axis, -dot(y_axis, origin)));
+    m_inv.set_row(2, Vector4(z_axis, -dot(z_axis, origin)));
     return m_inv;
 }
 

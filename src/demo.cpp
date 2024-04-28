@@ -8,10 +8,12 @@
 #include "imgui/imgui_impl_vulkan.h"
 #include "imgui/imgui_impl_glfw.h"
 
+static VkFormat render_target_format = VK_FORMAT_R16G16B16A16_SFLOAT;
+
 static VkFormat get_depth_image_format() {
-    VkFormat candidates[2] = { VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT_S8_UINT };
+    VkFormat candidates[2] = { VK_FORMAT_D32_SFLOAT, VK_FORMAT_X8_D24_UNORM_PACK32 };
     for (auto format : candidates) {
-        VkFormatProperties props;
+        VkFormatProperties props{};
         vkGetPhysicalDeviceFormatProperties(vk.physical_device, format, &props);
         if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
             return format;
@@ -94,37 +96,6 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         vk_set_debug_name(sampler, "diffuse_texture_sampler");
     }
 
-    // UI render pass.
-    {
-        VkAttachmentDescription attachments[1] = {};
-        attachments[0].format = VK_FORMAT_R16G16B16A16_SFLOAT;
-        attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-        attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-        VkAttachmentReference color_attachment_ref;
-        color_attachment_ref.attachment = 0;
-        color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-        VkSubpassDescription subpass{};
-        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subpass.colorAttachmentCount = 1;
-        subpass.pColorAttachments = &color_attachment_ref;
-
-        VkRenderPassCreateInfo create_info{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
-        create_info.attachmentCount = (uint32_t)std::size(attachments);
-        create_info.pAttachments = attachments;
-        create_info.subpassCount = 1;
-        create_info.pSubpasses = &subpass;
-
-        VK_CHECK(vkCreateRenderPass(vk.device, &create_info, nullptr, &ui_render_pass));
-        vk_set_debug_name(ui_render_pass, "ui_render_pass");
-    }
-
     // ImGui setup.
     {
         ImGui::CreateContext();
@@ -137,22 +108,25 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         init_info.QueueFamily = vk.queue_family_index;
         init_info.Queue = vk.queue;
         init_info.DescriptorPool = vk.descriptor_pool;
-        init_info.RenderPass = ui_render_pass;
 		init_info.MinImageCount = 2;
 		init_info.ImageCount = (uint32_t)vk.swapchain_info.images.size();
+        init_info.UseDynamicRendering = true;
+        init_info.PipelineRenderingCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+        init_info.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+        init_info.PipelineRenderingCreateInfo.pColorAttachmentFormats = &render_target_format;
+        init_info.PipelineRenderingCreateInfo.depthAttachmentFormat = get_depth_image_format();
         ImGui_ImplVulkan_Init(&init_info);
         ImGui::StyleColorsDark();
         ImGui_ImplVulkan_CreateFontsTexture();
     }
 
-    draw_mesh.create(get_depth_image_format(), texture.view, sampler);
+    draw_mesh.create(render_target_format, get_depth_image_format(), texture.view, sampler);
     raytrace_scene.create(gpu_mesh, texture.view, sampler);
     copy_to_swapchain.create();
     restore_resolution_dependent_resources();
 
     gpu_times.frame = time_keeper.allocate_time_interval();
     gpu_times.draw = time_keeper.allocate_time_interval();
-    gpu_times.ui = time_keeper.allocate_time_interval();
     gpu_times.compute_copy = time_keeper.allocate_time_interval();
     time_keeper.initialize_time_intervals();
 }
@@ -164,12 +138,12 @@ void Vk_Demo::shutdown() {
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
+    release_resolution_dependent_resources();
+    vkDestroySampler(vk.device, sampler, nullptr);
+
     gpu_mesh.destroy();
     texture.destroy();
     copy_to_swapchain.destroy();
-    vkDestroySampler(vk.device, sampler, nullptr);
-    vkDestroyRenderPass(vk.device, ui_render_pass, nullptr);
-    release_resolution_dependent_resources();
     draw_mesh.destroy();
     raytrace_scene.destroy();
     
@@ -177,52 +151,29 @@ void Vk_Demo::shutdown() {
 }
 
 void Vk_Demo::release_resolution_dependent_resources() {
-    vkDestroyFramebuffer(vk.device, ui_framebuffer, nullptr);
-    ui_framebuffer = VK_NULL_HANDLE;
     output_image.destroy();
     depth_buffer_image.destroy();
 }
 
 void Vk_Demo::restore_resolution_dependent_resources() {
     // create depth buffer
-    {
-        VkFormat depth_format = get_depth_image_format();
-        depth_buffer_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, depth_format,
-            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, "depth_buffer");
-
-        vk_execute(vk.command_pools[0], vk.queue, [this](VkCommandBuffer command_buffer) {
-            VkImageSubresourceRange subresource_range{};
-            subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-            subresource_range.levelCount = 1;
-            subresource_range.layerCount = 1;
-
-            vk_cmd_image_barrier_for_subresource(command_buffer, depth_buffer_image.handle, subresource_range,
-                VK_PIPELINE_STAGE_NONE, 0, VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_PIPELINE_STAGE_NONE, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-            });
-    }
+    depth_buffer_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, get_depth_image_format(),
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, "depth_buffer");
+    vk_execute(vk.command_pools[0], vk.queue, [this](VkCommandBuffer command_buffer) {
+        VkImageSubresourceRange subresource_range{};
+        subresource_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        subresource_range.levelCount = 1;
+        subresource_range.layerCount = 1;
+        vk_cmd_image_barrier_for_subresource(command_buffer, depth_buffer_image.handle, subresource_range,
+            VK_PIPELINE_STAGE_NONE, 0, VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_PIPELINE_STAGE_NONE, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    });
 
     // output image
-    {
-        output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, VK_FORMAT_R16G16B16A16_SFLOAT,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, "output_image");
-
-        raytrace_scene.update_output_image_descriptor(output_image.view);
-        copy_to_swapchain.update_resolution_dependent_descriptors(output_image.view);
-    }
-
-    // imgui framebuffer
-    {
-        VkFramebufferCreateInfo create_info { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-        create_info.renderPass = ui_render_pass;
-        create_info.attachmentCount = 1;
-        create_info.pAttachments = &output_image.view;
-        create_info.width = vk.surface_size.width;
-        create_info.height = vk.surface_size.height;
-        create_info.layers = 1;
-        VK_CHECK(vkCreateFramebuffer(vk.device, &create_info, nullptr, &ui_framebuffer));
-        vk_set_debug_name(ui_framebuffer, "imgui_framebuffer");
-    }
+    output_image = vk_create_image(vk.surface_size.width, vk.surface_size.height, render_target_format,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, "output_image");
+    raytrace_scene.update_output_image_descriptor(output_image.view);
+    copy_to_swapchain.update_resolution_dependent_descriptors(output_image.view);
 
     last_frame_time = Clock::now();
 }
@@ -235,19 +186,14 @@ void Vk_Demo::run_frame() {
     }
     last_frame_time = current_time;
 
-    Matrix3x4 model_transform = rotate_y(Matrix3x4::identity, (float)sim_time * radians(20.0f));
-    Matrix3x4 view_transform = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
-    draw_mesh.update(model_transform, view_transform);
+    Matrix3x4 object_to_world = rotate_y(Matrix3x4::identity, (float)sim_time * radians(20.0f));
+    Matrix3x4 world_to_camera = look_at_transform(camera_pos, Vector3(0), Vector3(0, 1, 0));
+    Matrix3x4 object_to_camera = world_to_camera * object_to_world;
+    Matrix3x4 camera_to_world = get_inverse(world_to_camera);
 
-    Matrix3x4 camera_to_world_transform;
-    camera_to_world_transform.set_column(0, Vector3(view_transform.get_row(0)));
-    camera_to_world_transform.set_column(1, Vector3(view_transform.get_row(1)));
-    camera_to_world_transform.set_column(2, Vector3(view_transform.get_row(2)));
-    camera_to_world_transform.set_column(3, camera_pos);
-    
-    raytrace_scene.update(model_transform, camera_to_world_transform);
+    draw_mesh.update(object_to_camera);
+    raytrace_scene.update(object_to_world, camera_to_world);
 
-    bool old_raytracing = raytracing_active;
     do_imgui();
     draw_frame();
 }
@@ -256,20 +202,18 @@ void Vk_Demo::draw_frame() {
     vk_begin_frame();
     time_keeper.next_frame();
     gpu_times.frame->begin();
-
-    if (raytracing_active)
-        draw_raytraced_image();
-    else
-        draw_rasterized_image();
-
-    draw_imgui();
+    if (ray_tracing_active) {
+        render_frame_ray_tracing();
+    }
+    else {
+        render_frame_rasterization();
+    }
     copy_output_image_to_swapchain();
-
     gpu_times.frame->end();
     vk_end_frame();
 }
 
-void Vk_Demo::draw_rasterized_image() {
+void Vk_Demo::render_frame_rasterization() {
     GPU_TIME_SCOPE(gpu_times.draw);
 
     vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
@@ -277,8 +221,8 @@ void Vk_Demo::draw_rasterized_image() {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     VkViewport viewport{};
-    viewport.width = static_cast<float>(vk.surface_size.width);
-    viewport.height = static_cast<float>(vk.surface_size.height);
+    viewport.width = float(vk.surface_size.width);
+    viewport.height = float(vk.surface_size.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     vkCmdSetViewport(vk.command_buffer, 0, 1, &viewport);
@@ -310,10 +254,11 @@ void Vk_Demo::draw_rasterized_image() {
 
     vkCmdBeginRendering(vk.command_buffer, &rendering_info);
     draw_mesh.dispatch(gpu_mesh, show_texture_lod);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
     vkCmdEndRendering(vk.command_buffer);
 }
 
-void Vk_Demo::draw_raytraced_image() {
+void Vk_Demo::render_frame_ray_tracing() {
     GPU_TIME_SCOPE(gpu_times.draw);
 
     vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
@@ -321,27 +266,26 @@ void Vk_Demo::draw_raytraced_image() {
         VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL);
 
     raytrace_scene.dispatch(spp4, show_texture_lod);
-}
 
-void Vk_Demo::draw_imgui() {
-    GPU_TIME_SCOPE(gpu_times.ui);
+    vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
+        VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-    ImGui::Render();
+    VkRenderingAttachmentInfo color_attachment{ VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO };
+    color_attachment.imageView = output_image.view;
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
-    if (raytracing_active) {
-        vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
-            VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    }
+    VkRenderingInfo rendering_info{ VK_STRUCTURE_TYPE_RENDERING_INFO };
+    rendering_info.renderArea.extent = vk.surface_size;
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
 
-    VkRenderPassBeginInfo render_pass_begin_info{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    render_pass_begin_info.renderPass = ui_render_pass;
-    render_pass_begin_info.framebuffer = ui_framebuffer;
-    render_pass_begin_info.renderArea.extent = vk.surface_size;
-
-    vkCmdBeginRenderPass(vk.command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRendering(vk.command_buffer, &rendering_info);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), vk.command_buffer);
-    vkCmdEndRenderPass(vk.command_buffer);
+    vkCmdEndRendering(vk.command_buffer);
 }
 
 void Vk_Demo::copy_output_image_to_swapchain() {
@@ -402,7 +346,6 @@ void Vk_Demo::do_imgui() {
             ImGui::Text("%.1f FPS (%.3f ms/frame)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
             ImGui::Text("Frame time         : %.2f ms", gpu_times.frame->length_ms);
             ImGui::Text("Draw time          : %.2f ms", gpu_times.draw->length_ms);
-            ImGui::Text("UI time            : %.2f ms", gpu_times.ui->length_ms);
             ImGui::Text("Compute copy time  : %.2f ms", gpu_times.compute_copy->length_ms);
             ImGui::Separator();
             ImGui::Spacing();
@@ -410,7 +353,7 @@ void Vk_Demo::do_imgui() {
             ImGui::Checkbox("Animate", &animate);
             ImGui::Checkbox("Show texture lod", &show_texture_lod);
 
-            ImGui::Checkbox("Raytracing", &raytracing_active);
+            ImGui::Checkbox("Ray tracing", &ray_tracing_active);
             ImGui::Checkbox("4 rays per pixel", &spp4);
 
             if (ImGui::BeginPopupContextWindow()) {
@@ -425,4 +368,5 @@ void Vk_Demo::do_imgui() {
         }
         ImGui::End();
     }
+    ImGui::Render();
 }

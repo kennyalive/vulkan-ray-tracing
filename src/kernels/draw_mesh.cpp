@@ -11,7 +11,7 @@ struct Uniform_Buffer {
 };
 }
 
-void Draw_Mesh::create(VkFormat depth_attachment_format, VkImageView texture_view, VkSampler sampler) {
+void Draw_Mesh::create(VkFormat color_attachment_format, VkFormat depth_attachment_format, VkImageView texture_view, VkSampler sampler) {
     uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "raster_uniform_buffer");
 
@@ -52,7 +52,7 @@ void Draw_Mesh::create(VkFormat depth_attachment_format, VkImageView texture_vie
 
         state.vertex_attribute_count = 2;
 
-        state.color_attachment_formats[0] = VK_FORMAT_R16G16B16A16_SFLOAT;
+        state.color_attachment_formats[0] = color_attachment_format;
         state.color_attachment_count = 1;
         state.depth_attachment_format = depth_attachment_format;
 
@@ -74,11 +74,11 @@ void Draw_Mesh::destroy() {
     *this = Draw_Mesh{};
 }
 
-void Draw_Mesh::update(const Matrix3x4& model_transform, const Matrix3x4& view_transform) {
+void Draw_Mesh::update(const Matrix3x4& object_to_camera_transform) {
     float aspect_ratio = (float)vk.surface_size.width / (float)vk.surface_size.height;
     Matrix4x4 projection_transform = perspective_transform_opengl_z01(radians(45.0f), aspect_ratio, 0.1f, 50.0f);
-    Matrix4x4 model_view_projection = projection_transform * view_transform * model_transform;
-    memcpy(mapped_uniform_buffer, &model_view_projection, sizeof(model_view_projection));
+    Matrix4x4 transform = projection_transform * object_to_camera_transform;
+    memcpy(mapped_uniform_buffer, &transform, sizeof(transform));
 }
 
 void Draw_Mesh::dispatch(const GPU_Mesh& mesh, bool show_texture_lod) {

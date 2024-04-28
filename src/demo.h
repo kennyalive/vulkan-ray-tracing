@@ -22,9 +22,8 @@ public:
 
 private:
     void draw_frame();
-    void draw_rasterized_image();
-    void draw_raytraced_image();
-    void draw_imgui();
+    void render_frame_rasterization();
+    void render_frame_ray_tracing();
     void copy_output_image_to_swapchain();
     void do_imgui();
 
@@ -35,7 +34,7 @@ private:
     bool show_ui = true;
     bool vsync = true;
     bool animate = false;
-    bool raytracing_active = true;
+    bool ray_tracing_active = true;
     bool show_texture_lod = false;
     bool spp4 = false;
 
@@ -47,12 +46,9 @@ private:
     struct {
         GPU_Time_Interval* frame;
         GPU_Time_Interval* draw;
-        GPU_Time_Interval* ui;
         GPU_Time_Interval* compute_copy;
     } gpu_times;
 
-    VkRenderPass ui_render_pass;
-    VkFramebuffer ui_framebuffer;
     Vk_Image depth_buffer_image;
     Vk_Image output_image;
     GPU_Mesh gpu_mesh;

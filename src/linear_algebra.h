@@ -197,6 +197,7 @@ struct Matrix3x4 {
     static const Matrix3x4 identity;
 
     void set_column(int column_index, Vector3 c);
+    Vector3 get_column(int column) const;
     void set_row(int row_index, Vector4 r);
     Vector4 get_row(int row) const;
 };
