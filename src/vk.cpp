@@ -34,19 +34,6 @@ constexpr uint32_t max_timestamp_queries = 64;
 //
 Vk_Instance vk;
 
-#ifdef _WIN32
-VkSurfaceKHR platform_create_surface(VkInstance instance, GLFWwindow* window) {
-    VkWin32SurfaceCreateInfoKHR desc{ VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR };
-    desc.hinstance = ::GetModuleHandle(nullptr);
-    desc.hwnd = glfwGetWin32Window(window);
-    VkSurfaceKHR surface;
-    VK_CHECK(vkCreateWin32SurfaceKHR(instance, &desc, nullptr, &surface));
-    return surface;
-}
-#else
-#error platform_create_surface() is not implemented on this platform
-#endif
-
 static void create_instance(bool enable_validation_layers) {
     const char* instance_extensions[] = {
         VK_KHR_SURFACE_EXTENSION_NAME,
@@ -120,7 +107,7 @@ static void create_device(GLFWwindow* window) {
             error("Failed to find physical device that supports requested Vulkan API version");
     }
 
-    vk.surface = platform_create_surface(vk.instance, window);
+    VK_CHECK(glfwCreateWindowSurface(vk.instance, window, nullptr, &vk.surface));
 
     // select queue family
     {
