@@ -1,4 +1,3 @@
-#include "std.h"
 #include "draw_mesh.h"
 #include "gpu_mesh.h"
 #include "linear_algebra.h"

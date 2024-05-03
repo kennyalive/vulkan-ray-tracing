@@ -1,4 +1,3 @@
-#include "std.h"
 #include "lib.h"
 
 #define VMA_IMPLEMENTATION

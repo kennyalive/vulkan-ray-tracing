@@ -1,5 +1,6 @@
-#include "std.h"
 #include "vk_utils.h"
+
+#include <cassert>
 
 VkPipelineLayout create_pipeline_layout(std::initializer_list<VkDescriptorSetLayout> set_layouts,
     std::initializer_list<VkPushConstantRange> push_constant_ranges, const char* name)

@@ -13,8 +13,6 @@ set(PROGRAM_SOURCE
     src/linear_algebra.cpp
     src/linear_algebra.h
     src/main.cpp
-    src/std.cpp
-    src/std.h
     src/triangle_mesh.cpp
     src/triangle_mesh.h
     src/vk.cpp

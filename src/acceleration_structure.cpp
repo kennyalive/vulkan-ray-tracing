@@ -1,4 +1,3 @@
-#include "std.h"
 #include "acceleration_structure.h"
 #include "gpu_mesh.h"
 #include "lib.h"

@@ -1,5 +1,6 @@
-#include "std.h"
 #include "lib.h"
+
+#include <fstream>
 
 std::string g_data_dir = "./data";
 

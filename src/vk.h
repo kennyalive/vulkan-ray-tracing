@@ -14,6 +14,9 @@
 #define VULKAN_H_ 1
 #include "vma/vk_mem_alloc.h"
 
+#include <functional>
+#include <string>
+
 const char* get_VkResult_string(VkResult result);
 #define VK_CHECK_RESULT(result) if (result < 0) error(std::string("Error: ") + get_VkResult_string(result));
 #define VK_CHECK(function_call) { VkResult result = function_call;  VK_CHECK_RESULT(result); }

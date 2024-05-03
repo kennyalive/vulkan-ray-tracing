@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+
 namespace fs = std::filesystem;
 
 constexpr float Pi = 3.14159265f;

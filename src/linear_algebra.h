@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 struct Vector4;
 
 struct Vector3 {

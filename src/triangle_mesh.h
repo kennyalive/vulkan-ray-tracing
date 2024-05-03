@@ -2,6 +2,9 @@
 
 #include "linear_algebra.h"
 
+#include <string>
+#include <vector>
+
 struct Vertex {
     Vector3 pos;
     Vector2 uv;
