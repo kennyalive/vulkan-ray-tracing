@@ -8,18 +8,28 @@
 
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
-// Volk does not include vulkan.h because of windows.h disaster.
-// Here we define VULKAN_H_ to tell VMA that vulkan headers are included,
-// otherwise it will include vulkan.h + windows.h
-#define VULKAN_H_ 1
 #include "vma/vk_mem_alloc.h"
 
 #include <functional>
+#include <span>
 #include <string>
+#include <vector>
 
+void error(const std::string& message);
 const char* get_VkResult_string(VkResult result);
 #define VK_CHECK_RESULT(result) if (result < 0) error(std::string("Error: ") + get_VkResult_string(result));
 #define VK_CHECK(function_call) { VkResult result = function_call;  VK_CHECK_RESULT(result); }
+
+struct Vk_Init_Params {
+    bool enable_validation_layer = false;
+    int physical_device_index = -1;
+    bool vsync = false;
+    std::span<const char*> instance_extensions;
+    std::span<const char*> device_extensions;
+    const VkBaseInStructure* device_create_info_pnext = nullptr;
+    std::span<VkFormat> supported_surface_formats;
+    VkImageUsageFlags surface_usage_flags = 0;
+};
 
 struct Vk_Image {
     VkImage handle = VK_NULL_HANDLE;
@@ -58,7 +68,7 @@ struct GLFWwindow;
 
 // Initializes VK_Instance structure.
 // After calling this function we get fully functional vulkan subsystem.
-void vk_initialize(GLFWwindow* window, bool enable_validation_layers);
+void vk_initialize(GLFWwindow* window, const Vk_Init_Params& init_params);
 
 // Shutdown vulkan subsystem by releasing resources acquired by Vk_Instance.
 void vk_shutdown();
@@ -69,7 +79,7 @@ void vk_destroy_swapchain();
 
 void vk_ensure_staging_buffer_allocation(VkDeviceSize size);
 
-// buffers
+// Buffers
 Vk_Buffer vk_create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
     const void* data = nullptr, const char* name = nullptr);
 Vk_Buffer vk_create_buffer_with_alignment(VkDeviceSize size, VkBufferUsageFlags usage, uint32_t min_alignment,
@@ -77,9 +87,9 @@ Vk_Buffer vk_create_buffer_with_alignment(VkDeviceSize size, VkBufferUsageFlags 
 Vk_Buffer vk_create_mapped_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
     void** buffer_ptr, const char* name = nullptr);
 
-// textures
-Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate_mipmaps, const uint8_t* pixels, int bytes_per_pixel, const char*  name);
+// Images
 Vk_Image vk_create_image(int width, int height, VkFormat format, VkImageUsageFlags usage_flags, const char* name);
+Vk_Image vk_create_texture(int width, int height, VkFormat format, bool generate_mipmaps, const uint8_t* pixels, int bytes_per_pixel, const char*  name);
 Vk_Image vk_load_texture(const std::string& texture_file);
 
 VkShaderModule vk_load_spirv(const std::string& spirv_file);
@@ -101,19 +111,24 @@ void vk_execute(VkCommandPool command_pool, VkQueue queue, std::function<void(Vk
 
 // Barrier for all subresources of non-depth image.
 void vk_cmd_image_barrier(VkCommandBuffer command_buffer, VkImage image,
-    VkPipelineStageFlags src_stage_mask, VkAccessFlags src_access_mask, VkImageLayout old_layout,
-    VkPipelineStageFlags dst_stage_mask, VkAccessFlags dst_access_mask, VkImageLayout new_layout);
+    VkPipelineStageFlags2 src_stage_mask, VkAccessFlags2 src_access_mask, VkImageLayout old_layout,
+    VkPipelineStageFlags2 dst_stage_mask, VkAccessFlags2 dst_access_mask, VkImageLayout new_layout);
 
 // General image barrier.
 void vk_cmd_image_barrier_for_subresource(VkCommandBuffer command_buffer, VkImage image, const VkImageSubresourceRange& subresource_range,
-    VkPipelineStageFlags src_stage_mask, VkAccessFlags src_access_mask, VkImageLayout old_layout,
-    VkPipelineStageFlags dst_stage_mask, VkAccessFlags dst_access_mask, VkImageLayout new_layout);
+    VkPipelineStageFlags2 src_stage_mask, VkAccessFlags2 src_access_mask, VkImageLayout old_layout,
+    VkPipelineStageFlags2 dst_stage_mask, VkAccessFlags2 dst_access_mask, VkImageLayout new_layout);
 
 
 uint32_t vk_allocate_timestamp_queries(uint32_t count);
 
+// Workaround for static_assert(false). It should be used like this: static_assert(dependent_false_v<T>)
+template<typename>
+inline constexpr bool dependent_false_v = false;
+
 template <typename Vk_Object_Type>
-void vk_set_debug_name(Vk_Object_Type object, const char* name) {
+void vk_set_debug_name(Vk_Object_Type object, const char* name)
+{
     VkObjectType object_type;
 
 #define IF_TYPE_THEN_ENUM(vk_type, vk_object_type_enum) \
@@ -149,7 +164,7 @@ void vk_set_debug_name(Vk_Object_Type object, const char* name) {
     else IF_TYPE_THEN_ENUM(VkSwapchainKHR,              VK_OBJECT_TYPE_SWAPCHAIN_KHR                )
     else IF_TYPE_THEN_ENUM(VkAccelerationStructureKHR,  VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR   )
     else IF_TYPE_THEN_ENUM(VkDebugUtilsMessengerEXT,    VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT    )
-    else static_assert(false, "Unknown Vulkan object type");
+    else static_assert(dependent_false_v<Vk_Object_Type>, "Unknown Vulkan object type");
 #undef IF_TYPE_THEN_ENUM
 
     void set_debug_name_impl(VkObjectType object_type, uint64_t object_handle, const char* name);
@@ -175,6 +190,7 @@ struct Vk_Instance {
     VmaAllocator                    allocator;
 
     VkSurfaceKHR                    surface;
+    VkImageUsageFlags               surface_usage_flags;
     VkSurfaceFormatKHR              surface_format;
     VkExtent2D                      surface_size;
     Swapchain_Info                  swapchain_info;
@@ -185,8 +201,6 @@ struct Vk_Instance {
     VkCommandBuffer                 command_buffers[2];
     VkCommandBuffer                 command_buffer; // command_buffers[frame_index]
     int                             frame_index;
-
-    VkDescriptorPool                descriptor_pool;
 
     VkSemaphore                     image_acquired_semaphore[2];
     VkSemaphore                     rendering_finished_semaphore[2];
@@ -203,6 +217,107 @@ struct Vk_Instance {
     uint8_t*                        staging_buffer_ptr; // pointer to mapped staging buffer
 
     VkDebugUtilsMessengerEXT        debug_utils_messenger;
+
+    VkDescriptorPool                imgui_descriptor_pool;
 };
 
 extern Vk_Instance vk;
+
+//*****************************************************************************
+//
+// Misc Vulkan utilities section
+//
+//*****************************************************************************
+struct Shader_Module {
+    Shader_Module(const std::string& spirv_file);
+    ~Shader_Module();
+    VkShaderModule handle;
+};
+
+VkPipelineLayout create_pipeline_layout(
+    std::initializer_list<VkDescriptorSetLayout> set_layouts,
+    std::initializer_list<VkPushConstantRange> push_constant_ranges,
+    const char* name);
+
+VkPipeline create_compute_pipeline(const std::string& spirv_file, VkPipelineLayout pipeline_layout, const char* name);
+VkDescriptorSet allocate_descriptor_set(VkDescriptorSetLayout set_layout);
+
+struct Descriptor_Set_Layout {
+    static constexpr uint32_t max_bindings = 32;
+
+    VkDescriptorSetLayoutBinding bindings[max_bindings];
+    uint32_t binding_count;
+
+    Descriptor_Set_Layout() {
+        binding_count = 0;
+    }
+
+    Descriptor_Set_Layout& sampled_image(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& sampled_image_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& storage_image(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& sampler(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& uniform_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& storage_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& storage_buffer_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags);
+    Descriptor_Set_Layout& accelerator(uint32_t binding, VkShaderStageFlags stage_flags);
+    VkDescriptorSetLayout create(const char* name);
+};
+
+//
+// GPU time queries.
+//
+struct GPU_Time_Interval {
+    uint32_t start_query[2]; // end query == (start_query[frame_index] + 1)
+    float length_ms;
+
+    void begin();
+    void end();
+};
+
+struct GPU_Time_Keeper {
+    static constexpr uint32_t max_time_intervals = 128;
+
+    GPU_Time_Interval time_intervals[max_time_intervals];
+    uint32_t time_interval_count;
+
+    GPU_Time_Interval* allocate_time_interval();
+    void initialize_time_intervals();
+    void next_frame();
+};
+
+struct GPU_Time_Scope {
+    GPU_Time_Scope(GPU_Time_Interval* time_interval) {
+        this->time_interval = time_interval;
+        time_interval->begin();
+    }
+    ~GPU_Time_Scope() {
+        time_interval->end();
+    }
+
+private:
+    GPU_Time_Interval* time_interval;
+};
+
+#define GPU_TIME_SCOPE(time_interval) GPU_Time_Scope gpu_time_scope##__LINE__(time_interval)
+
+//
+// GPU debug markers.
+//
+void begin_gpu_marker_scope(VkCommandBuffer command_buffer, const char* name);
+void end_gpu_marker_scope(VkCommandBuffer command_buffer);
+void write_gpu_marker(VkCommandBuffer command_buffer, const char* name);
+
+struct GPU_Marker_Scope {
+    GPU_Marker_Scope(VkCommandBuffer command_buffer, const char* name) {
+        this->command_buffer = command_buffer;
+        begin_gpu_marker_scope(command_buffer, name);
+    }
+    ~GPU_Marker_Scope() {
+        end_gpu_marker_scope(command_buffer);
+    }
+
+private:
+    VkCommandBuffer command_buffer;
+};
+
+#define GPU_MARKER_SCOPE(command_buffer, name) GPU_Marker_Scope gpu_marker_scope##__LINE__(command_buffer, name)

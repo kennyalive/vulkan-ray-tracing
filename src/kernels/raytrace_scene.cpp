@@ -1,7 +1,8 @@
 #include "raytrace_scene.h"
 #include "gpu_mesh.h"
 #include "triangle_mesh.h"
-#include "vk_utils.h"
+
+#include "lib.h"
 
 #include <cassert>
 
@@ -12,6 +13,14 @@ struct Uniform_Buffer {
 }
 
 void Raytrace_Scene::create(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler) {
+    descriptor_buffer_properties = VkPhysicalDeviceDescriptorBufferPropertiesEXT{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT };
+
+    VkPhysicalDeviceProperties2 physical_device_properties{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+    physical_device_properties.pNext = &descriptor_buffer_properties;
+    vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
+
     uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &(void*&)mapped_uniform_buffer, "rt_uniform_buffer");
 
@@ -34,6 +43,7 @@ void Raytrace_Scene::create(const GPU_Mesh& gpu_mesh, VkImageView texture_view, 
 }
 
 void Raytrace_Scene::destroy() {
+    descriptor_buffer.destroy();
     uniform_buffer.destroy();
     shader_binding_table.destroy();
     accelerator.destroy();
@@ -44,7 +54,21 @@ void Raytrace_Scene::destroy() {
 }
 
 void Raytrace_Scene::update_output_image_descriptor(VkImageView output_image_view) {
-    Descriptor_Writes(descriptor_set).storage_image(0, output_image_view);
+    // Write descriptor 0 (output image)
+    {
+        VkDescriptorImageInfo image_info;
+        image_info.imageView = output_image_view;
+        image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+        VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+        descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        descriptor_info.data.pStorageImage = &image_info;
+
+        VkDeviceSize offset;
+        vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 0, &offset);
+        vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.storageImageDescriptorSize,
+            (uint8_t*)mapped_descriptor_buffer_ptr + offset);
+    }
 }
 
 void Raytrace_Scene::update(const Matrix3x4& model_transform, const Matrix3x4& camera_to_world_transform) {
@@ -131,8 +155,10 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
         }
 
         VkRayTracingPipelineCreateInfoKHR create_info { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
-        create_info.flags = VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR |
-                            VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_MISS_SHADERS_BIT_KHR;
+        create_info.flags =
+            VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT |
+            VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR |
+            VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_MISS_SHADERS_BIT_KHR;
         create_info.stageCount = (uint32_t)std::size(stage_infos);
         create_info.pStages = stage_infos;
         create_info.groupCount = (uint32_t)std::size(shader_groups);
@@ -142,29 +168,115 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
         VK_CHECK(vkCreateRayTracingPipelinesKHR(vk.device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
     }
 
-    descriptor_set = allocate_descriptor_set(descriptor_set_layout);
-    Descriptor_Writes(descriptor_set)
-        .accelerator(1, accelerator.top_level_accel.aceleration_structure)
-        .uniform_buffer(2, uniform_buffer.handle, 0, sizeof(Uniform_Buffer))
+    // Descriptor buffer.
+    {
+        VkDeviceSize layout_size_in_bytes = 0;
+        vkGetDescriptorSetLayoutSizeEXT(vk.device, descriptor_set_layout, &layout_size_in_bytes);
 
-        .storage_buffer(3,
-            gpu_mesh.index_buffer.handle,
-            0,
-            gpu_mesh.index_count * 4 /*VK_INDEX_TYPE_UINT32*/)
+        descriptor_buffer = vk_create_mapped_buffer(
+            layout_size_in_bytes,
+            VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT,
+            &mapped_descriptor_buffer_ptr, "ray_tracing_descriptor_buffer"
+        );
+        assert(descriptor_buffer.device_address % descriptor_buffer_properties.descriptorBufferOffsetAlignment == 0);
 
-        .storage_buffer(4,
-            gpu_mesh.vertex_buffer.handle,
-            0, /* assume that position is the first vertex attribute */
-            gpu_mesh.vertex_count * sizeof(Vertex))
+        // Write descriptor 1 (acceleration structure)
+        {
+            VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+            descriptor_info.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+            descriptor_info.data.accelerationStructure = accelerator.top_level_accel.buffer.device_address;
 
-        .sampled_image(5, texture_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        .sampler(6, sampler);
+            VkDeviceSize offset;
+            vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 1, &offset);
+            vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.accelerationStructureDescriptorSize,
+                (uint8_t*)mapped_descriptor_buffer_ptr + offset);
+        }
+        // Write descriptor 2 (uniform buffer)
+        {
+            VkDescriptorAddressInfoEXT address_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT };
+            address_info.address = uniform_buffer.device_address;
+            address_info.range = sizeof(Matrix3x4);
+
+            VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+            descriptor_info.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptor_info.data.pUniformBuffer = &address_info;
+
+            VkDeviceSize offset;
+            vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 2, &offset);
+            vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.uniformBufferDescriptorSize,
+                (uint8_t*)mapped_descriptor_buffer_ptr + offset);
+        }
+        // Write descriptor 3 (index buffer)
+        {
+            VkDescriptorAddressInfoEXT address_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT };
+            address_info.address = gpu_mesh.index_buffer.device_address;
+            address_info.range = gpu_mesh.index_count * 4 /*VK_INDEX_TYPE_UINT32*/;
+
+            VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+            descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            descriptor_info.data.pStorageBuffer = &address_info;
+
+            VkDeviceSize offset;
+            vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 3, &offset);
+            vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.storageBufferDescriptorSize,
+                (uint8_t*)mapped_descriptor_buffer_ptr + offset);
+        }
+        // Write descriptor 4 (vertex buffer)
+        {
+            VkDescriptorAddressInfoEXT address_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT };
+            address_info.address = gpu_mesh.vertex_buffer.device_address;
+            address_info.range = gpu_mesh.vertex_count * sizeof(Vertex);
+
+            VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+            descriptor_info.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            descriptor_info.data.pStorageBuffer = &address_info;
+
+            VkDeviceSize offset;
+            vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 4, &offset);
+            vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.storageBufferDescriptorSize,
+                (uint8_t*)mapped_descriptor_buffer_ptr + offset);
+        }
+        // Write descriptor 5 (sampled image)
+        {
+            VkDescriptorImageInfo image_info;
+            image_info.imageView = texture_view;
+            image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+            descriptor_info.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+            descriptor_info.data.pSampledImage = &image_info;
+
+            VkDeviceSize offset;
+            vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 5, &offset);
+            vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.sampledImageDescriptorSize,
+                (uint8_t*)mapped_descriptor_buffer_ptr + offset);
+        }
+        // Write descriptor 6 (sampler)
+        {
+            VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
+            descriptor_info.type = VK_DESCRIPTOR_TYPE_SAMPLER;
+            descriptor_info.data.pSampler = &sampler;
+
+            VkDeviceSize offset;
+            vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 6, &offset);
+            vkGetDescriptorEXT(vk.device, &descriptor_info, descriptor_buffer_properties.samplerDescriptorSize,
+                (uint8_t*)mapped_descriptor_buffer_ptr + offset);
+        }
+    }
 }
 
 void Raytrace_Scene::dispatch(bool spp4, bool show_texture_lod) {
     accelerator.rebuild_top_level_accel(vk.command_buffer);
 
-    vkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline_layout, 0, 1, &descriptor_set, 0, nullptr);
+    VkDescriptorBufferBindingInfoEXT descriptor_buffer_binding_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT };
+    descriptor_buffer_binding_info.address = descriptor_buffer.device_address;
+    descriptor_buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT;
+    vkCmdBindDescriptorBuffersEXT(vk.command_buffer, 1, &descriptor_buffer_binding_info);
+
+    const uint32_t buffer_index = 0;
+    const VkDeviceSize set_offset = 0;
+    vkCmdSetDescriptorBufferOffsetsEXT(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline_layout, 0, 1, &buffer_index, &set_offset);
+
     vkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline);
 
     uint32_t push_constants[2] = { spp4, show_texture_lod };

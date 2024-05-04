@@ -7,7 +7,9 @@ struct Copy_To_Swapchain {
     VkPipelineLayout pipeline_layout;
     VkPipeline pipeline;
     VkSampler point_sampler;
-    std::vector<VkDescriptorSet> sets; // per swapchain image
+    Vk_Buffer descriptor_buffer; // contains descriptors per swapchain image
+
+    VkDeviceSize layout_size_in_bytes = 0;
 
     void create();
     void destroy();

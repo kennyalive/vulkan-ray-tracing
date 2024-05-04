@@ -1,4 +1,5 @@
 #include "demo.h"
+#include "lib.h"
 #include "triangle_mesh.h"
 
 #include "glfw/glfw3.h"
@@ -6,6 +7,8 @@
 #include "imgui/imgui_internal.h"
 #include "imgui/imgui_impl_vulkan.h"
 #include "imgui/imgui_impl_glfw.h"
+
+#include <array>
 
 static VkFormat render_target_format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
@@ -23,7 +26,94 @@ static VkFormat get_depth_image_format() {
 }
 
 void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
-    vk_initialize(window, enable_validation_layers);
+    Vk_Init_Params vk_init_params;
+    vk_init_params.enable_validation_layer = enable_validation_layers;
+
+    std::array instance_extensions = {
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#endif
+#ifdef VK_USE_PLATFORM_XCB_KHR
+        VK_KHR_XCB_SURFACE_EXTENSION_NAME,
+#endif
+    };
+    std::array device_extensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_EXT_ROBUSTNESS_2_EXTENSION_NAME, // nullDescriptor feature
+        VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
+        VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+        VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
+        VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+    };
+    vk_init_params.instance_extensions = std::span{ instance_extensions };
+    vk_init_params.device_extensions = std::span{ device_extensions };
+
+    // Specify required features.
+    VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{
+    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+    buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
+
+    VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES };
+    dynamic_rendering_features.dynamicRendering = VK_TRUE;
+
+    VkPhysicalDeviceSynchronization2Features synchronization2_features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES };
+    synchronization2_features.synchronization2 = VK_TRUE;
+
+    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES };
+    descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
+
+    VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_buffer_features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT };
+    descriptor_buffer_features.descriptorBuffer = VK_TRUE;
+
+    VkPhysicalDeviceMaintenance4Features maintenance4_features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES };
+    maintenance4_features.maintenance4 = VK_TRUE;
+
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+    acceleration_structure_features.accelerationStructure = VK_TRUE;
+
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+    ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
+
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT };
+    robustness2_features.nullDescriptor = VK_TRUE;
+
+    VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+
+    // Chain feature structures.
+    buffer_device_address_features.pNext = &dynamic_rendering_features;
+    dynamic_rendering_features.pNext = &synchronization2_features;
+    synchronization2_features.pNext = &descriptor_indexing_features;
+    descriptor_indexing_features.pNext = &descriptor_buffer_features;
+    descriptor_buffer_features.pNext = &maintenance4_features;
+    maintenance4_features.pNext = &acceleration_structure_features;
+    acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
+    ray_tracing_pipeline_features.pNext = &robustness2_features;
+    features2.pNext = &buffer_device_address_features;
+    vk_init_params.device_create_info_pnext = (const VkBaseInStructure*)&features2;
+
+    // use non-srgb formats for swapchain images, so we can render to swapchain from compute,
+    // also it means we should do srgb encoding manually.
+    std::array surface_formats = {
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_FORMAT_B8G8R8A8_UNORM,
+    };
+    vk_init_params.supported_surface_formats = std::span{ surface_formats };
+    vk_init_params.surface_usage_flags =
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+        VK_IMAGE_USAGE_STORAGE_BIT;
+
+    vk_initialize(window, vk_init_params);
 
     // Device properties.
     {
@@ -106,7 +196,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
         init_info.Device = vk.device;
         init_info.QueueFamily = vk.queue_family_index;
         init_info.Queue = vk.queue;
-        init_info.DescriptorPool = vk.descriptor_pool;
+        init_info.DescriptorPool = vk.imgui_descriptor_pool;
 		init_info.MinImageCount = 2;
 		init_info.ImageCount = (uint32_t)vk.swapchain_info.images.size();
         init_info.UseDynamicRendering = true;

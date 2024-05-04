@@ -2,11 +2,12 @@
 
 #include "gpu_mesh.h"
 #include "linear_algebra.h"
-#include "vk_utils.h"
 
 #include "kernels/copy_to_swapchain.h"
 #include "kernels/draw_mesh.h"
 #include "kernels/raytrace_scene.h"
+
+#include <chrono>
 
 struct GLFWwindow;
 

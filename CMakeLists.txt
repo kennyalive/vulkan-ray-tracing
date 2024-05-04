@@ -17,8 +17,6 @@ set(PROGRAM_SOURCE
     src/triangle_mesh.h
     src/vk.cpp
     src/vk.h
-    src/vk_utils.cpp
-    src/vk_utils.h
     src/kernels/copy_to_swapchain.cpp
     src/kernels/copy_to_swapchain.h
     src/kernels/draw_mesh.cpp
@@ -61,7 +59,7 @@ else()
 endif()
 
 add_executable(${TARGET_NAME} ${PROGRAM_SOURCE} ${SHADER_SOURCE})
-target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
+target_compile_features(${TARGET_NAME} PRIVATE cxx_std_20)
 target_include_directories(${TARGET_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src")
 add_subdirectory(third-party)
 target_link_libraries(${TARGET_NAME} third-party)
