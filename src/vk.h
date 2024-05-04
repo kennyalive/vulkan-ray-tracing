@@ -240,17 +240,11 @@ VkPipelineLayout create_pipeline_layout(
     const char* name);
 
 VkPipeline create_compute_pipeline(const std::string& spirv_file, VkPipelineLayout pipeline_layout, const char* name);
-VkDescriptorSet allocate_descriptor_set(VkDescriptorSetLayout set_layout);
 
 struct Descriptor_Set_Layout {
     static constexpr uint32_t max_bindings = 32;
-
     VkDescriptorSetLayoutBinding bindings[max_bindings];
-    uint32_t binding_count;
-
-    Descriptor_Set_Layout() {
-        binding_count = 0;
-    }
+    uint32_t binding_count = 0;
 
     Descriptor_Set_Layout& sampled_image(uint32_t binding, VkShaderStageFlags stage_flags);
     Descriptor_Set_Layout& sampled_image_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags);
