@@ -15,12 +15,14 @@
 #include <string>
 #include <vector>
 
-void error(const std::string& message);
-const char* get_VkResult_string(VkResult result);
-#define VK_CHECK_RESULT(result) if (result < 0) error(std::string("Error: ") + get_VkResult_string(result));
+const char* vk_result_to_string(VkResult result);
+#define VK_CHECK_RESULT(result) if (result < 0 && vk.error) vk.error(std::string("Error: ") + vk_result_to_string(result));
 #define VK_CHECK(function_call) { VkResult result = function_call;  VK_CHECK_RESULT(result); }
 
+using Vk_Error_Func = void (*)(const std::string& error_message);
+
 struct Vk_Init_Params {
+    Vk_Error_Func error_reporter = nullptr;
     bool enable_validation_layer = false;
     int physical_device_index = -1;
     bool vsync = false;
@@ -94,15 +96,19 @@ Vk_Image vk_load_texture(const std::string& texture_file);
 
 VkShaderModule vk_load_spirv(const std::string& spirv_file);
 
+VkPipelineLayout vk_create_pipeline_layout(
+    std::initializer_list<VkDescriptorSetLayout> set_layouts,
+    std::initializer_list<VkPushConstantRange> push_constant_ranges,
+    const char* name);
+
 Vk_Graphics_Pipeline_State get_default_graphics_pipeline_state();
 
-VkPipeline vk_create_graphics_pipeline(
-    const Vk_Graphics_Pipeline_State&   state,
-    VkPipelineLayout                    pipeline_layout,
-    VkShaderModule                      vertex_shader,
-    VkShaderModule                      fragment_shader
-);
+VkPipeline vk_create_graphics_pipeline(const Vk_Graphics_Pipeline_State& state,
+    VkShaderModule vertex_shader, VkShaderModule fragment_shader,
+    VkPipelineLayout pipeline_layout, const char* name);
 
+VkPipeline vk_create_compute_pipeline(VkShaderModule compute_shader,
+    VkPipelineLayout pipeline_layout, const char* name);
 
 void vk_begin_frame();
 void vk_end_frame();
@@ -180,6 +186,7 @@ struct Swapchain_Info {
 // Vk_Instance contains vulkan resources that do not depend on applicaton logic.
 // This structure is initialized/deinitialized by vk_initialize/vk_shutdown functions correspondingly.
 struct Vk_Instance {
+    Vk_Error_Func                   error = nullptr;
     VkInstance                      instance;
     VkPhysicalDevice                physical_device;
     uint32_t                        queue_family_index;
@@ -228,39 +235,32 @@ extern Vk_Instance vk;
 // Misc Vulkan utilities section
 //
 //*****************************************************************************
-struct Shader_Module {
-    Shader_Module(const std::string& spirv_file);
-    ~Shader_Module();
+struct Vk_Shader_Module {
+    Vk_Shader_Module(const std::string& spirv_file);
+    ~Vk_Shader_Module();
     VkShaderModule handle;
 };
 
-VkPipelineLayout create_pipeline_layout(
-    std::initializer_list<VkDescriptorSetLayout> set_layouts,
-    std::initializer_list<VkPushConstantRange> push_constant_ranges,
-    const char* name);
-
-VkPipeline create_compute_pipeline(const std::string& spirv_file, VkPipelineLayout pipeline_layout, const char* name);
-
-struct Descriptor_Set_Layout {
+struct Vk_Descriptor_Set_Layout {
     static constexpr uint32_t max_bindings = 32;
     VkDescriptorSetLayoutBinding bindings[max_bindings];
     uint32_t binding_count = 0;
 
-    Descriptor_Set_Layout& sampled_image(uint32_t binding, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& sampled_image_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& storage_image(uint32_t binding, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& sampler(uint32_t binding, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& uniform_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& storage_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& storage_buffer_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags);
-    Descriptor_Set_Layout& accelerator(uint32_t binding, VkShaderStageFlags stage_flags);
+    Vk_Descriptor_Set_Layout& sampled_image(uint32_t binding, VkShaderStageFlags stage_flags);
+    Vk_Descriptor_Set_Layout& sampled_image_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags);
+    Vk_Descriptor_Set_Layout& storage_image(uint32_t binding, VkShaderStageFlags stage_flags);
+    Vk_Descriptor_Set_Layout& sampler(uint32_t binding, VkShaderStageFlags stage_flags);
+    Vk_Descriptor_Set_Layout& uniform_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
+    Vk_Descriptor_Set_Layout& storage_buffer(uint32_t binding, VkShaderStageFlags stage_flags);
+    Vk_Descriptor_Set_Layout& storage_buffer_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags);
+    Vk_Descriptor_Set_Layout& accelerator(uint32_t binding, VkShaderStageFlags stage_flags);
     VkDescriptorSetLayout create(const char* name);
 };
 
 //
 // GPU time queries.
 //
-struct GPU_Time_Interval {
+struct Vk_GPU_Time_Interval {
     uint32_t start_query[2]; // end query == (start_query[frame_index] + 1)
     float length_ms;
 
@@ -268,50 +268,50 @@ struct GPU_Time_Interval {
     void end();
 };
 
-struct GPU_Time_Keeper {
+struct Vk_GPU_Time_Keeper {
     static constexpr uint32_t max_time_intervals = 128;
 
-    GPU_Time_Interval time_intervals[max_time_intervals];
+    Vk_GPU_Time_Interval time_intervals[max_time_intervals];
     uint32_t time_interval_count;
 
-    GPU_Time_Interval* allocate_time_interval();
+    Vk_GPU_Time_Interval* allocate_time_interval();
     void initialize_time_intervals();
     void next_frame();
 };
 
-struct GPU_Time_Scope {
-    GPU_Time_Scope(GPU_Time_Interval* time_interval) {
+struct Vk_GPU_Time_Scope {
+    Vk_GPU_Time_Scope(Vk_GPU_Time_Interval* time_interval) {
         this->time_interval = time_interval;
         time_interval->begin();
     }
-    ~GPU_Time_Scope() {
+    ~Vk_GPU_Time_Scope() {
         time_interval->end();
     }
 
 private:
-    GPU_Time_Interval* time_interval;
+    Vk_GPU_Time_Interval* time_interval;
 };
 
-#define GPU_TIME_SCOPE(time_interval) GPU_Time_Scope gpu_time_scope##__LINE__(time_interval)
+#define VK_GPU_TIME_SCOPE(time_interval) Vk_GPU_Time_Scope gpu_time_scope##__LINE__(time_interval)
 
 //
 // GPU debug markers.
 //
-void begin_gpu_marker_scope(VkCommandBuffer command_buffer, const char* name);
-void end_gpu_marker_scope(VkCommandBuffer command_buffer);
-void write_gpu_marker(VkCommandBuffer command_buffer, const char* name);
+void vk_begin_gpu_marker_scope(VkCommandBuffer command_buffer, const char* name);
+void vk_end_gpu_marker_scope(VkCommandBuffer command_buffer);
+void vk_write_gpu_marker(VkCommandBuffer command_buffer, const char* name);
 
-struct GPU_Marker_Scope {
-    GPU_Marker_Scope(VkCommandBuffer command_buffer, const char* name) {
+struct Vk_GPU_Marker_Scope {
+    Vk_GPU_Marker_Scope(VkCommandBuffer command_buffer, const char* name) {
         this->command_buffer = command_buffer;
-        begin_gpu_marker_scope(command_buffer, name);
+        vk_begin_gpu_marker_scope(command_buffer, name);
     }
-    ~GPU_Marker_Scope() {
-        end_gpu_marker_scope(command_buffer);
+    ~Vk_GPU_Marker_Scope() {
+        vk_end_gpu_marker_scope(command_buffer);
     }
 
 private:
     VkCommandBuffer command_buffer;
 };
 
-#define GPU_MARKER_SCOPE(command_buffer, name) GPU_Marker_Scope gpu_marker_scope##__LINE__(command_buffer, name)
+#define VK_GPU_MARKER_SCOPE(command_buffer, name) GPU_Marker_Scope gpu_marker_scope##__LINE__(command_buffer, name)

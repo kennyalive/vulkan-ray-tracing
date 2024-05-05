@@ -1,20 +1,22 @@
 #include "copy_to_swapchain.h"
+#include "lib.h"
 
 void Copy_To_Swapchain::create()
 {
-    set_layout = Descriptor_Set_Layout()
+    set_layout = Vk_Descriptor_Set_Layout()
         .sampler(0, VK_SHADER_STAGE_COMPUTE_BIT)
         .sampled_image(1, VK_SHADER_STAGE_COMPUTE_BIT)
         .storage_image(2, VK_SHADER_STAGE_COMPUTE_BIT)
         .create("copy_to_swapchain_set_layout");
 
-    pipeline_layout = create_pipeline_layout(
+    pipeline_layout = vk_create_pipeline_layout(
         { set_layout },
         { VkPushConstantRange{VK_SHADER_STAGE_COMPUTE_BIT, 0, 8 /*uint32 width + uint32 height*/} },
         "copy_to_swapchain_pipeline_layout");
 
-    pipeline = create_compute_pipeline("spirv/copy_to_swapchain.comp.spv", pipeline_layout,
-        "copy_to_swapchain_pipeline");
+    Vk_Shader_Module compute_shader(get_resource_path("spirv/copy_to_swapchain.comp.spv"));
+
+    pipeline = vk_create_compute_pipeline(compute_shader.handle, pipeline_layout, "copy_to_swapchain_pipeline");
 
     // point sampler
     {

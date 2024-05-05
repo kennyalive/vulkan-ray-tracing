@@ -86,7 +86,7 @@ void Raytrace_Scene::update(const Matrix3x4& model_transform, const Matrix3x4& c
 }
 
 void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler) {
-    descriptor_set_layout = Descriptor_Set_Layout()
+    descriptor_set_layout = Vk_Descriptor_Set_Layout()
         .storage_image (0, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
         .accelerator (1, VK_SHADER_STAGE_RAYGEN_BIT_KHR)
         .uniform_buffer (2, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
@@ -96,7 +96,7 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
         .sampler (6, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
         .create ("rt_set_layout");
 
-    pipeline_layout = create_pipeline_layout(
+    pipeline_layout = vk_create_pipeline_layout(
         { descriptor_set_layout },
         { VkPushConstantRange{VK_SHADER_STAGE_RAYGEN_BIT_KHR, 0, 4}, 
           VkPushConstantRange{VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, 4, 4} },
@@ -105,9 +105,9 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
 
     // pipeline
     {
-        Shader_Module rgen_shader("spirv/rt_mesh.rgen.spv");
-        Shader_Module miss_shader("spirv/rt_mesh.rmiss.spv");
-        Shader_Module chit_shader("spirv/rt_mesh.rchit.spv");
+        Vk_Shader_Module rgen_shader(get_resource_path("spirv/rt_mesh.rgen.spv"));
+        Vk_Shader_Module miss_shader(get_resource_path("spirv/rt_mesh.rmiss.spv"));
+        Vk_Shader_Module chit_shader(get_resource_path("spirv/rt_mesh.rchit.spv"));
 
         VkPipelineShaderStageCreateInfo stage_infos[3] {};
         stage_infos[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

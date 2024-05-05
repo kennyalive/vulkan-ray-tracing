@@ -1,5 +1,3 @@
-#include "lib.h"
-
 #define VMA_IMPLEMENTATION
 #include "vk.h"
 
@@ -9,11 +7,9 @@
 #include "glfw/glfw3.h"
 
 #include "vulkan/vk_enum_string_helper.h"
+const char* vk_result_to_string(VkResult result) { return string_VkResult(result); }
 
-const char* get_VkResult_string(VkResult result)
-{
-    return string_VkResult(result);
-}
+#include <fstream>
 
 constexpr uint32_t max_timestamp_queries = 64;
 
@@ -39,7 +35,7 @@ static void create_instance(const std::span<const char*>& instance_extensions, b
             }
         }
         if (!supported)
-            error("Required instance extension is not available: " + std::string(name));
+            vk.error("Required instance extension is not available: " + std::string(name));
     }
 
     VkApplicationInfo app_info { VK_STRUCTURE_TYPE_APPLICATION_INFO };
@@ -65,31 +61,27 @@ static void create_device(const Vk_Init_Params& params, GLFWwindow* window)
 {
     // select physical device
     {
-        uint32_t count;
+        uint32_t count = 0;
         VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &count, nullptr));
-
-        if (count == 0)
-            error("There are no Vulkan physical devices available");
-
+        if (count == 0) {
+            vk.error("There are no Vulkan physical devices available");
+        }
         std::vector<VkPhysicalDevice> physical_devices(count);
         VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &count, physical_devices.data()));
 
-        for (const auto& physical_device : physical_devices)
-        {
+        for (const auto& physical_device : physical_devices) {
             VkPhysicalDeviceProperties props;
             vkGetPhysicalDeviceProperties(physical_device, &props);
-
             // Check for device-level Vulkan 1.3 compatibility.
-            if (VK_VERSION_MAJOR(props.apiVersion) == 1 && VK_VERSION_MINOR(props.apiVersion) >= 3)
-            {
+            if (VK_VERSION_MAJOR(props.apiVersion) == 1 && VK_VERSION_MINOR(props.apiVersion) >= 3) {
                 vk.physical_device = physical_device;
                 vk.timestamp_period_ms = (double)props.limits.timestampPeriod * 1e-6;
                 break;
             }
         }
-
-        if (vk.physical_device == nullptr)
-            error("Failed to find physical device that supports requested Vulkan API version");
+        if (vk.physical_device == nullptr) {
+            vk.error("Failed to find physical device that supports requested Vulkan API version");
+        }
     }
 
     VK_CHECK(glfwCreateWindowSurface(vk.instance, window, nullptr, &vk.surface));
@@ -114,8 +106,9 @@ static void create_device(const Vk_Init_Params& params, GLFWwindow* window)
                 break;
             }
         }
-        if (vk.queue_family_index == uint32_t(-1))
-            error("Vulkan: failed to find queue family");
+        if (vk.queue_family_index == uint32_t(-1)) {
+            vk.error("Vulkan: failed to find queue family");
+        }
     }
 
     // create VkDevice
@@ -134,8 +127,9 @@ static void create_device(const Vk_Init_Params& params, GLFWwindow* window)
             return false;
         };
         for (auto required_extension : params.device_extensions) {
-            if (!is_extension_supported(required_extension))
-                error("Vulkan: required device extension is not available: " + std::string(required_extension));
+            if (!is_extension_supported(required_extension)) {
+                vk.error("Vulkan: required device extension is not available: " + std::string(required_extension));
+            }
         }
 
         const float priority = 1.0;
@@ -170,18 +164,22 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_utils_messenger_callback(
     return VK_FALSE;
 }
 
-void Vk_Image::destroy() {
+void Vk_Image::destroy()
+{
     vmaDestroyImage(vk.allocator, handle, allocation);
     vkDestroyImageView(vk.device, view, nullptr);
     *this = Vk_Image{};
 }
 
-void Vk_Buffer::destroy() {
+void Vk_Buffer::destroy()
+{
     vmaDestroyBuffer(vk.allocator, handle, allocation);
     *this = Vk_Buffer{};
 }
 
-void vk_initialize(GLFWwindow* window, const Vk_Init_Params& init_params) {
+void vk_initialize(GLFWwindow* window, const Vk_Init_Params& init_params)
+{
+    vk.error = init_params.error_reporter;
     VK_CHECK(volkInitialize());
     uint32_t instance_version = volkGetInstanceVersion();
 
@@ -190,9 +188,9 @@ void vk_initialize(GLFWwindow* window, const Vk_Init_Params& init_params) {
     // versions of Vulkan with an instance than it does with a device or physical device."
     bool instance_version_higher_than_or_equal_to_1_1 =
         VK_VERSION_MAJOR(instance_version) > 1 || VK_VERSION_MINOR(instance_version) >= 1;
-    if (!instance_version_higher_than_or_equal_to_1_1)
-        error("The supported instance version is Vulkan 1.1 or higher, but Vulkan 1.0 loader is detected");
-
+    if (!instance_version_higher_than_or_equal_to_1_1) {
+        vk.error("The supported instance version is Vulkan 1.1 or higher, but Vulkan 1.0 loader is detected");
+    }
     create_instance(init_params.instance_extensions, init_params.enable_validation_layer);
     volkLoadInstance(vk.instance);
 
@@ -326,7 +324,7 @@ void vk_initialize(GLFWwindow* window, const Vk_Init_Params& init_params) {
                     }
                 }
             }
-            error("Failed to find supported surface format");
+            vk.error("Failed to find supported surface format");
         } ();
     }
 
@@ -342,7 +340,8 @@ void vk_initialize(GLFWwindow* window, const Vk_Init_Params& init_params) {
     }
 }
 
-void vk_shutdown() {
+void vk_shutdown()
+{
     vkDeviceWaitIdle(vk.device);
 
     if (vk.staging_buffer != VK_NULL_HANDLE) {
@@ -368,7 +367,8 @@ void vk_shutdown() {
     vkDestroyInstance(vk.instance, nullptr);
 }
 
-void vk_create_swapchain(bool vsync) {
+void vk_create_swapchain(bool vsync)
+{
     assert(vk.swapchain_info.handle == VK_NULL_HANDLE);
 
     VkSurfaceCapabilitiesKHR surface_caps;
@@ -383,8 +383,9 @@ void vk_create_swapchain(bool vsync) {
     assert(vk.surface_size.width != 0 && vk.surface_size.height != 0);
 
     // VK_IMAGE_USAGE_TRANSFER_DST_BIT is required by image clear operations.
-    if ((surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0)
-        error("vk_create_swapchain: VK_IMAGE_USAGE_TRANSFER_DST_BIT is not supported by the swapchain");
+    if ((surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT) == 0) {
+        vk.error("vk_create_swapchain: VK_IMAGE_USAGE_TRANSFER_DST_BIT is not supported by the swapchain");
+    }
 
     // determine present mode and swapchain image count
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
@@ -453,7 +454,8 @@ void vk_create_swapchain(bool vsync) {
     }
 }
 
-void vk_destroy_swapchain() {
+void vk_destroy_swapchain()
+{
     for (auto image_view : vk.swapchain_info.image_views) {
         vkDestroyImageView(vk.device, image_view, nullptr);
     }
@@ -461,7 +463,8 @@ void vk_destroy_swapchain() {
     vk.swapchain_info = Swapchain_Info{};
 }
 
-void vk_ensure_staging_buffer_allocation(VkDeviceSize size) {
+void vk_ensure_staging_buffer_allocation(VkDeviceSize size)
+{
     if (vk.staging_buffer_size >= size)
         return;
 
@@ -743,12 +746,36 @@ Vk_Image vk_load_texture(const std::string& texture_file)
     int component_count;
 
     auto rgba_pixels = stbi_load(texture_file.c_str(), &w, &h, &component_count,STBI_rgb_alpha);
-    if (rgba_pixels == nullptr)
-        error("failed to load image file: " + texture_file);
+    if (rgba_pixels == nullptr) {
+        vk.error("failed to load image file: " + texture_file);
+    }
 
     Vk_Image texture = vk_create_texture(w, h, VK_FORMAT_R8G8B8A8_SRGB, true, rgba_pixels, 4, texture_file.c_str());
     stbi_image_free(rgba_pixels);
     return texture;
+}
+
+static std::vector<uint8_t> read_binary_file(const std::string& file_name)
+{
+    std::ifstream file(file_name, std::ios_base::in | std::ios_base::binary);
+    if (!file) {
+        vk.error("failed to open file: " + file_name);
+    }
+    // get file size
+    file.seekg(0, std::ios_base::end);
+    std::streampos file_size = file.tellg();
+    file.seekg(0, std::ios_base::beg);
+
+    if (file_size == std::streampos(-1) || !file) {
+        vk.error("failed to read file stats: " + file_name);
+    }
+    // read file content
+    std::vector<uint8_t> file_content(static_cast<size_t>(file_size));
+    file.read(reinterpret_cast<char*>(file_content.data()), file_size);
+    if (!file) {
+        vk.error("failed to read file content: " + file_name);
+    }
+    return file_content;
 }
 
 VkShaderModule vk_load_spirv(const std::string& spirv_file)
@@ -756,7 +783,7 @@ VkShaderModule vk_load_spirv(const std::string& spirv_file)
     std::vector<uint8_t> bytes = read_binary_file(spirv_file);
 
     if (bytes.size() % 4 != 0) {
-        error("Vulkan: SPIR-V binary buffer size is not multiple of 4");
+        vk.error("Vulkan: SPIR-V binary buffer size is not multiple of 4");
     }
 
     VkShaderModuleCreateInfo create_info { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO } ;
@@ -766,6 +793,21 @@ VkShaderModule vk_load_spirv(const std::string& spirv_file)
     VkShaderModule shader_module;
     VK_CHECK(vkCreateShaderModule(vk.device, &create_info, nullptr, &shader_module));
     return shader_module;
+}
+
+VkPipelineLayout vk_create_pipeline_layout(std::initializer_list<VkDescriptorSetLayout> set_layouts,
+    std::initializer_list<VkPushConstantRange> push_constant_ranges, const char* name)
+{
+    VkPipelineLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+    create_info.setLayoutCount = (uint32_t)set_layouts.size();
+    create_info.pSetLayouts = set_layouts.begin();
+    create_info.pushConstantRangeCount = (uint32_t)push_constant_ranges.size();
+    create_info.pPushConstantRanges = push_constant_ranges.begin();
+
+    VkPipelineLayout pipeline_layout{};
+    VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
+    vk_set_debug_name(pipeline_layout, name);
+    return pipeline_layout;
 }
 
 Vk_Graphics_Pipeline_State get_default_graphics_pipeline_state()
@@ -846,11 +888,9 @@ Vk_Graphics_Pipeline_State get_default_graphics_pipeline_state()
     return state;
 }
 
-VkPipeline vk_create_graphics_pipeline(
-    const Vk_Graphics_Pipeline_State&   state,
-    VkPipelineLayout                    pipeline_layout,
-    VkShaderModule                      vertex_shader,
-    VkShaderModule                      fragment_shader)
+VkPipeline vk_create_graphics_pipeline(const Vk_Graphics_Pipeline_State& state,
+    VkShaderModule vertex_shader, VkShaderModule fragment_shader,
+    VkPipelineLayout pipeline_layout, const char* name)
 {
     auto get_shader_stage_create_info = [](VkShaderStageFlagBits stage, VkShaderModule shader_module) {
         VkPipelineShaderStageCreateInfo create_info{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
@@ -902,28 +942,47 @@ VkPipeline vk_create_graphics_pipeline(
     create_info.layout                                  = pipeline_layout;
     create_info.subpass                                 = 0;
 
-    VkPipeline pipeline;
+    VkPipeline pipeline{};
     VK_CHECK(vkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
+    vk_set_debug_name(pipeline, name);
     return pipeline;
 }
 
-void vk_begin_frame() {
+VkPipeline vk_create_compute_pipeline(VkShaderModule compute_shader, VkPipelineLayout pipeline_layout, const char* name)
+{
+    VkPipelineShaderStageCreateInfo compute_stage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+    compute_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    compute_stage.module = compute_shader;
+    compute_stage.pName = "main";
+
+    VkComputePipelineCreateInfo create_info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+    create_info.flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
+    create_info.stage = compute_stage;
+    create_info.layout = pipeline_layout;
+
+    VkPipeline pipeline{};
+    VK_CHECK(vkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
+    vk_set_debug_name(pipeline, name);
+    return pipeline;
+}
+
+void vk_begin_frame()
+{
     VK_CHECK(vkWaitForFences(vk.device, 1, &vk.frame_fence[vk.frame_index], VK_FALSE, std::numeric_limits<uint64_t>::max()));
     VK_CHECK(vkResetFences(vk.device, 1, &vk.frame_fence[vk.frame_index]));
     vkResetCommandPool(vk.device, vk.command_pools[vk.frame_index], 0);
     vk.command_buffer = vk.command_buffers[vk.frame_index];
     vk.timestamp_query_pool = vk.timestamp_query_pools[vk.frame_index];
 
-    START_TIMER
     VK_CHECK(vkAcquireNextImageKHR(vk.device, vk.swapchain_info.handle, UINT64_MAX, vk.image_acquired_semaphore[vk.frame_index], VK_NULL_HANDLE, &vk.swapchain_image_index));
-    STOP_TIMER("vkAcquireNextImageKHR")
 
     VkCommandBufferBeginInfo begin_info { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     VK_CHECK(vkBeginCommandBuffer(vk.command_buffer, &begin_info));
 }
 
-void vk_end_frame() {
+void vk_end_frame()
+{
     VK_CHECK(vkEndCommandBuffer(vk.command_buffer));
 
     VkSemaphoreSubmitInfo wait_info{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
@@ -945,9 +1004,7 @@ void vk_end_frame() {
     submit_info.signalSemaphoreInfoCount = 1;
     submit_info.pSignalSemaphoreInfos = &signal_info;
 
-    START_TIMER
     VK_CHECK(vkQueueSubmit2(vk.queue, 1, &submit_info, vk.frame_fence[vk.frame_index]));
-    STOP_TIMER("vkQueueSubmit2")
 
     VkPresentInfoKHR present_info { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present_info.waitSemaphoreCount = 1;
@@ -956,15 +1013,13 @@ void vk_end_frame() {
     present_info.pSwapchains        = &vk.swapchain_info.handle;
     present_info.pImageIndices      = &vk.swapchain_image_index;
 
-    START_TIMER
     VK_CHECK(vkQueuePresentKHR(vk.queue, &present_info));
-    STOP_TIMER("vkQueuePresentKHR")
 
     vk.frame_index = 1 - vk.frame_index;
 }
 
-void vk_execute(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder) {
-
+void vk_execute(VkCommandPool command_pool, VkQueue queue, std::function<void(VkCommandBuffer)> recorder)
+{
     VkCommandBufferAllocateInfo alloc_info { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     alloc_info.commandPool          = command_pool;
     alloc_info.level                = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -1039,7 +1094,8 @@ void vk_cmd_image_barrier_for_subresource(
     vkCmdPipelineBarrier2(command_buffer, &dep_info);
 }
 
-uint32_t vk_allocate_timestamp_queries(uint32_t count) {
+uint32_t vk_allocate_timestamp_queries(uint32_t count)
+{
     assert(count > 0);
     assert(vk.timestamp_query_count + count <= max_timestamp_queries);
     uint32_t first_query = vk.timestamp_query_count;
@@ -1047,7 +1103,8 @@ uint32_t vk_allocate_timestamp_queries(uint32_t count) {
     return first_query;
 }
 
-void set_debug_name_impl(VkObjectType object_type, uint64_t object_handle, const char* name) {
+void set_debug_name_impl(VkObjectType object_type, uint64_t object_handle, const char* name)
+{
     if (name) {
         VkDebugUtilsObjectNameInfoEXT name_info { VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT };
         name_info.objectType = object_type;
@@ -1062,54 +1119,16 @@ void set_debug_name_impl(VkObjectType object_type, uint64_t object_handle, const
 // Misc Vulkan utilities section
 //
 //*****************************************************************************
-Shader_Module::Shader_Module(const std::string& spirv_file)
+Vk_Shader_Module::Vk_Shader_Module(const std::string& spirv_file)
 {
-    handle = vk_load_spirv((get_data_directory() / spirv_file).string());
+    handle = vk_load_spirv(spirv_file);
 }
 
-Shader_Module::~Shader_Module()
+Vk_Shader_Module::~Vk_Shader_Module()
 {
     vkDestroyShaderModule(vk.device, handle, nullptr);
 }
 
-VkPipelineLayout create_pipeline_layout(std::initializer_list<VkDescriptorSetLayout> set_layouts,
-    std::initializer_list<VkPushConstantRange> push_constant_ranges, const char* name)
-{
-    VkPipelineLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-    create_info.setLayoutCount = (uint32_t)set_layouts.size();
-    create_info.pSetLayouts = set_layouts.begin();
-    create_info.pushConstantRangeCount = (uint32_t)push_constant_ranges.size();
-    create_info.pPushConstantRanges = push_constant_ranges.begin();
-
-    VkPipelineLayout pipeline_layout;
-    VK_CHECK(vkCreatePipelineLayout(vk.device, &create_info, nullptr, &pipeline_layout));
-    vk_set_debug_name(pipeline_layout, name);
-    return pipeline_layout;
-}
-
-VkPipeline create_compute_pipeline(const std::string& spirv_file, VkPipelineLayout pipeline_layout, const char* name)
-{
-    Shader_Module shader(spirv_file);
-
-    VkPipelineShaderStageCreateInfo compute_stage{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-    compute_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    compute_stage.module = shader.handle;
-    compute_stage.pName = "main";
-
-    VkComputePipelineCreateInfo create_info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-    create_info.flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
-    create_info.stage = compute_stage;
-    create_info.layout = pipeline_layout;
-
-    VkPipeline pipeline;
-    VK_CHECK(vkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
-    vk_set_debug_name(pipeline, name);
-    return pipeline;
-}
-
-//
-// Descriptor_Set_Layout
-//
 static VkDescriptorSetLayoutBinding get_set_layout_binding(uint32_t binding, uint32_t count,
     VkDescriptorType descriptor_type, VkShaderStageFlags stage_flags)
 {
@@ -1121,63 +1140,63 @@ static VkDescriptorSetLayoutBinding get_set_layout_binding(uint32_t binding, uin
     return entry;
 }
 
-Descriptor_Set_Layout& Descriptor_Set_Layout::sampled_image(uint32_t binding, VkShaderStageFlags stage_flags)
+Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::sampled_image(uint32_t binding, VkShaderStageFlags stage_flags)
 {
     assert(binding_count < max_bindings);
     bindings[binding_count++] = get_set_layout_binding(binding, 1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, stage_flags);
     return *this;
 }
 
-Descriptor_Set_Layout& Descriptor_Set_Layout::sampled_image_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags)
+Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::sampled_image_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags)
 {
     assert(binding_count < max_bindings);
     bindings[binding_count++] = get_set_layout_binding(binding, array_size, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, stage_flags);
     return *this;
 }
 
-Descriptor_Set_Layout& Descriptor_Set_Layout::storage_image(uint32_t binding, VkShaderStageFlags stage_flags)
+Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::storage_image(uint32_t binding, VkShaderStageFlags stage_flags)
 {
     assert(binding_count < max_bindings);
     bindings[binding_count++] = get_set_layout_binding(binding, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, stage_flags);
     return *this;
 }
 
-Descriptor_Set_Layout& Descriptor_Set_Layout::sampler(uint32_t binding, VkShaderStageFlags stage_flags)
+Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::sampler(uint32_t binding, VkShaderStageFlags stage_flags)
 {
     assert(binding_count < max_bindings);
     bindings[binding_count++] = get_set_layout_binding(binding, 1, VK_DESCRIPTOR_TYPE_SAMPLER, stage_flags);
     return *this;
 }
 
-Descriptor_Set_Layout& Descriptor_Set_Layout::uniform_buffer(uint32_t binding, VkShaderStageFlags stage_flags)
+Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::uniform_buffer(uint32_t binding, VkShaderStageFlags stage_flags)
 {
     assert(binding_count < max_bindings);
     bindings[binding_count++] = get_set_layout_binding(binding, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, stage_flags);
     return *this;
 }
 
-Descriptor_Set_Layout& Descriptor_Set_Layout::storage_buffer(uint32_t binding, VkShaderStageFlags stage_flags)
+Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::storage_buffer(uint32_t binding, VkShaderStageFlags stage_flags)
 {
     assert(binding_count < max_bindings);
     bindings[binding_count++] = get_set_layout_binding(binding, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, stage_flags);
     return *this;
 }
 
-Descriptor_Set_Layout& Descriptor_Set_Layout::storage_buffer_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags)
+Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::storage_buffer_array(uint32_t binding, uint32_t array_size, VkShaderStageFlags stage_flags)
 {
     assert(binding_count < max_bindings);
     bindings[binding_count++] = get_set_layout_binding(binding, array_size, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, stage_flags);
     return *this;
 }
 
-Descriptor_Set_Layout& Descriptor_Set_Layout::accelerator(uint32_t binding, VkShaderStageFlags stage_flags)
+Vk_Descriptor_Set_Layout& Vk_Descriptor_Set_Layout::accelerator(uint32_t binding, VkShaderStageFlags stage_flags)
 {
     assert(binding_count < max_bindings);
     bindings[binding_count++] = get_set_layout_binding(binding, 1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, stage_flags);
     return *this;
 }
 
-VkDescriptorSetLayout Descriptor_Set_Layout::create(const char* name)
+VkDescriptorSetLayout Vk_Descriptor_Set_Layout::create(const char* name)
 {
     VkDescriptorSetLayoutCreateInfo create_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
     create_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
@@ -1190,27 +1209,27 @@ VkDescriptorSetLayout Descriptor_Set_Layout::create(const char* name)
     return set_layout;
 }
 
-void GPU_Time_Interval::begin()
+void Vk_GPU_Time_Interval::begin()
 {
     vkCmdWriteTimestamp(vk.command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk.timestamp_query_pool, start_query[vk.frame_index]);
 }
 
-void GPU_Time_Interval::end()
+void Vk_GPU_Time_Interval::end()
 {
     vkCmdWriteTimestamp(vk.command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk.timestamp_query_pool, start_query[vk.frame_index] + 1);
 }
 
-GPU_Time_Interval* GPU_Time_Keeper::allocate_time_interval()
+Vk_GPU_Time_Interval* Vk_GPU_Time_Keeper::allocate_time_interval()
 {
     assert(time_interval_count < max_time_intervals);
-    GPU_Time_Interval* time_interval = &time_intervals[time_interval_count++];
+    Vk_GPU_Time_Interval* time_interval = &time_intervals[time_interval_count++];
 
     time_interval->start_query[0] = time_interval->start_query[1] = vk_allocate_timestamp_queries(2);
     time_interval->length_ms = 0.f;
     return time_interval;
 }
 
-void GPU_Time_Keeper::initialize_time_intervals()
+void Vk_GPU_Time_Keeper::initialize_time_intervals()
 {
     vk_execute(vk.command_pools[0], vk.queue, [this](VkCommandBuffer command_buffer) {
         vkCmdResetQueryPool(command_buffer, vk.timestamp_query_pools[0], 0, 2 * time_interval_count);
@@ -1224,7 +1243,7 @@ void GPU_Time_Keeper::initialize_time_intervals()
         });
 }
 
-void GPU_Time_Keeper::next_frame()
+void Vk_GPU_Time_Keeper::next_frame()
 {
     uint64_t query_results[2/*query_result + availability*/ * 2/*start + end*/ * max_time_intervals];
     const uint32_t query_count = 2 * time_interval_count;
@@ -1243,19 +1262,19 @@ void GPU_Time_Keeper::next_frame()
     vkCmdResetQueryPool(vk.command_buffer, vk.timestamp_query_pool, 0, query_count);
 }
 
-void begin_gpu_marker_scope(VkCommandBuffer command_buffer, const char* name)
+void vk_begin_gpu_marker_scope(VkCommandBuffer command_buffer, const char* name)
 {
     VkDebugUtilsLabelEXT label{ VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT };
     label.pLabelName = name;
     vkCmdBeginDebugUtilsLabelEXT(command_buffer, &label);
 }
 
-void end_gpu_marker_scope(VkCommandBuffer command_buffer)
+void vk_end_gpu_marker_scope(VkCommandBuffer command_buffer)
 {
     vkCmdEndDebugUtilsLabelEXT(command_buffer);
 }
 
-void write_gpu_marker(VkCommandBuffer command_buffer, const char* name)
+void vk_write_gpu_marker(VkCommandBuffer command_buffer, const char* name)
 {
     VkDebugUtilsLabelEXT label{ VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT };
     label.pLabelName = name;

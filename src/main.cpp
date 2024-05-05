@@ -1,5 +1,7 @@
 #include "gpu_mesh.h"
 #include "demo.h"
+#include "lib.h"
+
 #include "glfw/glfw3.h"
 
 #include <cassert>

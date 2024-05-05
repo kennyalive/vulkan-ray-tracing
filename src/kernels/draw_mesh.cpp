@@ -14,21 +14,21 @@ void Draw_Mesh::create(VkFormat color_attachment_format, VkFormat depth_attachme
     uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "raster_uniform_buffer");
 
-    descriptor_set_layout = Descriptor_Set_Layout()
+    descriptor_set_layout = Vk_Descriptor_Set_Layout()
         .uniform_buffer (0, VK_SHADER_STAGE_VERTEX_BIT)
         .sampled_image (1, VK_SHADER_STAGE_FRAGMENT_BIT)
         .sampler (2, VK_SHADER_STAGE_FRAGMENT_BIT)
         .create ("raster_set_layout");
 
-    pipeline_layout = create_pipeline_layout(
+    pipeline_layout = vk_create_pipeline_layout(
         { descriptor_set_layout },
         { VkPushConstantRange{VK_SHADER_STAGE_FRAGMENT_BIT, 0, 4} },
         "raster_pipeline_layout");
 
     // pipeline
     {
-        Shader_Module vertex_shader("spirv/raster_mesh.vert.spv");
-        Shader_Module fragment_shader("spirv/raster_mesh.frag.spv");
+        Vk_Shader_Module vertex_shader(get_resource_path("spirv/raster_mesh.vert.spv"));
+        Vk_Shader_Module fragment_shader(get_resource_path("spirv/raster_mesh.frag.spv"));
 
         Vk_Graphics_Pipeline_State state = get_default_graphics_pipeline_state();
 
@@ -55,7 +55,8 @@ void Draw_Mesh::create(VkFormat color_attachment_format, VkFormat depth_attachme
         state.color_attachment_count = 1;
         state.depth_attachment_format = depth_attachment_format;
 
-        pipeline = vk_create_graphics_pipeline(state, pipeline_layout, vertex_shader.handle, fragment_shader.handle);
+        pipeline = vk_create_graphics_pipeline(state, vertex_shader.handle, fragment_shader.handle,
+            pipeline_layout, "draw_mesh_pipeline");
     }
 
     // Descriptor buffer.

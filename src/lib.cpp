@@ -1,19 +1,25 @@
 #include "lib.h"
 
+#include <filesystem>
 #include <fstream>
 
-std::string g_data_dir = "./data";
-
-void error(const std::string& message) {
+void error(const std::string& message)
+{
     printf("%s\n", message.c_str());
     throw std::runtime_error(message);
 }
 
-fs::path get_data_directory() {
-	return g_data_dir;
+// The place where program's resources are located (models, textures, spirv binaries).
+// This location can be configured with --data-dir command line option.
+std::string g_data_dir = "./data";
+
+std::string get_resource_path(const std::string& path_relative_data_directory)
+{
+    return (std::filesystem::path(g_data_dir) / path_relative_data_directory).string();
 }
 
-std::vector<uint8_t> read_binary_file(const std::string& file_name) {
+std::vector<uint8_t> read_binary_file(const std::string& file_name)
+{
     std::ifstream file(file_name, std::ios_base::in | std::ios_base::binary);
     if (!file)
     error("failed to open file: " + file_name);
@@ -35,13 +41,15 @@ std::vector<uint8_t> read_binary_file(const std::string& file_name) {
     return file_content;
 }
 
-uint64_t elapsed_milliseconds(Timestamp timestamp) {
+uint64_t elapsed_milliseconds(Timestamp timestamp)
+{
     auto duration = std::chrono::steady_clock::now() - timestamp.t;
     auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
     return (uint64_t)milliseconds;
 }
 
-uint64_t elapsed_nanoseconds(Timestamp timestamp) {
+uint64_t elapsed_nanoseconds(Timestamp timestamp)
+{
     auto duration = std::chrono::steady_clock::now() - timestamp.t;
     auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
     return (uint64_t)nanoseconds;

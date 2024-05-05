@@ -27,6 +27,7 @@ static VkFormat get_depth_image_format() {
 
 void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
     Vk_Init_Params vk_init_params;
+    vk_init_params.error_reporter = &error;
     vk_init_params.enable_validation_layer = enable_validation_layers;
 
     std::array instance_extensions = {
@@ -147,7 +148,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
 
     // Geometry buffers.
     {
-        Triangle_Mesh mesh = load_obj_model((get_data_directory() / "model/mesh.obj").string(), 1.25f);
+        Triangle_Mesh mesh = load_obj_model(get_resource_path("model/mesh.obj"), 1.25f);
         {
             VkDeviceSize size = mesh.vertices.size() * sizeof(mesh.vertices[0]);
             VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
@@ -166,7 +167,7 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
 
     // Texture.
     {
-        texture = vk_load_texture((get_data_directory() / "model/diffuse.jpg").string());
+        texture = vk_load_texture(get_resource_path("model/diffuse.jpg"));
 
         VkSamplerCreateInfo create_info { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
         create_info.magFilter = VK_FILTER_LINEAR;
@@ -303,7 +304,7 @@ void Vk_Demo::draw_frame() {
 }
 
 void Vk_Demo::render_frame_rasterization() {
-    GPU_TIME_SCOPE(gpu_times.draw);
+    VK_GPU_TIME_SCOPE(gpu_times.draw);
 
     vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
@@ -348,7 +349,7 @@ void Vk_Demo::render_frame_rasterization() {
 }
 
 void Vk_Demo::render_frame_ray_tracing() {
-    GPU_TIME_SCOPE(gpu_times.draw);
+    VK_GPU_TIME_SCOPE(gpu_times.draw);
 
     vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED,
@@ -378,7 +379,7 @@ void Vk_Demo::render_frame_ray_tracing() {
 }
 
 void Vk_Demo::copy_output_image_to_swapchain() {
-    GPU_TIME_SCOPE(gpu_times.compute_copy);
+    VK_GPU_TIME_SCOPE(gpu_times.compute_copy);
 
     vk_cmd_image_barrier(vk.command_buffer, output_image.handle,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL,

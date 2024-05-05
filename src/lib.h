@@ -1,8 +1,7 @@
 #pragma once
 
-#include <filesystem>
-
-namespace fs = std::filesystem;
+#include <chrono>
+#include <vector>
 
 constexpr float Pi = 3.14159265f;
 constexpr float Infinity = std::numeric_limits<float>::infinity();
@@ -18,11 +17,7 @@ inline float degrees(float radians) {
 }
 
 void error(const std::string& message);
-
-// The place where program's resources are located (models, textures, spirv binaries).
-// This location can be configured with --data-dir command line option.
-fs::path get_data_directory();
-
+std::string get_resource_path(const std::string& path_relative_data_directory);
 std::vector<uint8_t> read_binary_file(const std::string& file_name);
 
 struct Timestamp {
@@ -51,16 +46,3 @@ inline T round_up(T k, T alignment) {
     return (k + alignment - 1) & ~(alignment - 1);
 }
 
-#if 0
-#define START_TIMER { Timestamp t;
-#define STOP_TIMER(message) \
-    auto d = elapsed_nanoseconds(t); \
-    static Timestamp t0; \
-    if (elapsed_milliseconds(t0) > 1000) { \
-        t0 = Timestamp(); \
-        printf(message ## " time = %lld  microseconds\n", d / 1000); } }
-
-#else
-#define START_TIMER
-#define STOP_TIMER(...)
-#endif
