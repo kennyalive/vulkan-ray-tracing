@@ -1,6 +1,5 @@
 #include "raytrace_scene.h"
 #include "gpu_mesh.h"
-#include "triangle_mesh.h"
 
 #include "lib.h"
 

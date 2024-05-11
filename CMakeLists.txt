@@ -10,11 +10,7 @@ set(PROGRAM_SOURCE
     src/gpu_mesh.h
     src/lib.cpp
     src/lib.h
-    src/linear_algebra.cpp
-    src/linear_algebra.h
     src/main.cpp
-    src/triangle_mesh.cpp
-    src/triangle_mesh.h
     src/vk.cpp
     src/vk.h
     src/kernels/copy_to_swapchain.cpp

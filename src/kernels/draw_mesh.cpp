@@ -1,8 +1,6 @@
 #include "draw_mesh.h"
 #include "gpu_mesh.h"
 #include "lib.h"
-#include "linear_algebra.h"
-#include "triangle_mesh.h"
 
 namespace {
 struct Uniform_Buffer {

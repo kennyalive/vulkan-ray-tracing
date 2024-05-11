@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gpu_mesh.h"
-#include "linear_algebra.h"
+#include "lib.h"
 
 #include "kernels/copy_to_swapchain.h"
 #include "kernels/draw_mesh.h"
