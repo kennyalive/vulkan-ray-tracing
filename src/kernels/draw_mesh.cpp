@@ -2,14 +2,8 @@
 #include "gpu_mesh.h"
 #include "lib.h"
 
-namespace {
-struct Uniform_Buffer {
-    Matrix4x4 model_view_proj;
-};
-}
-
 void Draw_Mesh::create(VkFormat color_attachment_format, VkFormat depth_attachment_format, VkImageView texture_view, VkSampler sampler) {
-    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
+    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Matrix4x4)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &mapped_uniform_buffer, "raster_uniform_buffer");
 
     descriptor_set_layout = Vk_Descriptor_Set_Layout()

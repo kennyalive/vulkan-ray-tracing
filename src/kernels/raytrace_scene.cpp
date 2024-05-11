@@ -5,12 +5,6 @@
 
 #include <cassert>
 
-namespace {
-struct Uniform_Buffer {
-    Matrix3x4 camera_to_world;
-};
-}
-
 void Raytrace_Scene::create(const GPU_Mesh& gpu_mesh, VkImageView texture_view, VkSampler sampler) {
     descriptor_buffer_properties = VkPhysicalDeviceDescriptorBufferPropertiesEXT{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT };
@@ -20,7 +14,7 @@ void Raytrace_Scene::create(const GPU_Mesh& gpu_mesh, VkImageView texture_view, 
     physical_device_properties.pNext = &descriptor_buffer_properties;
     vkGetPhysicalDeviceProperties2(vk.physical_device, &physical_device_properties);
 
-    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Uniform_Buffer)),
+    uniform_buffer = vk_create_mapped_buffer(static_cast<VkDeviceSize>(sizeof(Matrix3x4)),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, &(void*&)mapped_uniform_buffer, "rt_uniform_buffer");
 
     accelerator = create_intersection_accelerator({gpu_mesh});
