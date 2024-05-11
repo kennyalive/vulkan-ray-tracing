@@ -9,6 +9,7 @@
 #include "vulkan/vk_enum_string_helper.h"
 const char* vk_result_to_string(VkResult result) { return string_VkResult(result); }
 
+#include <format>
 #include <fstream>
 
 constexpr uint32_t max_timestamp_queries = 64;
@@ -61,27 +62,43 @@ static void create_device(const Vk_Init_Params& params, GLFWwindow* window)
 {
     // select physical device
     {
-        uint32_t count = 0;
-        VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &count, nullptr));
-        if (count == 0) {
+        uint32_t gpu_count = 0;
+        VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &gpu_count, nullptr));
+        if (gpu_count == 0) {
             vk.error("There are no Vulkan physical devices available");
         }
-        std::vector<VkPhysicalDevice> physical_devices(count);
-        VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &count, physical_devices.data()));
+        if (params.physical_device_index >= (int)gpu_count) {
+            vk.error(std::format("Requested physical device index (zero-based) is {}, but physical device count is {}",
+                params.physical_device_index, gpu_count));
+        }
+        std::vector<VkPhysicalDevice> physical_devices(gpu_count);
+        VK_CHECK(vkEnumeratePhysicalDevices(vk.instance, &gpu_count, physical_devices.data()));
 
-        for (const auto& physical_device : physical_devices) {
-            VkPhysicalDeviceProperties props;
-            vkGetPhysicalDeviceProperties(physical_device, &props);
-            // Check for device-level Vulkan 1.3 compatibility.
-            if (VK_VERSION_MAJOR(props.apiVersion) == 1 && VK_VERSION_MINOR(props.apiVersion) >= 3) {
-                vk.physical_device = physical_device;
-                vk.timestamp_period_ms = (double)props.limits.timestampPeriod * 1e-6;
-                break;
+        int selected_gpu = -1;
+        VkPhysicalDeviceProperties gpu_properties{};
+
+        if (params.physical_device_index != -1) {
+            vkGetPhysicalDeviceProperties(physical_devices[params.physical_device_index], &gpu_properties);
+            if (VK_VERSION_MAJOR(gpu_properties.apiVersion) != 1 || VK_VERSION_MINOR(gpu_properties.apiVersion) < 3) {
+                vk.error(std::format("Physical device %d reports unsupported Vulkan version: {}.{}. Vulkan 1.3 or higher is required",
+                    params.physical_device_index, VK_VERSION_MAJOR(gpu_properties.apiVersion), VK_VERSION_MINOR(gpu_properties.apiVersion)));
+            }
+            selected_gpu = params.physical_device_index;
+        }
+        else {
+            for (const auto& physical_device : physical_devices) {
+                vkGetPhysicalDeviceProperties(physical_device, &gpu_properties);
+                if (VK_VERSION_MAJOR(gpu_properties.apiVersion) == 1 && VK_VERSION_MINOR(gpu_properties.apiVersion) >= 3) {
+                    selected_gpu = int(&physical_device - physical_devices.data());
+                    break;
+                }
             }
         }
-        if (vk.physical_device == nullptr) {
-            vk.error("Failed to find physical device that supports requested Vulkan API version");
+        if (selected_gpu == -1) {
+            vk.error("Failed to select physical device that supports Vulkan 1.3 or higher");
         }
+        vk.physical_device = physical_devices[selected_gpu];
+        vk.timestamp_period_ms = (double)gpu_properties.limits.timestampPeriod * 1e-6;
     }
 
     VK_CHECK(glfwCreateWindowSurface(vk.instance, window, nullptr, &vk.surface));
