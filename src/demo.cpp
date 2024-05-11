@@ -41,7 +41,6 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
     };
     std::array device_extensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_EXT_ROBUSTNESS_2_EXTENSION_NAME, // nullDescriptor feature
         VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
         VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
         VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
@@ -51,55 +50,39 @@ void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
     vk_init_params.device_extensions = std::span{ device_extensions };
 
     // Specify required features.
+    VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    Vk_PNexer pnexer(features2);
+    vk_init_params.device_create_info_pnext = (const VkBaseInStructure*)&features2;
+
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features{
-    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES };
     buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
+    pnexer.next(buffer_device_address_features);
 
     VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES };
     dynamic_rendering_features.dynamicRendering = VK_TRUE;
+    pnexer.next(dynamic_rendering_features);
 
     VkPhysicalDeviceSynchronization2Features synchronization2_features{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES };
     synchronization2_features.synchronization2 = VK_TRUE;
-
-    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES };
-    descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
+    pnexer.next(synchronization2_features);
 
     VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_buffer_features{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT };
     descriptor_buffer_features.descriptorBuffer = VK_TRUE;
-
-    VkPhysicalDeviceMaintenance4Features maintenance4_features{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES };
-    maintenance4_features.maintenance4 = VK_TRUE;
+    pnexer.next(descriptor_buffer_features);
 
     VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
     acceleration_structure_features.accelerationStructure = VK_TRUE;
+    pnexer.next(acceleration_structure_features);
 
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
     ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
-
-    VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT };
-    robustness2_features.nullDescriptor = VK_TRUE;
-
-    VkPhysicalDeviceFeatures2 features2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
-
-    // Chain feature structures.
-    buffer_device_address_features.pNext = &dynamic_rendering_features;
-    dynamic_rendering_features.pNext = &synchronization2_features;
-    synchronization2_features.pNext = &descriptor_indexing_features;
-    descriptor_indexing_features.pNext = &descriptor_buffer_features;
-    descriptor_buffer_features.pNext = &maintenance4_features;
-    maintenance4_features.pNext = &acceleration_structure_features;
-    acceleration_structure_features.pNext = &ray_tracing_pipeline_features;
-    ray_tracing_pipeline_features.pNext = &robustness2_features;
-    features2.pNext = &buffer_device_address_features;
-    vk_init_params.device_create_info_pnext = (const VkBaseInStructure*)&features2;
+    pnexer.next(ray_tracing_pipeline_features);
 
     // use non-srgb formats for swapchain images, so we can render to swapchain from compute,
     // also it means we should do srgb encoding manually.

@@ -235,6 +235,21 @@ extern Vk_Instance vk;
 // Misc Vulkan utilities section
 //
 //*****************************************************************************
+struct Vk_PNexer {
+    VkBaseOutStructure* tail = nullptr;
+    template <typename TVkStruct>
+    Vk_PNexer(TVkStruct& vk_struct)
+    {
+        tail = reinterpret_cast<VkBaseOutStructure*>(&vk_struct);
+    }
+    template <typename TVkStruct>
+    void next(TVkStruct& vk_struct)
+    {
+        tail->pNext = reinterpret_cast<VkBaseOutStructure*>(&vk_struct);
+        tail = tail->pNext;
+    }
+};
+
 struct Vk_Shader_Module {
     Vk_Shader_Module(const std::string& spirv_file);
     ~Vk_Shader_Module();
