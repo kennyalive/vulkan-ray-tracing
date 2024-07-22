@@ -24,10 +24,9 @@ static VkFormat get_depth_image_format() {
     return VK_FORMAT_UNDEFINED;
 }
 
-void Vk_Demo::initialize(GLFWwindow* window, bool enable_validation_layers) {
+void Vk_Demo::initialize(GLFWwindow* window) {
     Vk_Init_Params vk_init_params;
     vk_init_params.error_reporter = &error;
-    vk_init_params.enable_validation_layer = enable_validation_layers;
 
     std::array instance_extensions = {
         VK_KHR_SURFACE_EXTENSION_NAME,

@@ -13,7 +13,7 @@ struct GLFWwindow;
 
 class Vk_Demo {
 public:
-    void initialize(GLFWwindow* glfw_window, bool enable_validation_layers);
+    void initialize(GLFWwindow* glfw_window);
     void shutdown();
 
     void release_resolution_dependent_resources();

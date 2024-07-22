@@ -23,7 +23,6 @@ using Vk_Error_Func = void (*)(const std::string& error_message);
 
 struct Vk_Init_Params {
     Vk_Error_Func error_reporter = nullptr;
-    bool enable_validation_layer = false;
     int physical_device_index = -1;
     bool vsync = false;
     std::span<const char*> instance_extensions;

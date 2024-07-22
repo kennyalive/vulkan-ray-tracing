@@ -20,7 +20,7 @@ constexpr uint32_t max_timestamp_queries = 64;
 //
 Vk_Instance vk;
 
-static void create_instance(const std::span<const char*>& instance_extensions, bool enable_validation_layers)
+static void create_instance(const std::span<const char*>& instance_extensions)
 {
     uint32_t count = 0;
     VK_CHECK(vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr));
@@ -35,25 +35,18 @@ static void create_instance(const std::span<const char*>& instance_extensions, b
                 break;
             }
         }
-        if (!supported)
+        if (!supported) {
             vk.error("Required instance extension is not available: " + std::string(name));
+        }
     }
 
     VkApplicationInfo app_info { VK_STRUCTURE_TYPE_APPLICATION_INFO };
     app_info.apiVersion = VK_API_VERSION_1_3;
 
-    VkInstanceCreateInfo instance_create_info { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+    VkInstanceCreateInfo instance_create_info{ VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instance_create_info.pApplicationInfo = &app_info;
     instance_create_info.enabledExtensionCount = uint32_t(instance_extensions.size());
     instance_create_info.ppEnabledExtensionNames = instance_extensions.data();
-
-    if (enable_validation_layers) {
-        static const char* layer_names[] = {
-            "VK_LAYER_KHRONOS_validation"
-        };
-		instance_create_info.enabledLayerCount = (uint32_t)std::size(layer_names);
-		instance_create_info.ppEnabledLayerNames = layer_names;
-    }    
 
     VK_CHECK(vkCreateInstance(&instance_create_info, nullptr, &vk.instance));
 }
@@ -166,21 +159,6 @@ static void create_device(const Vk_Init_Params& params, GLFWwindow* window)
     }
 }
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_utils_messenger_callback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT          message_severity,
-    VkDebugUtilsMessageTypeFlagsEXT                 message_type,
-    const VkDebugUtilsMessengerCallbackDataEXT*     callback_data,
-    void*                                           user_data)
-{
-#ifdef _WIN32
-    printf("%s\n", callback_data->pMessage);
-    OutputDebugStringA(callback_data->pMessage);
-    OutputDebugStringA("\n");
-    DebugBreak();
-#endif
-    return VK_FALSE;
-}
-
 void Vk_Image::destroy()
 {
     vmaDestroyImage(vk.allocator, handle, allocation);
@@ -208,24 +186,8 @@ void vk_initialize(GLFWwindow* window, const Vk_Init_Params& init_params)
     if (!instance_version_higher_than_or_equal_to_1_1) {
         vk.error("The supported instance version is Vulkan 1.1 or higher, but Vulkan 1.0 loader is detected");
     }
-    create_instance(init_params.instance_extensions, init_params.enable_validation_layer);
+    create_instance(init_params.instance_extensions);
     volkLoadInstance(vk.instance);
-
-    // Create debug messenger as early as possible (even before VkDevice is created).
-    {
-        VkDebugUtilsMessengerCreateInfoEXT desc{ VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
-
-        desc.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                               VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-
-        desc.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-
-        desc.pfnUserCallback = &debug_utils_messenger_callback;
-        VK_CHECK(vkCreateDebugUtilsMessengerEXT(vk.instance, &desc, nullptr, &vk.debug_utils_messenger));
-    }
-
     create_device(init_params, window);
     volkLoadDevice(vk.device);
 
