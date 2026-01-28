@@ -11,9 +11,10 @@ struct BLAS_Info {
 };
 
 struct TLAS_Info {
-    VkAccelerationStructureKHR aceleration_structure = VK_NULL_HANDLE;
+    VkAccelerationStructureKHR acceleration_structure = VK_NULL_HANDLE;
     Vk_Buffer buffer;
     Vk_Buffer scratch_buffer;
+    VkDeviceAddress device_address = 0;
 };
 
 struct Vk_Intersection_Accelerator {

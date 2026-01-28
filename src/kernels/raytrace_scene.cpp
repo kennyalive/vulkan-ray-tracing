@@ -177,7 +177,7 @@ void Raytrace_Scene::create_pipeline(const GPU_Mesh& gpu_mesh, VkImageView textu
         {
             VkDescriptorGetInfoEXT descriptor_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT };
             descriptor_info.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-            descriptor_info.data.accelerationStructure = accelerator.top_level_accel.buffer.device_address;
+            descriptor_info.data.accelerationStructure = accelerator.top_level_accel.device_address;
 
             VkDeviceSize offset;
             vkGetDescriptorSetLayoutBindingOffsetEXT(vk.device, descriptor_set_layout, 1, &offset);

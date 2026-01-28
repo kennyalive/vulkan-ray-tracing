@@ -88,12 +88,17 @@ static TLAS_Info create_TLAS(uint32_t instance_count, VkDeviceAddress instances_
     create_info.offset = 0;
     create_info.size = build_sizes.accelerationStructureSize;
     create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-    VK_CHECK(vkCreateAccelerationStructureKHR(vk.device, &create_info, nullptr, &tlas.aceleration_structure));
-    vk_set_debug_name(tlas.aceleration_structure, "tlas");
+    VK_CHECK(vkCreateAccelerationStructureKHR(vk.device, &create_info, nullptr, &tlas.acceleration_structure));
+    vk_set_debug_name(tlas.acceleration_structure, "tlas");
+
+    // Get acceleration structure address.
+    VkAccelerationStructureDeviceAddressInfoKHR device_address_info{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
+    device_address_info.accelerationStructure = tlas.acceleration_structure;
+    tlas.device_address = vkGetAccelerationStructureDeviceAddressKHR(vk.device, &device_address_info);
 
     // Build acceleration structure.
     tlas.scratch_buffer = vk_create_buffer_with_alignment(build_sizes.buildScratchSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, scratch_alignment);
-    build_info.dstAccelerationStructure = tlas.aceleration_structure;
+    build_info.dstAccelerationStructure = tlas.acceleration_structure;
     build_info.scratchData.deviceAddress = tlas.scratch_buffer.device_address;
 
     VkAccelerationStructureBuildRangeInfoKHR build_range_info{};
@@ -160,7 +165,7 @@ void Vk_Intersection_Accelerator::rebuild_top_level_accel(VkCommandBuffer comman
     build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
     build_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
     build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-    build_info.dstAccelerationStructure = top_level_accel.aceleration_structure;
+    build_info.dstAccelerationStructure = top_level_accel.acceleration_structure;
     build_info.geometryCount = 1;
     build_info.pGeometries = &geometry;
     build_info.scratchData.deviceAddress = top_level_accel.scratch_buffer.device_address;
@@ -198,7 +203,7 @@ void Vk_Intersection_Accelerator::destroy() {
         vkDestroyAccelerationStructureKHR(vk.device, blas.acceleration_structure, nullptr);
         blas.buffer.destroy();
     }
-    vkDestroyAccelerationStructureKHR(vk.device, top_level_accel.aceleration_structure, nullptr);
+    vkDestroyAccelerationStructureKHR(vk.device, top_level_accel.acceleration_structure, nullptr);
     top_level_accel.buffer.destroy();
     top_level_accel.scratch_buffer.destroy();
     instance_buffer.destroy();
