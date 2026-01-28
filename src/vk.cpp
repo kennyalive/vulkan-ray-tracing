@@ -236,8 +236,6 @@ void vk_initialize(GLFWwindow* window, const Vk_Init_Params& init_params)
         VkSemaphoreCreateInfo desc { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
         VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.image_acquired_semaphore[0]));
         VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.image_acquired_semaphore[1]));
-        VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.rendering_finished_semaphore[0]));
-        VK_CHECK(vkCreateSemaphore(vk.device, &desc, nullptr, &vk.rendering_finished_semaphore[1]));
 
         VkFenceCreateInfo fence_desc { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         fence_desc.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -331,8 +329,6 @@ void vk_shutdown()
     vkDestroyCommandPool(vk.device, vk.command_pools[1], nullptr);
     vkDestroySemaphore(vk.device, vk.image_acquired_semaphore[0], nullptr);
     vkDestroySemaphore(vk.device, vk.image_acquired_semaphore[1], nullptr);
-    vkDestroySemaphore(vk.device, vk.rendering_finished_semaphore[0], nullptr);
-    vkDestroySemaphore(vk.device, vk.rendering_finished_semaphore[1], nullptr);
     vkDestroyFence(vk.device, vk.frame_fence[0], nullptr);
     vkDestroyFence(vk.device, vk.frame_fence[1], nullptr);
     vkDestroyQueryPool(vk.device, vk.timestamp_query_pools[0], nullptr);
@@ -416,7 +412,7 @@ void vk_create_swapchain(bool vsync)
     VK_CHECK(vkGetSwapchainImagesKHR(vk.device, vk.swapchain_info.handle, &image_count, vk.swapchain_info.images.data()));
 
     vk.swapchain_info.image_views.resize(image_count);
-
+    vk.swapchain_info.ready_for_present_semaphores.resize(image_count);
     for (uint32_t i = 0; i < image_count; i++) {
         VkImageViewCreateInfo desc { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
         desc.image          = vk.swapchain_info.images[i];
@@ -428,15 +424,20 @@ void vk_create_swapchain(bool vsync)
         desc.subresourceRange.levelCount     = 1;
         desc.subresourceRange.baseArrayLayer = 0;
         desc.subresourceRange.layerCount     = 1;
-
         VK_CHECK(vkCreateImageView(vk.device, &desc, nullptr, &vk.swapchain_info.image_views[i]));
+
+        VkSemaphoreCreateInfo semaphore_ci{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+        VK_CHECK(vkCreateSemaphore(vk.device, &semaphore_ci, nullptr, &vk.swapchain_info.ready_for_present_semaphores[i]));
     }
 }
 
 void vk_destroy_swapchain()
 {
-    for (auto image_view : vk.swapchain_info.image_views) {
+    for (VkImageView image_view : vk.swapchain_info.image_views) {
         vkDestroyImageView(vk.device, image_view, nullptr);
+    }
+    for (VkSemaphore semaphore : vk.swapchain_info.ready_for_present_semaphores) {
+        vkDestroySemaphore(vk.device, semaphore, nullptr);
     }
     vkDestroySwapchainKHR(vk.device, vk.swapchain_info.handle, nullptr);
     vk.swapchain_info = Swapchain_Info{};
@@ -972,7 +973,7 @@ void vk_end_frame()
     cmd_info.commandBuffer = vk.command_buffer;
 
     VkSemaphoreSubmitInfo signal_info{ VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO };
-    signal_info.semaphore = vk.rendering_finished_semaphore[vk.frame_index];
+    signal_info.semaphore = vk.swapchain_info.ready_for_present_semaphores[vk.swapchain_image_index];
     signal_info.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
     VkSubmitInfo2 submit_info{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
@@ -987,7 +988,7 @@ void vk_end_frame()
 
     VkPresentInfoKHR present_info { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores    = &vk.rendering_finished_semaphore[vk.frame_index];
+    present_info.pWaitSemaphores    = &vk.swapchain_info.ready_for_present_semaphores[vk.swapchain_image_index];
     present_info.swapchainCount     = 1;
     present_info.pSwapchains        = &vk.swapchain_info.handle;
     present_info.pImageIndices      = &vk.swapchain_image_index;

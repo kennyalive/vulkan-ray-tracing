@@ -180,6 +180,7 @@ struct Swapchain_Info {
     VkSwapchainKHR handle = VK_NULL_HANDLE;
     std::vector<VkImage> images;
     std::vector<VkImageView> image_views;
+    std::vector<VkSemaphore> ready_for_present_semaphores;
 };
 
 // Vk_Instance contains vulkan resources that do not depend on applicaton logic.
@@ -209,7 +210,6 @@ struct Vk_Instance {
     int                             frame_index;
 
     VkSemaphore                     image_acquired_semaphore[2];
-    VkSemaphore                     rendering_finished_semaphore[2];
     VkFence                         frame_fence[2];
 
     VkQueryPool                     timestamp_query_pools[2];
